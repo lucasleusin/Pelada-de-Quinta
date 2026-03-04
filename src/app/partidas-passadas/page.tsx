@@ -57,8 +57,20 @@ function getTodayIsoDate() {
   return today.toISOString().slice(0, 10);
 }
 
-function sortByName<T extends { player: { name: string } }>(list: T[]) {
-  return [...list].sort((a, b) => a.player.name.localeCompare(b.player.name));
+function getPositionOrder(position: Position) {
+  if (position === "GOLEIRO") return 0;
+  if (position === "ZAGUEIRO") return 1;
+  if (position === "MEIA") return 2;
+  if (position === "ATACANTE") return 3;
+  return 4;
+}
+
+function sortByPositionAndName<T extends { player: { name: string; position: Position } }>(list: T[]) {
+  return [...list].sort((a, b) => {
+    const byPosition = getPositionOrder(a.player.position) - getPositionOrder(b.player.position);
+    if (byPosition !== 0) return byPosition;
+    return a.player.name.localeCompare(b.player.name);
+  });
 }
 
 function getPositionCode(position: Position) {
@@ -77,6 +89,10 @@ function parseNullableScore(value: string): number | null {
   if (value.trim() === "") return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : Math.min(99, Math.max(0, Math.trunc(parsed)));
+}
+
+function sanitizeTwoDigitInput(value: string) {
+  return value.replace(/\D/g, "").slice(0, 2);
 }
 
 function validateGoalsVsScore(
@@ -268,11 +284,11 @@ export default function PartidasPassadasPage() {
   }, [match, score, scoreDirty, stats, statsDirty]);
 
   const teamA = useMemo(
-    () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "A")),
+    () => sortByPositionAndName((match?.participants ?? []).filter((participant) => participant.team === "A")),
     [match],
   );
   const teamB = useMemo(
-    () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "B")),
+    () => sortByPositionAndName((match?.participants ?? []).filter((participant) => participant.team === "B")),
     [match],
   );
 
@@ -300,31 +316,35 @@ export default function PartidasPassadasPage() {
   }, [match]);
 
   function updateScore(field: keyof ScoreState, value: string) {
-    setScore((prev) => ({ ...prev, [field]: value }));
+    const sanitized = sanitizeTwoDigitInput(value);
+    setScore((prev) => ({ ...prev, [field]: sanitized }));
     setScoreDirty(true);
   }
 
-  function updateStat(playerId: string, field: keyof StatRow, value: number) {
+  function updateStat(playerId: string, field: keyof StatRow, value: string) {
+    const sanitized = sanitizeTwoDigitInput(value);
+    const parsed = sanitized === "" ? 0 : Number(sanitized);
+
     setStats((prev) => ({
       ...prev,
       [playerId]: {
         goals:
           field === "goals"
-            ? Number.isNaN(value)
+            ? Number.isNaN(parsed)
               ? 0
-              : Math.min(99, Math.max(0, Math.trunc(value)))
+              : Math.min(99, Math.max(0, Math.trunc(parsed)))
             : prev[playerId]?.goals ?? 0,
         assists:
           field === "assists"
-            ? Number.isNaN(value)
+            ? Number.isNaN(parsed)
               ? 0
-              : Math.min(99, Math.max(0, Math.trunc(value)))
+              : Math.min(99, Math.max(0, Math.trunc(parsed)))
             : prev[playerId]?.assists ?? 0,
         goalsConceded:
           field === "goalsConceded"
-            ? Number.isNaN(value)
+            ? Number.isNaN(parsed)
               ? 0
-              : Math.min(99, Math.max(0, Math.trunc(value)))
+              : Math.min(99, Math.max(0, Math.trunc(parsed)))
             : prev[playerId]?.goalsConceded ?? 0,
       },
     }));
@@ -344,7 +364,7 @@ export default function PartidasPassadasPage() {
               <span className="text-center">G</span>
               <span className="text-center">A</span>
               <span className="text-center">GS</span>
-              <span className="text-center">Media</span>
+              <span className="text-center">Nota</span>
             </div>
 
             <ul className="mt-2 space-y-2">
@@ -355,33 +375,36 @@ export default function PartidasPassadasPage() {
                 >
                   <span className="truncate pr-1 text-sm font-medium text-emerald-950">{formatPlayerLabel(participant.player)}</span>
                   <input
-                    type="number"
-                    min={0}
-                    max={99}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={2}
                     className="field-input h-8 w-12 justify-self-center px-1 text-center"
                     value={stats[participant.playerId]?.goals ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "goals", Number(event.currentTarget.value))
+                      updateStat(participant.playerId, "goals", event.currentTarget.value)
                     }
                   />
                   <input
-                    type="number"
-                    min={0}
-                    max={99}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={2}
                     className="field-input h-8 w-12 justify-self-center px-1 text-center"
                     value={stats[participant.playerId]?.assists ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "assists", Number(event.currentTarget.value))
+                      updateStat(participant.playerId, "assists", event.currentTarget.value)
                     }
                   />
                   <input
-                    type="number"
-                    min={0}
-                    max={99}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={2}
                     className="field-input h-8 w-12 justify-self-center px-1 text-center"
                     value={stats[participant.playerId]?.goalsConceded ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "goalsConceded", Number(event.currentTarget.value))
+                      updateStat(participant.playerId, "goalsConceded", event.currentTarget.value)
                     }
                   />
                   <span className="justify-self-center text-sm font-semibold text-emerald-900">
@@ -435,9 +458,10 @@ export default function PartidasPassadasPage() {
               <label>
                 <span className="field-label">{match.teamAName || "Time A"}</span>
                 <input
-                  type="number"
-                  min={0}
-                  max={99}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={2}
                   className="field-input"
                   value={score.teamAScore}
                   onChange={(event) => updateScore("teamAScore", event.currentTarget.value)}
@@ -446,9 +470,10 @@ export default function PartidasPassadasPage() {
               <label>
                 <span className="field-label">{match.teamBName || "Time B"}</span>
                 <input
-                  type="number"
-                  min={0}
-                  max={99}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={2}
                   className="field-input"
                   value={score.teamBScore}
                   onChange={(event) => updateScore("teamBScore", event.currentTarget.value)}

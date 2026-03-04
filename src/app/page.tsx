@@ -41,6 +41,14 @@ function getPositionCode(position: Player["position"]) {
   return "O";
 }
 
+function getPositionOrder(position: Player["position"]) {
+  if (position === "GOLEIRO") return 0;
+  if (position === "ZAGUEIRO") return 1;
+  if (position === "MEIA") return 2;
+  if (position === "ATACANTE") return 3;
+  return 4;
+}
+
 function formatPlayerLabel(player: Player) {
   return `${player.name} (${getPositionCode(player.position)})`;
 }
@@ -83,9 +91,11 @@ export default function HomePage() {
 
   const confirmed = useMemo(
     () =>
-      [...(selectedMatch?.participants.filter((item) => item.presenceStatus === "CONFIRMED") ?? [])].sort((a, b) =>
-        a.player.name.localeCompare(b.player.name),
-      ),
+      [...(selectedMatch?.participants.filter((item) => item.presenceStatus === "CONFIRMED") ?? [])].sort((a, b) => {
+        const byPosition = getPositionOrder(a.player.position) - getPositionOrder(b.player.position);
+        if (byPosition !== 0) return byPosition;
+        return a.player.name.localeCompare(b.player.name);
+      }),
     [selectedMatch],
   );
 

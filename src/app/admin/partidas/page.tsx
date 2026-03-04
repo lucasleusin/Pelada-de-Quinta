@@ -17,6 +17,9 @@ type Participant = {
   presenceStatus: "CONFIRMED" | "WAITLIST" | "CANCELED";
   team: "A" | "B" | null;
   player: Player;
+  goals: number;
+  assists: number;
+  goalsConceded: number;
 };
 
 type Match = {
@@ -51,6 +54,10 @@ function getPositionCode(position: Position) {
 
 function formatPlayerLabel(player: Player) {
   return `${player.name} (${getPositionCode(player.position)})`;
+}
+
+function formatParticipantStats(participant: Participant) {
+  return `G=${participant.goals} / A=${participant.assists} / GS=${participant.goalsConceded}`;
 }
 
 function parseNullableScore(value: string): number | null {
@@ -115,11 +122,14 @@ export default function AdminPartidasPage() {
       const participant = participantByPlayerId.get(player.id);
       if (participant) return participant;
 
-      return {
+            return {
         playerId: player.id,
         presenceStatus: "WAITLIST" as const,
         team: null,
         player,
+        goals: 0,
+        assists: 0,
+        goalsConceded: 0,
       };
     });
 
@@ -282,7 +292,7 @@ export default function AdminPartidasPage() {
         className="cursor-move rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm"
       >
         <div className="flex items-start justify-between gap-2">
-          <p>{formatPlayerLabel(participant.player)}</p>
+          <p className="pr-1">{formatPlayerLabel(participant.player)} <span className="text-xs font-medium text-emerald-700">{formatParticipantStats(participant)}</span></p>
           {canRemoveFromTeam ? (
             <button
               type="button"

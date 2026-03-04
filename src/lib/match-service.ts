@@ -609,7 +609,7 @@ export async function getGeneralStatsOverview() {
   const today = startOfToday();
 
   const finishedMatches = await db().match.findMany({
-    where: { matchDate: { lt: today } },
+    where: { matchDate: { lte: today } },
     select: { id: true },
   });
 
@@ -684,6 +684,7 @@ export async function getGeneralStatsOverview() {
 }
 
 export async function getPlayerReport(playerId: string) {
+  const today = startOfToday();
   const player = await db().player.findUnique({ where: { id: playerId } });
 
   if (!player) {
@@ -691,7 +692,10 @@ export async function getPlayerReport(playerId: string) {
   }
 
   const stats = await db().matchParticipant.aggregate({
-    where: { playerId },
+    where: {
+      playerId,
+      match: { matchDate: { lte: today } },
+    },
     _sum: {
       goals: true,
       assists: true,
@@ -701,13 +705,19 @@ export async function getPlayerReport(playerId: string) {
   });
 
   const ratings = await db().matchRating.aggregate({
-    where: { ratedPlayerId: playerId },
+    where: {
+      ratedPlayerId: playerId,
+      match: { matchDate: { lte: today } },
+    },
     _avg: { rating: true },
     _count: { _all: true },
   });
 
   const history = await db().matchParticipant.findMany({
-    where: { playerId },
+    where: {
+      playerId,
+      match: { matchDate: { lte: today } },
+    },
     include: {
       match: true,
     },

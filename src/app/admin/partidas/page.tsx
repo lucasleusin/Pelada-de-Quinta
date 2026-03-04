@@ -170,7 +170,9 @@ export default function AdminPartidasPage() {
     assignTeam(playerId, column).catch(() => setMessage("Falha ao mover jogador."));
   }
 
-  function renderPlayerCard(participant: Participant) {
+  function renderPlayerCard(participant: Participant, column: TeamColumn) {
+    const mobileActionClass = "rounded-full border px-2 py-1 text-[11px] font-semibold";
+
     return (
       <div
         key={participant.playerId}
@@ -178,7 +180,33 @@ export default function AdminPartidasPage() {
         onDragStart={(event) => onPlayerDragStart(event, participant.playerId)}
         className="cursor-move rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm"
       >
-        {participant.player.name}
+        <p>{participant.player.name}</p>
+        <div className="mt-2 flex flex-wrap gap-1 md:hidden">
+          <button
+            type="button"
+            disabled={column === "POOL"}
+            className={`${mobileActionClass} ${column === "POOL" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
+            onClick={() => assignTeam(participant.playerId, "POOL")}
+          >
+            Sem time
+          </button>
+          <button
+            type="button"
+            disabled={column === "A"}
+            className={`${mobileActionClass} ${column === "A" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
+            onClick={() => assignTeam(participant.playerId, "A")}
+          >
+            {selectedMatch?.teamAName ?? "Time A"}
+          </button>
+          <button
+            type="button"
+            disabled={column === "B"}
+            className={`${mobileActionClass} ${column === "B" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
+            onClick={() => assignTeam(participant.playerId, "B")}
+          >
+            {selectedMatch?.teamBName ?? "Time B"}
+          </button>
+        </div>
       </div>
     );
   }
@@ -260,56 +288,58 @@ export default function AdminPartidasPage() {
           <section className="card p-4">
             <h3 className="text-xl font-semibold text-emerald-950">Definicao dos times (drag and drop)</h3>
             <p className="mt-1 text-sm text-emerald-800">
-              Arraste jogadores confirmados entre as colunas para montar os times.
+              Arraste jogadores confirmados entre as colunas para montar os times. No celular, use os botoes de mover em cada jogador.
             </p>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <section
-                onDragOver={onColumnDragOver}
-                onDrop={(event) => onColumnDrop(event, "POOL")}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
-              >
-                <h4 className="font-semibold text-emerald-950">
-                  Confirmados sem time ({confirmedWithoutTeam.length})
-                </h4>
-                <div className="mt-3 space-y-2">
-                  {confirmedWithoutTeam.length === 0 ? (
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
-                  ) : (
-                    confirmedWithoutTeam.map((participant) => renderPlayerCard(participant))
-                  )}
-                </div>
-              </section>
+            <div className="mt-4 overflow-x-auto">
+              <div className="grid min-w-[920px] grid-cols-3 gap-4">
+                <section
+                  onDragOver={onColumnDragOver}
+                  onDrop={(event) => onColumnDrop(event, "POOL")}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
+                >
+                  <h4 className="font-semibold text-emerald-950">
+                    Confirmados sem time ({confirmedWithoutTeam.length})
+                  </h4>
+                  <div className="mt-3 space-y-2">
+                    {confirmedWithoutTeam.length === 0 ? (
+                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                    ) : (
+                      confirmedWithoutTeam.map((participant) => renderPlayerCard(participant, "POOL"))
+                    )}
+                  </div>
+                </section>
 
-              <section
-                onDragOver={onColumnDragOver}
-                onDrop={(event) => onColumnDrop(event, "A")}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
-              >
-                <h4 className="font-semibold text-emerald-950">{selectedMatch.teamAName} ({teamAPlayers.length})</h4>
-                <div className="mt-3 space-y-2">
-                  {teamAPlayers.length === 0 ? (
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
-                  ) : (
-                    teamAPlayers.map((participant) => renderPlayerCard(participant))
-                  )}
-                </div>
-              </section>
+                <section
+                  onDragOver={onColumnDragOver}
+                  onDrop={(event) => onColumnDrop(event, "A")}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
+                >
+                  <h4 className="font-semibold text-emerald-950">{selectedMatch.teamAName} ({teamAPlayers.length})</h4>
+                  <div className="mt-3 space-y-2">
+                    {teamAPlayers.length === 0 ? (
+                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                    ) : (
+                      teamAPlayers.map((participant) => renderPlayerCard(participant, "A"))
+                    )}
+                  </div>
+                </section>
 
-              <section
-                onDragOver={onColumnDragOver}
-                onDrop={(event) => onColumnDrop(event, "B")}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
-              >
-                <h4 className="font-semibold text-emerald-950">{selectedMatch.teamBName} ({teamBPlayers.length})</h4>
-                <div className="mt-3 space-y-2">
-                  {teamBPlayers.length === 0 ? (
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
-                  ) : (
-                    teamBPlayers.map((participant) => renderPlayerCard(participant))
-                  )}
-                </div>
-              </section>
+                <section
+                  onDragOver={onColumnDragOver}
+                  onDrop={(event) => onColumnDrop(event, "B")}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
+                >
+                  <h4 className="font-semibold text-emerald-950">{selectedMatch.teamBName} ({teamBPlayers.length})</h4>
+                  <div className="mt-3 space-y-2">
+                    {teamBPlayers.length === 0 ? (
+                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                    ) : (
+                      teamBPlayers.map((participant) => renderPlayerCard(participant, "B"))
+                    )}
+                  </div>
+                </section>
+              </div>
             </div>
           </section>
         </>

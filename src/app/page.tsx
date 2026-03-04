@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, RotateCcw, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 type Player = {
   id: string;
@@ -25,22 +25,41 @@ type Match = {
   participants: Participant[];
 };
 
-type ExpandedAction = {
-  list: "pending" | "confirmed" | "canceled";
-  playerId: string;
-};
-
 function getTodayIsoDate() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today.toISOString().slice(0, 10);
 }
 
+function ActionButton({
+  label,
+  tone,
+  onClick,
+  children,
+}: {
+  label: string;
+  tone: "green" | "red" | "yellow";
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const className =
+    tone === "green"
+      ? "rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
+      : tone === "red"
+        ? "rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
+        : "rounded-full bg-amber-400 p-1.5 text-white hover:bg-amber-500";
+
+  return (
+    <button type="button" className={className} onClick={onClick} aria-label={label}>
+      {children}
+    </button>
+  );
+}
+
 export default function HomePage() {
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const [expandedAction, setExpandedAction] = useState<ExpandedAction | null>(null);
   const [message, setMessage] = useState<string>("");
 
   const selectedMatch = useMemo(
@@ -105,16 +124,6 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function toggleAction(list: ExpandedAction["list"], playerId: string) {
-    setExpandedAction((current) => {
-      if (current?.list === list && current.playerId === playerId) {
-        return null;
-      }
-
-      return { list, playerId };
-    });
-  }
-
   async function setPresence(playerId: string, presenceStatus: PresenceStatus) {
     if (!selectedMatch) return;
 
@@ -129,8 +138,6 @@ export default function HomePage() {
       setMessage(payload.error ?? "Falha ao atualizar presenca.");
       return;
     }
-
-    setExpandedAction(null);
 
     if (presenceStatus === "CONFIRMED") {
       setMessage("Jogador confirmado.");
@@ -183,123 +190,90 @@ export default function HomePage() {
           <div className="card p-4">
             <h4 className="text-lg font-semibold text-emerald-900">Pendentes ({pending.length})</h4>
             <ul className="mt-2 space-y-2 text-sm">
-              {pending.map((player) => {
-                const isExpanded = expandedAction?.list === "pending" && expandedAction.playerId === player.id;
-                return (
-                  <li key={player.id} className="rounded-lg bg-zinc-50 px-3 py-2">
-                    <button
-                      type="button"
-                      className="w-full text-left font-medium text-emerald-950"
-                      onClick={() => toggleAction("pending", player.id)}
+              {pending.map((player) => (
+                <li
+                  key={player.id}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2"
+                >
+                  <span className="font-medium text-emerald-950">{player.name}</span>
+                  <div className="flex items-center gap-2">
+                    <ActionButton
+                      label="Confirmar jogador"
+                      tone="green"
+                      onClick={() => setPresence(player.id, "CONFIRMED")}
                     >
-                      {player.name}
-                    </button>
-
-                    {isExpanded ? (
-                      <div className="mt-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
-                          onClick={() => setPresence(player.id, "CONFIRMED")}
-                          aria-label="Confirmar jogador"
-                        >
-                          <Check size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
-                          onClick={() => setPresence(player.id, "CANCELED")}
-                          aria-label="Desconfirmar jogador"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
+                      <Check size={16} />
+                    </ActionButton>
+                    <ActionButton
+                      label="Desconfirmar jogador"
+                      tone="red"
+                      onClick={() => setPresence(player.id, "CANCELED")}
+                    >
+                      <X size={16} />
+                    </ActionButton>
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
 
           <div className="card p-4">
             <h4 className="text-lg font-semibold text-emerald-900">Confirmados ({confirmed.length})</h4>
             <ul className="mt-2 space-y-2 text-sm">
-              {confirmed.map((item) => {
-                const isExpanded = expandedAction?.list === "confirmed" && expandedAction.playerId === item.playerId;
-                return (
-                  <li key={item.playerId} className="rounded-lg bg-emerald-50 px-3 py-2">
-                    <button
-                      type="button"
-                      className="w-full text-left font-medium text-emerald-950"
-                      onClick={() => toggleAction("confirmed", item.playerId)}
+              {confirmed.map((item) => (
+                <li
+                  key={item.playerId}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2"
+                >
+                  <span className="font-medium text-emerald-950">{item.player.name}</span>
+                  <div className="flex items-center gap-2">
+                    <ActionButton
+                      label="Desconfirmar jogador"
+                      tone="red"
+                      onClick={() => setPresence(item.playerId, "CANCELED")}
                     >
-                      {item.player.name}
-                    </button>
-
-                    {isExpanded ? (
-                      <div className="mt-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
-                          onClick={() => setPresence(item.playerId, "CANCELED")}
-                          aria-label="Desconfirmar jogador"
-                        >
-                          <X size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-full bg-amber-400 p-1.5 text-white hover:bg-amber-500"
-                          onClick={() => setPresence(item.playerId, "WAITLIST")}
-                          aria-label="Voltar jogador para pendentes"
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
+                      <X size={16} />
+                    </ActionButton>
+                    <ActionButton
+                      label="Voltar jogador para pendentes"
+                      tone="yellow"
+                      onClick={() => setPresence(item.playerId, "WAITLIST")}
+                    >
+                      <RotateCcw size={16} />
+                    </ActionButton>
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
 
           <div className="card p-4">
             <h4 className="text-lg font-semibold text-emerald-900">Desconfirmados ({canceled.length})</h4>
             <ul className="mt-2 space-y-2 text-sm">
-              {canceled.map((item) => {
-                const isExpanded = expandedAction?.list === "canceled" && expandedAction.playerId === item.playerId;
-                return (
-                  <li key={item.playerId} className="rounded-lg bg-red-50 px-3 py-2">
-                    <button
-                      type="button"
-                      className="w-full text-left font-medium text-emerald-950"
-                      onClick={() => toggleAction("canceled", item.playerId)}
+              {canceled.map((item) => (
+                <li
+                  key={item.playerId}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2"
+                >
+                  <span className="font-medium text-emerald-950">{item.player.name}</span>
+                  <div className="flex items-center gap-2">
+                    <ActionButton
+                      label="Confirmar jogador"
+                      tone="green"
+                      onClick={() => setPresence(item.playerId, "CONFIRMED")}
                     >
-                      {item.player.name}
-                    </button>
-
-                    {isExpanded ? (
-                      <div className="mt-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
-                          onClick={() => setPresence(item.playerId, "CONFIRMED")}
-                          aria-label="Confirmar jogador"
-                        >
-                          <Check size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-full bg-amber-400 p-1.5 text-white hover:bg-amber-500"
-                          onClick={() => setPresence(item.playerId, "WAITLIST")}
-                          aria-label="Voltar jogador para pendentes"
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
+                      <Check size={16} />
+                    </ActionButton>
+                    <ActionButton
+                      label="Voltar jogador para pendentes"
+                      tone="yellow"
+                      onClick={() => setPresence(item.playerId, "WAITLIST")}
+                    >
+                      <RotateCcw size={16} />
+                    </ActionButton>
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
         </section>

@@ -327,57 +327,69 @@ export default function PartidasPassadasPage() {
     setRatingsDirty(true);
   }
 
-  function renderPlayerCard(participant: Participant) {
+  function renderTeamGrid(title: string, participants: Participant[]) {
     return (
-      <li key={participant.playerId} className="rounded-xl border border-emerald-100 bg-white p-3">
-        <p className="font-semibold text-emerald-950">{participant.player.name}</p>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <label>
-            <span className="field-label">Gols</span>
-            <input
-              type="number"
-              min={0}
-              className="field-input"
-              value={stats[participant.playerId]?.goals ?? 0}
-              onChange={(event) =>
-                updateStat(participant.playerId, "goals", Number(event.currentTarget.value))
-              }
-            />
-          </label>
-          <label>
-            <span className="field-label">Assistencias</span>
-            <input
-              type="number"
-              min={0}
-              className="field-input"
-              value={stats[participant.playerId]?.assists ?? 0}
-              onChange={(event) =>
-                updateStat(participant.playerId, "assists", Number(event.currentTarget.value))
-              }
-            />
-          </label>
-          <label>
-            <span className="field-label">Gols sofridos</span>
-            <input
-              type="number"
-              min={0}
-              className="field-input"
-              value={stats[participant.playerId]?.goalsConceded ?? 0}
-              onChange={(event) =>
-                updateStat(participant.playerId, "goalsConceded", Number(event.currentTarget.value))
-              }
-            />
-          </label>
-        </div>
+      <div className="card p-4">
+        <h3 className="text-2xl font-bold text-emerald-950">{title}</h3>
+        {participants.length === 0 ? (
+          <p className="mt-2 text-sm text-emerald-800">Sem jogadores neste time.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <div className="min-w-[820px]">
+              <div className="grid grid-cols-[minmax(180px,1.6fr)_90px_120px_130px_260px] gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-900">
+                <span>Jogador</span>
+                <span>Gols</span>
+                <span>Assistencias</span>
+                <span>Gols sofridos</span>
+                <span>Nota</span>
+              </div>
 
-        <div className="mt-3">
-          <p className="field-label mb-1">Nota</p>
-          <StarRating
-            value={ratings[participant.playerId] ?? 0}
-            onChange={(value) => updateRating(participant.playerId, value)}
-          />
-        </div>
-      </li>
+              <ul className="mt-2 space-y-2">
+                {participants.map((participant) => (
+                  <li
+                    key={participant.playerId}
+                    className="grid grid-cols-[minmax(180px,1.6fr)_90px_120px_130px_260px] items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2"
+                  >
+                    <span className="text-sm font-medium text-emerald-950">{participant.player.name}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="field-input h-9"
+                      value={stats[participant.playerId]?.goals ?? 0}
+                      onChange={(event) =>
+                        updateStat(participant.playerId, "goals", Number(event.currentTarget.value))
+                      }
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      className="field-input h-9"
+                      value={stats[participant.playerId]?.assists ?? 0}
+                      onChange={(event) =>
+                        updateStat(participant.playerId, "assists", Number(event.currentTarget.value))
+                      }
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      className="field-input h-9"
+                      value={stats[participant.playerId]?.goalsConceded ?? 0}
+                      onChange={(event) =>
+                        updateStat(participant.playerId, "goalsConceded", Number(event.currentTarget.value))
+                      }
+                    />
+                    <StarRating
+                      size="sm"
+                      value={ratings[participant.playerId] ?? 0}
+                      onChange={(value) => updateRating(participant.playerId, value)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -440,24 +452,9 @@ export default function PartidasPassadasPage() {
             </div>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2">
-            <div className="card p-4">
-              <h3 className="text-2xl font-bold text-emerald-950">{match.teamAName || "Time A"}</h3>
-              {teamA.length === 0 ? (
-                <p className="mt-2 text-sm text-emerald-800">Sem jogadores no Time A.</p>
-              ) : (
-                <ul className="mt-3 space-y-3">{teamA.map((participant) => renderPlayerCard(participant))}</ul>
-              )}
-            </div>
-
-            <div className="card p-4">
-              <h3 className="text-2xl font-bold text-emerald-950">{match.teamBName || "Time B"}</h3>
-              {teamB.length === 0 ? (
-                <p className="mt-2 text-sm text-emerald-800">Sem jogadores no Time B.</p>
-              ) : (
-                <ul className="mt-3 space-y-3">{teamB.map((participant) => renderPlayerCard(participant))}</ul>
-              )}
-            </div>
+          <section className="grid gap-4 xl:grid-cols-2">
+            {renderTeamGrid(match.teamAName || "Time A", teamA)}
+            {renderTeamGrid(match.teamBName || "Time B", teamB)}
           </section>
         </>
       ) : null}

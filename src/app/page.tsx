@@ -2,6 +2,7 @@
 
 import { Check, RotateCcw, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 
 type Player = {
   id: string;
@@ -116,7 +117,7 @@ export default function HomePage() {
     const players = ((await playersRes.json()) as Player[]).sort((a, b) => a.name.localeCompare(b.name));
     const upcomingMatches = (await matchesRes.json()) as Match[];
     const sortedMatches = upcomingMatches.sort(
-      (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime(),
+      (a, b) => getDateSortValue(a.matchDate) - getDateSortValue(b.matchDate),
     );
 
     setAllPlayers(players);
@@ -185,7 +186,7 @@ export default function HomePage() {
                     }`}
                   >
                     <p className="text-base font-semibold text-emerald-950">
-                      {new Date(match.matchDate).toLocaleDateString("pt-BR")}
+                      {formatDatePtBr(match.matchDate)}
                     </p>
                     <p className="text-xs uppercase tracking-[0.1em] text-emerald-700">
                       {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"}

@@ -498,12 +498,13 @@ export async function updateTeams(matchId: string, body: unknown) {
         },
         update: {
           team: assignment.team,
+          presenceStatus: assignment.team ? PresenceStatus.CONFIRMED : undefined,
         },
         create: {
           matchId,
           playerId: assignment.playerId,
           team: assignment.team,
-          presenceStatus: PresenceStatus.CANCELED,
+          presenceStatus: assignment.team ? PresenceStatus.CONFIRMED : PresenceStatus.CANCELED,
         },
       }),
     ),

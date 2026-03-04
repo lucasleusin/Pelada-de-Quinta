@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { StarRating } from "@/components/star-rating";
+import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 
 type MatchSummary = {
   id: string;
@@ -124,7 +125,7 @@ export default function PartidasPassadasPage() {
       .then((res) => res.json())
       .then((payload: MatchSummary[]) => {
         const sorted = payload.sort(
-          (a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime(),
+          (a, b) => getDateSortValue(b.matchDate) - getDateSortValue(a.matchDate),
         );
         setMatches(sorted);
       })
@@ -438,7 +439,7 @@ export default function PartidasPassadasPage() {
           <option value="">Selecione...</option>
           {matches.map((item) => (
             <option key={item.id} value={item.id}>
-              {new Date(item.matchDate).toLocaleDateString("pt-BR")} - {item.startTime}
+              {formatDatePtBr(item.matchDate)} - {item.startTime}
               {item.location ? ` - ${item.location}` : ""}
             </option>
           ))}

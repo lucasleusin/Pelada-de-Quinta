@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDatePtBr } from "@/lib/date-format";
 
 type Overview = {
   totalMatches: number;
@@ -158,7 +159,7 @@ export default function EstatisticasPage() {
                 {selectedPlayerStats.history.map((item) => (
                   <li key={item.match.id} className="rounded-xl bg-zinc-50 p-3">
                     <p className="font-semibold text-emerald-900">
-                      {new Date(item.match.matchDate).toLocaleDateString("pt-BR")} -{" "}
+                      {formatDatePtBr(item.match.matchDate)} -{" "}
                       {item.match.teamAScore ?? "-"} x {item.match.teamBScore ?? "-"}
                     </p>
                     <p>

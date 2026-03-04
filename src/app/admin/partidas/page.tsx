@@ -1,6 +1,7 @@
 "use client";
 
 import { DragEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { formatDatePtBr } from "@/lib/date-format";
 
 type Player = {
   id: string;
@@ -25,7 +26,7 @@ type Match = {
   participants: Participant[];
 };
 
-type TeamColumn = "POOL" | "A" | "B";
+type TeamColumn = "POOL" | "A" | "B" | "UNCONFIRMED";
 
 function sortByName<T extends { player: { name: string } }>(list: T[]) {
   return [...list].sort((a, b) => a.player.name.localeCompare(b.player.name));
@@ -33,6 +34,7 @@ function sortByName<T extends { player: { name: string } }>(list: T[]) {
 
 export default function AdminPartidasPage() {
   const [matches, setMatches] = useState<Match[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
@@ -41,6 +43,10 @@ export default function AdminPartidasPage() {
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
     [matches, selectedMatchId],
+  );
+  const participantByPlayerId = useMemo(
+    () => new Map((selectedMatch?.participants ?? []).map((participant) => [participant.playerId, participant])),
+    [selectedMatch],
   );
 
   const confirmedWithoutTeam = useMemo(
@@ -73,11 +79,33 @@ export default function AdminPartidasPage() {
     [selectedMatch],
   );
 
+  const nonConfirmedPlayers = useMemo(() => {
+    const list = players.map((player) => {
+      const participant = participantByPlayerId.get(player.id);
+      if (participant) return participant;
+
+      return {
+        playerId: player.id,
+        presenceStatus: "WAITLIST" as const,
+        team: null,
+        player,
+      };
+    });
+
+    return sortByName(list.filter((participant) => participant.presenceStatus !== "CONFIRMED"));
+  }, [participantByPlayerId, players]);
+
   async function loadData() {
-    const matchesRes = await fetch("/api/admin/matches");
+    const [matchesRes, playersRes] = await Promise.all([
+      fetch("/api/admin/matches"),
+      fetch("/api/players?active=true"),
+    ]);
+
     const matchesPayload = (await matchesRes.json()) as Match[];
+    const playersPayload = (await playersRes.json()) as Player[];
 
     setMatches(matchesPayload);
+    setPlayers(playersPayload);
 
     if (!selectedMatchId && matchesPayload[0]) {
       setSelectedMatchId(matchesPayload[0].id);
@@ -172,6 +200,7 @@ export default function AdminPartidasPage() {
 
   function renderPlayerCard(participant: Participant, column: TeamColumn) {
     const mobileActionClass = "rounded-full border px-2 py-1 text-[11px] font-semibold";
+    const statusLabel = participant.presenceStatus === "CANCELED" ? "Desconfirmado" : "Pendente";
 
     return (
       <div
@@ -181,11 +210,14 @@ export default function AdminPartidasPage() {
         className="cursor-move rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm"
       >
         <p>{participant.player.name}</p>
+        {column === "UNCONFIRMED" ? (
+          <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-emerald-700">{statusLabel}</p>
+        ) : null}
         <div className="mt-2 flex flex-wrap gap-1 md:hidden">
           <button
             type="button"
-            disabled={column === "POOL"}
-            className={`${mobileActionClass} ${column === "POOL" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
+            disabled={column === "POOL" || column === "UNCONFIRMED"}
+            className={`${mobileActionClass} ${column === "POOL" || column === "UNCONFIRMED" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
             onClick={() => assignTeam(participant.playerId, "POOL")}
           >
             Sem time
@@ -245,7 +277,7 @@ export default function AdminPartidasPage() {
           <option value="">-- selecione --</option>
           {matches.map((match) => (
             <option key={match.id} value={match.id}>
-              {new Date(match.matchDate).toLocaleDateString("pt-BR")}
+              {formatDatePtBr(match.matchDate)}
               {match.location ? ` - ${match.location}` : " - Local a definir"}
             </option>
           ))}
@@ -303,10 +335,26 @@ export default function AdminPartidasPage() {
                   </h4>
                   <div className="mt-3 space-y-2">
                     {confirmedWithoutTeam.length === 0 ? (
-                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador confirmado sem time.</p>
                     ) : (
                       confirmedWithoutTeam.map((participant) => renderPlayerCard(participant, "POOL"))
                     )}
+                  </div>
+
+                  <div className="mt-4 border-t border-emerald-200 pt-3">
+                    <h5 className="font-semibold text-emerald-950">
+                      Nao confirmados ({nonConfirmedPlayers.length})
+                    </h5>
+                    <p className="mt-1 text-xs text-emerald-800">
+                      Arraste para Time A/B para confirmar automaticamente.
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {nonConfirmedPlayers.length === 0 ? (
+                        <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nao confirmado.</p>
+                      ) : (
+                        nonConfirmedPlayers.map((participant) => renderPlayerCard(participant, "UNCONFIRMED"))
+                      )}
+                    </div>
                   </div>
                 </section>
 

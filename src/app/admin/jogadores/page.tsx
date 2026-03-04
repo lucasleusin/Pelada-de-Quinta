@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { formatDatePtBr } from "@/lib/date-format";
 
 type Player = {
   id: string;
@@ -315,7 +316,7 @@ export default function AdminJogadoresPage() {
                               report.history.map((item) => (
                                 <li key={item.match.id} className="rounded-lg bg-white p-2">
                                   <p className="font-medium text-emerald-900">
-                                    {new Date(item.match.matchDate).toLocaleDateString("pt-BR")} -{" "}
+                                    {formatDatePtBr(item.match.matchDate)} -{" "}
                                     {item.match.teamAName} {item.match.teamAScore ?? "-"} x{" "}
                                     {item.match.teamBScore ?? "-"} {item.match.teamBName}
                                   </p>

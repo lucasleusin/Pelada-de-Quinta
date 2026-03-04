@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 type Player = {
   id: string;
   name: string;
+  position: "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 };
 
 type PresenceStatus = "CONFIRMED" | "WAITLIST" | "CANCELED";
@@ -29,6 +30,18 @@ function getTodayIsoDate() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today.toISOString().slice(0, 10);
+}
+
+function getPositionCode(position: Player["position"]) {
+  if (position === "GOLEIRO") return "G";
+  if (position === "ZAGUEIRO") return "Z";
+  if (position === "MEIA") return "M";
+  if (position === "ATACANTE") return "A";
+  return "O";
+}
+
+function formatPlayerLabel(player: Player) {
+  return `${player.name} (${getPositionCode(player.position)})`;
 }
 
 function ActionButton({
@@ -195,7 +208,7 @@ export default function HomePage() {
                   key={player.id}
                   className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2"
                 >
-                  <span className="font-medium text-emerald-950">{player.name}</span>
+                  <span className="font-medium text-emerald-950">{formatPlayerLabel(player)}</span>
                   <div className="flex items-center gap-2">
                     <ActionButton
                       label="Confirmar jogador"
@@ -225,7 +238,7 @@ export default function HomePage() {
                   key={item.playerId}
                   className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2"
                 >
-                  <span className="font-medium text-emerald-950">{item.player.name}</span>
+                  <span className="font-medium text-emerald-950">{formatPlayerLabel(item.player)}</span>
                   <div className="flex items-center gap-2">
                     <ActionButton
                       label="Desconfirmar jogador"
@@ -255,7 +268,7 @@ export default function HomePage() {
                   key={item.playerId}
                   className="flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2"
                 >
-                  <span className="font-medium text-emerald-950">{item.player.name}</span>
+                  <span className="font-medium text-emerald-950">{formatPlayerLabel(item.player)}</span>
                   <div className="flex items-center gap-2">
                     <ActionButton
                       label="Confirmar jogador"

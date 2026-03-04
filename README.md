@@ -101,7 +101,31 @@ Recomendado mudar via `.env`:
 - `npm run test`
 - `npm run test:e2e`
 - `npm run prisma:migrate`
+- `npm run prisma:migrate:deploy`
 - `npm run prisma:seed`
+
+## Bootstrap Supabase + Vercel
+
+Como voce ja criou os projetos, agora faltam 3 passos:
+
+1. Configurar variaveis no Vercel (Project Settings > Environment Variables):
+- `DATABASE_URL`: string do Supabase Pooler (porta `6543`)
+- `DIRECT_URL`: string direta do Supabase (porta `5432`)
+- `AUTH_SECRET`: segredo forte para Auth.js
+- `AUTH_TRUST_HOST`: `true`
+- `ADMIN_SEED_EMAIL` e `ADMIN_SEED_PASSWORD`
+
+2. Criar tabelas no Supabase:
+- opcao A (recomendada): rodar `npm run prisma:migrate:deploy` com `DATABASE_URL` e `DIRECT_URL` apontando para seu Supabase;
+- opcao B: executar o SQL de [prisma/migrations/20260304130000_init/migration.sql](c:\CODEX\Automations\Pelada-de-Quinta\prisma\migrations\20260304130000_init\migration.sql) no SQL Editor do Supabase.
+
+3. Popular admin e jogadores iniciais:
+
+```bash
+npm run prisma:seed
+```
+
+Depois disso, o deploy no Vercel ja sobe com banco pronto.
 
 ## Endpoints principais
 

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 
+type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
+
 type MatchSummary = {
   id: string;
   matchDate: string;
@@ -18,6 +20,7 @@ type Participant = {
   player: {
     id: string;
     name: string;
+    position: Position;
   };
   goals: number;
   assists: number;
@@ -56,6 +59,18 @@ function getTodayIsoDate() {
 
 function sortByName<T extends { player: { name: string } }>(list: T[]) {
   return [...list].sort((a, b) => a.player.name.localeCompare(b.player.name));
+}
+
+function getPositionCode(position: Position) {
+  if (position === "GOLEIRO") return "G";
+  if (position === "ZAGUEIRO") return "Z";
+  if (position === "MEIA") return "M";
+  if (position === "ATACANTE") return "A";
+  return "O";
+}
+
+function formatPlayerLabel(player: Participant["player"]) {
+  return `${player.name} (${getPositionCode(player.position)})`;
 }
 
 function parseNullableScore(value: string): number | null {
@@ -338,7 +353,7 @@ export default function PartidasPassadasPage() {
                   key={participant.playerId}
                   className="grid grid-cols-[minmax(0,1fr)_52px_52px_52px_140px] items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2"
                 >
-                  <span className="truncate pr-1 text-sm font-medium text-emerald-950">{participant.player.name}</span>
+                  <span className="truncate pr-1 text-sm font-medium text-emerald-950">{formatPlayerLabel(participant.player)}</span>
                   <input
                     type="number"
                     min={0}

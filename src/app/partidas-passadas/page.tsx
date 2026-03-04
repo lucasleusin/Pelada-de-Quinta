@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { StarRating } from "@/components/star-rating";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 
 type MatchSummary = {
@@ -112,10 +111,8 @@ export default function PartidasPassadasPage() {
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [match, setMatch] = useState<MatchDetails | null>(null);
   const [stats, setStats] = useState<Record<string, StatRow>>({});
-  const [ratings, setRatings] = useState<Record<string, number>>({});
   const [score, setScore] = useState<ScoreState>({ teamAScore: "", teamBScore: "" });
   const [statsDirty, setStatsDirty] = useState(false);
-  const [ratingsDirty, setRatingsDirty] = useState(false);
   const [scoreDirty, setScoreDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -139,7 +136,6 @@ export default function PartidasPassadasPage() {
       .then((res) => res.json())
       .then((payload: MatchDetails) => {
         const nextStats: Record<string, StatRow> = {};
-        const nextRatings: Record<string, number> = {};
 
         for (const participant of payload.participants) {
           nextStats[participant.playerId] = {
@@ -147,26 +143,15 @@ export default function PartidasPassadasPage() {
             assists: participant.assists,
             goalsConceded: participant.goalsConceded,
           };
-
-          const selfRating = payload.ratings.find(
-            (rating) =>
-              rating.ratedPlayerId === participant.playerId && rating.raterPlayerId === participant.playerId,
-          );
-          const fallbackRating = payload.ratings.find(
-            (rating) => rating.ratedPlayerId === participant.playerId,
-          );
-          nextRatings[participant.playerId] = selfRating?.rating ?? fallbackRating?.rating ?? 0;
         }
 
         setMatch(payload);
         setStats(nextStats);
-        setRatings(nextRatings);
         setScore({
           teamAScore: payload.teamAScore === null ? "" : String(payload.teamAScore),
           teamBScore: payload.teamBScore === null ? "" : String(payload.teamBScore),
         });
         setStatsDirty(false);
-        setRatingsDirty(false);
         setScoreDirty(false);
         setSaveStatus("idle");
         setMessage("");
@@ -180,10 +165,8 @@ export default function PartidasPassadasPage() {
   function resetSelection() {
     setMatch(null);
     setStats({});
-    setRatings({});
     setScore({ teamAScore: "", teamBScore: "" });
     setStatsDirty(false);
-    setRatingsDirty(false);
     setScoreDirty(false);
     setSaveStatus("idle");
     setMessage("");
@@ -233,36 +216,9 @@ export default function PartidasPassadasPage() {
     }
   }
 
-  async function persistRatings(selected: MatchDetails, currentRatings: Record<string, number>) {
-    const ratingsPayload = selected.participants
-      .map((participant) => ({
-        raterPlayerId: participant.playerId,
-        ratedPlayerId: participant.playerId,
-        rating: currentRatings[participant.playerId] ?? 0,
-      }))
-      .filter((item) => item.rating >= 1 && item.rating <= 5);
-
-    if (ratingsPayload.length === 0) {
-      return;
-    }
-
-    const response = await fetch(`/api/matches/${selected.id}/ratings`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ratings: ratingsPayload,
-      }),
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "Erro ao salvar avaliacoes." }));
-      throw new Error(payload.error ?? "Erro ao salvar avaliacoes.");
-    }
-  }
-
   useEffect(() => {
     if (!match) return;
-    if (!scoreDirty && !statsDirty && !ratingsDirty) return;
+    if (!scoreDirty && !statsDirty) return;
 
     const timeout = setTimeout(async () => {
       setSaveStatus("saving");
@@ -283,13 +239,8 @@ export default function PartidasPassadasPage() {
           await persistStats(match, stats);
         }
 
-        if (ratingsDirty) {
-          await persistRatings(match, ratings);
-        }
-
         setScoreDirty(false);
         setStatsDirty(false);
-        setRatingsDirty(false);
         setSaveStatus("saved");
         setMessage(`Salvo automaticamente em ${new Date().toLocaleTimeString("pt-BR")}.`);
       } catch (error) {
@@ -299,7 +250,7 @@ export default function PartidasPassadasPage() {
     }, 700);
 
     return () => clearTimeout(timeout);
-  }, [match, ratings, ratingsDirty, score, scoreDirty, stats, statsDirty]);
+  }, [match, score, scoreDirty, stats, statsDirty]);
 
   const teamA = useMemo(
     () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "A")),
@@ -309,6 +260,29 @@ export default function PartidasPassadasPage() {
     () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "B")),
     [match],
   );
+
+  const averageVoteByPlayerId = useMemo(() => {
+    if (!match) return {};
+
+    const grouped = new Map<string, { total: number; count: number }>();
+
+    for (const rating of match.ratings) {
+      const current = grouped.get(rating.ratedPlayerId) ?? { total: 0, count: 0 };
+      grouped.set(rating.ratedPlayerId, {
+        total: current.total + rating.rating,
+        count: current.count + 1,
+      });
+    }
+
+    const averages: Record<string, string> = {};
+
+    for (const [playerId, value] of grouped.entries()) {
+      const rounded = Math.round((value.total / value.count) * 10) / 10;
+      averages[playerId] = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    }
+
+    return averages;
+  }, [match]);
 
   function updateScore(field: keyof ScoreState, value: string) {
     setScore((prev) => ({ ...prev, [field]: value }));
@@ -342,14 +316,6 @@ export default function PartidasPassadasPage() {
     setStatsDirty(true);
   }
 
-  function updateRating(playerId: string, rating: number) {
-    setRatings((prev) => ({
-      ...prev,
-      [playerId]: rating,
-    }));
-    setRatingsDirty(true);
-  }
-
   function renderTeamGrid(title: string, participants: Participant[]) {
     return (
       <div className="card p-4">
@@ -363,7 +329,7 @@ export default function PartidasPassadasPage() {
               <span className="text-center">G</span>
               <span className="text-center">A</span>
               <span className="text-center">GS</span>
-              <span className="text-center">Nota</span>
+              <span className="text-center">Media</span>
             </div>
 
             <ul className="mt-2 space-y-2">
@@ -403,13 +369,9 @@ export default function PartidasPassadasPage() {
                       updateStat(participant.playerId, "goalsConceded", Number(event.currentTarget.value))
                     }
                   />
-                  <div className="justify-self-center">
-                    <StarRating
-                      size="xs"
-                      value={ratings[participant.playerId] ?? 1}
-                      onChange={(value) => updateRating(participant.playerId, value)}
-                    />
-                  </div>
+                  <span className="justify-self-center text-sm font-semibold text-emerald-900">
+                    {averageVoteByPlayerId[participant.playerId] ?? "-"}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -424,7 +386,7 @@ export default function PartidasPassadasPage() {
       <section className="card p-5">
         <h2 className="text-3xl font-bold text-emerald-950">Partidas Passadas</h2>
         <p className="text-sm text-emerald-800">
-          Selecione a partida de hoje ou anteriores, ajuste stats, notas e placar. O salvamento e automatico.
+          Selecione a partida de hoje ou anteriores, ajuste stats e placar. A media dos votos aparece por jogador.
         </p>
 
         <label className="field-label mt-4" htmlFor="past-match-select">

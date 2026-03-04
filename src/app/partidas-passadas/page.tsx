@@ -61,7 +61,7 @@ function sortByName<T extends { player: { name: string } }>(list: T[]) {
 function parseNullableScore(value: string): number | null {
   if (value.trim() === "") return null;
   const parsed = Number(value);
-  return Number.isNaN(parsed) ? null : Math.max(0, Math.trunc(parsed));
+  return Number.isNaN(parsed) ? null : Math.min(99, Math.max(0, Math.trunc(parsed)));
 }
 
 function validateGoalsVsScore(
@@ -233,15 +233,23 @@ export default function PartidasPassadasPage() {
   }
 
   async function persistRatings(selected: MatchDetails, currentRatings: Record<string, number>) {
+    const ratingsPayload = selected.participants
+      .map((participant) => ({
+        raterPlayerId: participant.playerId,
+        ratedPlayerId: participant.playerId,
+        rating: currentRatings[participant.playerId] ?? 0,
+      }))
+      .filter((item) => item.rating >= 1 && item.rating <= 5);
+
+    if (ratingsPayload.length === 0) {
+      return;
+    }
+
     const response = await fetch(`/api/matches/${selected.id}/ratings`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        ratings: selected.participants.map((participant) => ({
-          raterPlayerId: participant.playerId,
-          ratedPlayerId: participant.playerId,
-          rating: currentRatings[participant.playerId] ?? 0,
-        })),
+        ratings: ratingsPayload,
       }),
     });
 
@@ -310,10 +318,24 @@ export default function PartidasPassadasPage() {
     setStats((prev) => ({
       ...prev,
       [playerId]: {
-        goals: prev[playerId]?.goals ?? 0,
-        assists: prev[playerId]?.assists ?? 0,
-        goalsConceded: prev[playerId]?.goalsConceded ?? 0,
-        [field]: Number.isNaN(value) ? 0 : Math.max(0, value),
+        goals:
+          field === "goals"
+            ? Number.isNaN(value)
+              ? 0
+              : Math.min(99, Math.max(0, Math.trunc(value)))
+            : prev[playerId]?.goals ?? 0,
+        assists:
+          field === "assists"
+            ? Number.isNaN(value)
+              ? 0
+              : Math.min(99, Math.max(0, Math.trunc(value)))
+            : prev[playerId]?.assists ?? 0,
+        goalsConceded:
+          field === "goalsConceded"
+            ? Number.isNaN(value)
+              ? 0
+              : Math.min(99, Math.max(0, Math.trunc(value)))
+            : prev[playerId]?.goalsConceded ?? 0,
       },
     }));
     setStatsDirty(true);
@@ -338,9 +360,9 @@ export default function PartidasPassadasPage() {
             <div className="min-w-[820px]">
               <div className="grid grid-cols-[minmax(180px,1.6fr)_90px_120px_130px_260px] gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-900">
                 <span>Jogador</span>
-                <span>Gols</span>
-                <span>Assistencias</span>
-                <span>Gols sofridos</span>
+                <span>G</span>
+                <span>A</span>
+                <span>GS</span>
                 <span>Nota</span>
               </div>
 
@@ -354,6 +376,7 @@ export default function PartidasPassadasPage() {
                     <input
                       type="number"
                       min={0}
+                      max={99}
                       className="field-input h-9"
                       value={stats[participant.playerId]?.goals ?? 0}
                       onChange={(event) =>
@@ -363,6 +386,7 @@ export default function PartidasPassadasPage() {
                     <input
                       type="number"
                       min={0}
+                      max={99}
                       className="field-input h-9"
                       value={stats[participant.playerId]?.assists ?? 0}
                       onChange={(event) =>
@@ -372,6 +396,7 @@ export default function PartidasPassadasPage() {
                     <input
                       type="number"
                       min={0}
+                      max={99}
                       className="field-input h-9"
                       value={stats[participant.playerId]?.goalsConceded ?? 0}
                       onChange={(event) =>
@@ -434,6 +459,7 @@ export default function PartidasPassadasPage() {
                 <input
                   type="number"
                   min={0}
+                  max={99}
                   className="field-input"
                   value={score.teamAScore}
                   onChange={(event) => updateScore("teamAScore", event.currentTarget.value)}
@@ -444,6 +470,7 @@ export default function PartidasPassadasPage() {
                 <input
                   type="number"
                   min={0}
+                  max={99}
                   className="field-input"
                   value={score.teamBScore}
                   onChange={(event) => updateScore("teamBScore", event.currentTarget.value)}

@@ -27,5 +27,5 @@ export function pickPresenceStatusForConfirmation(confirmedCount: number): Prese
 }
 
 export function ratingIsValid(rating: number): boolean {
-  return Number.isInteger(rating) && rating >= 0 && rating <= 5;
+  return Number.isInteger(rating) && rating >= 1 && rating <= 5;
 }

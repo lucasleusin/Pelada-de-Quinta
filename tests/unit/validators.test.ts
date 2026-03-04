@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { ratingsBatchSchema, statsBatchSchema } from "@/lib/validators";
 
 describe("validators", () => {
-  it("rejects rating outside range 0..5", () => {
+  it("rejects rating outside range 1..5", () => {
     const parsed = ratingsBatchSchema.safeParse({
       ratings: [
         {
           raterPlayerId: "7f21ab95-ef41-4fc4-b073-9de6488020a8",
           ratedPlayerId: "d44ff307-eb23-40ad-962f-53d69780ceb2",
-          rating: 6,
+          rating: 0,
         },
       ],
     });

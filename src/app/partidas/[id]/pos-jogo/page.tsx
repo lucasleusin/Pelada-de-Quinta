@@ -191,7 +191,7 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
       </section>
 
       <section className="card p-5">
-        <h3 className="text-2xl font-bold text-emerald-950">Avaliacoes (0..5)</h3>
+        <h3 className="text-2xl font-bold text-emerald-950">Avaliacoes (1..5)</h3>
         <div className="mt-4 space-y-3">
           {participants
             .filter((participant) => participant.playerId !== currentPlayerId)

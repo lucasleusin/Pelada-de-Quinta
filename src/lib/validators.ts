@@ -39,8 +39,8 @@ export const matchStatusSchema = z.object({
 });
 
 export const matchScoreSchema = z.object({
-  teamAScore: z.number().int().min(0).nullable(),
-  teamBScore: z.number().int().min(0).nullable(),
+  teamAScore: z.number().int().min(0).max(99).nullable(),
+  teamBScore: z.number().int().min(0).max(99).nullable(),
 });
 
 export const confirmPresenceSchema = z.object({
@@ -70,9 +70,9 @@ export const statsBatchSchema = z.object({
   stats: z.array(
     z.object({
       playerId: z.string().uuid(),
-      goals: z.number().int().min(0),
-      assists: z.number().int().min(0),
-      goalsConceded: z.number().int().min(0),
+      goals: z.number().int().min(0).max(99),
+      assists: z.number().int().min(0).max(99),
+      goalsConceded: z.number().int().min(0).max(99),
       playedAsGoalkeeper: z.boolean().optional(),
     }),
   ),
@@ -84,7 +84,7 @@ export const ratingsBatchSchema = z.object({
       z.object({
         raterPlayerId: z.string().uuid(),
         ratedPlayerId: z.string().uuid(),
-        rating: z.number().int().min(0).max(5),
+        rating: z.number().int().min(1).max(5),
       }),
     )
     .min(1),

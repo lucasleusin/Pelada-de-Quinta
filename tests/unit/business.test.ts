@@ -39,8 +39,8 @@ describe("business rules", () => {
     expect(pickPresenceStatusForConfirmation(MAX_CONFIRMED_PLAYERS + 5)).toBe(PresenceStatus.WAITLIST);
   });
 
-  it("validates ratings between 0 and 5", () => {
-    expect(ratingIsValid(0)).toBe(true);
+  it("validates ratings between 1 and 5", () => {
+    expect(ratingIsValid(0)).toBe(false);
     expect(ratingIsValid(5)).toBe(true);
     expect(ratingIsValid(3)).toBe(true);
     expect(ratingIsValid(-1)).toBe(false);

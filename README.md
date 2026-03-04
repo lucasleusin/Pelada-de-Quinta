@@ -13,11 +13,12 @@ Aplicacao web para organizar a pelada semanal de quinta-feira em Cachoeira do Su
 
 ## Funcionalidades do MVP
 
-- Selecao de jogador sem senha (`/jogador`)
-- Confirmacao e cancelamento de presenca na proxima partida (`/`)
-- Lista de confirmados, lista de espera e pendentes
+- Home com lista de proximas partidas (`/`)
+- Confirmacao/desconfirmacao de jogadores por partida direto na Home
+- Listas de pendentes, confirmados e desconfirmados
 - Pos-jogo com registro de gols, assistencias e gols sofridos (`/partidas/[id]/pos-jogo`)
 - Avaliacoes 0..5 por jogador
+- Pagina de estatisticas (`/estatisticas`) com historico geral e recorte por jogador
 - Painel admin protegido (`/admin`)
 - CRUD de jogadores e controle ativo/inativo
 - Criacao/edicao de partidas, status, placar, times e presenca
@@ -84,13 +85,15 @@ npm run dev
 
 ## Credenciais seed (default)
 
-- Email: `admin@peladadaquinta.com`
-- Senha: `admin123`
+- Usuario: `marcio`
+- Senha: `sop`
 
 Recomendado mudar via `.env`:
 
 - `ADMIN_SEED_EMAIL`
 - `ADMIN_SEED_PASSWORD`
+- `ADMIN_LOGIN_USERNAME`
+- `ADMIN_LOGIN_PASSWORD`
 
 ## Scripts
 
@@ -114,10 +117,11 @@ Como voce ja criou os projetos, agora faltam 3 passos:
 - `AUTH_SECRET`: segredo forte para Auth.js
 - `AUTH_TRUST_HOST`: `true`
 - `ADMIN_SEED_EMAIL` e `ADMIN_SEED_PASSWORD`
+- `ADMIN_LOGIN_USERNAME` e `ADMIN_LOGIN_PASSWORD`
 
 2. Criar tabelas no Supabase:
 - opcao A (recomendada): rodar `npm run prisma:migrate:deploy` com `DATABASE_URL` e `DIRECT_URL` apontando para seu Supabase;
-- opcao B: executar o SQL de [prisma/migrations/20260304130000_init/migration.sql](c:\CODEX\Automations\Pelada-de-Quinta\prisma\migrations\20260304130000_init\migration.sql) no SQL Editor do Supabase.
+- opcao B: executar o SQL de [prisma/migrations/20260304130000_init/migration.sql](c:\CODEX\Pelada da Quinta\prisma\migrations\20260304130000_init\migration.sql) no SQL Editor do Supabase.
 
 3. Popular admin e jogadores iniciais:
 

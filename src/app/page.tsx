@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Check, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useEffect } from "react";
 
 type Player = {
   id: string;
@@ -21,181 +22,203 @@ type Match = {
   location: string | null;
   startTime: string;
   status: string;
-  teamAName: string;
-  teamBName: string;
   participants: Participant[];
 };
 
+function getTomorrowIsoDate() {
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().slice(0, 10);
+}
+
 export default function HomePage() {
-  const [selectedPlayerId] = useState<string | null>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("pelada:selectedPlayerId") : null,
-  );
-  const [selectedPlayerName, setSelectedPlayerName] = useState<string>("");
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
-  const [nextMatch, setNextMatch] = useState<Match | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [expandedPendingId, setExpandedPendingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string>("");
 
-  const confirmed = useMemo(
-    () => nextMatch?.participants.filter((item) => item.presenceStatus === "CONFIRMED") ?? [],
-    [nextMatch],
+  const selectedMatch = useMemo(
+    () => matches.find((match) => match.id === selectedMatchId) ?? null,
+    [matches, selectedMatchId],
   );
 
-  const waitlist = useMemo(
-    () => nextMatch?.participants.filter((item) => item.presenceStatus === "WAITLIST") ?? [],
-    [nextMatch],
+  const confirmed = useMemo(
+    () =>
+      [...(selectedMatch?.participants.filter((item) => item.presenceStatus === "CONFIRMED") ?? [])].sort((a, b) =>
+        a.player.name.localeCompare(b.player.name),
+      ),
+    [selectedMatch],
+  );
+
+  const canceled = useMemo(
+    () =>
+      [...(selectedMatch?.participants.filter((item) => item.presenceStatus === "CANCELED") ?? [])].sort((a, b) =>
+        a.player.name.localeCompare(b.player.name),
+      ),
+    [selectedMatch],
   );
 
   const pending = useMemo(() => {
-    const joinedIds = new Set(
-      nextMatch?.participants
-        .filter((item) => item.presenceStatus !== "CANCELED")
-        .map((item) => item.playerId) ?? [],
+    const statusByPlayer = new Map(
+      selectedMatch?.participants.map((participant) => [participant.playerId, participant.presenceStatus]) ?? [],
     );
 
-    return allPlayers.filter((player) => !joinedIds.has(player.id));
-  }, [allPlayers, nextMatch]);
+    return allPlayers.filter((player) => {
+      const status = statusByPlayer.get(player.id);
+      return status !== "CONFIRMED" && status !== "CANCELED";
+    });
+  }, [allPlayers, selectedMatch]);
 
-  async function loadData() {
-    const [playersRes, nextRes] = await Promise.all([
+  async function loadData(keepSelection = true) {
+    const [playersRes, matchesRes] = await Promise.all([
       fetch("/api/players?active=true"),
-      fetch("/api/matches/next"),
+      fetch(`/api/matches?from=${getTomorrowIsoDate()}`),
     ]);
 
-    const players = (await playersRes.json()) as Player[];
-    const nextPayload = (await nextRes.json()) as { match: Match | null };
+    const players = ((await playersRes.json()) as Player[]).sort((a, b) => a.name.localeCompare(b.name));
+    const upcomingMatches = (await matchesRes.json()) as Match[];
+    const sortedMatches = upcomingMatches
+      .filter((match) => match.status !== "ARCHIVED")
+      .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
 
     setAllPlayers(players);
-    setNextMatch(nextPayload.match);
+    setMatches(sortedMatches);
 
-    if (selectedPlayerId) {
-      setSelectedPlayerName(players.find((player) => player.id === selectedPlayerId)?.name ?? "");
+    if (!keepSelection && sortedMatches.length > 0) {
+      setSelectedMatchId(null);
+      return;
+    }
+
+    if (selectedMatchId && !sortedMatches.some((match) => match.id === selectedMatchId)) {
+      setSelectedMatchId(null);
     }
   }
 
   useEffect(() => {
-    loadData().catch(() => undefined);
+    loadData(false).catch(() => setMessage("Falha ao carregar dados da home."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!selectedPlayerId) {
-      setSelectedPlayerName("");
-      return;
-    }
+  async function setPresence(playerId: string, presenceStatus: "CONFIRMED" | "CANCELED") {
+    if (!selectedMatch) return;
 
-    const found = allPlayers.find((player) => player.id === selectedPlayerId);
-    setSelectedPlayerName(found?.name ?? "");
-  }, [selectedPlayerId, allPlayers]);
-
-  async function handlePresence(action: "confirm" | "cancel") {
-    if (!nextMatch || !selectedPlayerId) return;
-
-    const endpoint = action === "confirm" ? "confirm" : "cancel";
-    const response = await fetch(`/api/matches/${nextMatch.id}/${endpoint}`, {
-      method: "POST",
+    const response = await fetch(`/api/matches/${selectedMatch.id}/presence`, {
+      method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ playerId: selectedPlayerId }),
+      body: JSON.stringify({ playerId, presenceStatus }),
     });
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "Erro" }));
-      setMessage(payload.error ?? "Nao foi possivel salvar.");
+      const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presenca." }));
+      setMessage(payload.error ?? "Falha ao atualizar presenca.");
       return;
     }
 
-    setMessage(action === "confirm" ? "Presenca atualizada." : "Presenca cancelada.");
-    await loadData();
+    setExpandedPendingId(null);
+    setMessage(presenceStatus === "CONFIRMED" ? "Jogador confirmado." : "Jogador desconfirmado.");
+    await loadData(true);
   }
 
   return (
     <div className="space-y-5">
       <section className="card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proxima Quinta</p>
-        {nextMatch ? (
-          <>
-            <h2 className="text-3xl font-bold text-emerald-950">
-              {new Date(nextMatch.matchDate).toLocaleDateString("pt-BR")}
-            </h2>
-            <p className="text-sm text-emerald-800">
-              {nextMatch.startTime} {nextMatch.location ? `| ${nextMatch.location}` : "| Local a definir"}
-            </p>
-            <p className="mt-2 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-              Status: {nextMatch.status}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                className="btn btn-primary"
-                onClick={() => handlePresence("confirm")}
-                disabled={!selectedPlayerId}
-              >
-                Confirmar presenca
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => handlePresence("cancel")}
-                disabled={!selectedPlayerId}
-              >
-                Cancelar
-              </button>
-              <Link className="btn btn-accent" href={`/partidas/${nextMatch.id}/pos-jogo`}>
-                Pos-jogo
-              </Link>
-            </div>
-          </>
+        <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
+        {matches.length === 0 ? (
+          <p className="mt-2 text-sm text-emerald-900">Nenhuma partida futura cadastrada.</p>
         ) : (
-          <p className="text-sm text-emerald-900">Nenhuma partida futura cadastrada.</p>
+          <ul className="mt-3 space-y-2">
+            {matches.map((match) => {
+              const active = match.id === selectedMatchId;
+              return (
+                <li key={match.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMatchId(match.id)}
+                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                      active
+                        ? "border-emerald-700 bg-emerald-100"
+                        : "border-emerald-200 bg-white hover:border-emerald-400"
+                    }`}
+                  >
+                    <p className="text-base font-semibold text-emerald-950">
+                      {new Date(match.matchDate).toLocaleDateString("pt-BR")}
+                    </p>
+                    <p className="text-xs uppercase tracking-[0.1em] text-emerald-700">
+                      {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"} | {match.status}
+                    </p>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
 
-      <section className="card p-5">
-        <h3 className="text-xl font-semibold text-emerald-950">Jogador selecionado</h3>
-        {selectedPlayerId ? (
-          <p className="mt-2 text-emerald-800">{selectedPlayerName || "Jogador"}</p>
-        ) : (
-          <p className="mt-2 text-emerald-800">Selecione quem voce e para confirmar presenca.</p>
-        )}
-        <Link href="/jogador" className="btn btn-ghost mt-3 inline-flex">
-          Alterar jogador
-        </Link>
-      </section>
+      {selectedMatch ? (
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="card p-4">
+            <h4 className="text-lg font-semibold text-emerald-900">Pendentes ({pending.length})</h4>
+            <ul className="mt-2 space-y-2 text-sm">
+              {pending.map((player) => (
+                <li key={player.id} className="rounded-lg bg-zinc-50 px-3 py-2">
+                  <button
+                    type="button"
+                    className="w-full text-left font-medium text-emerald-950"
+                    onClick={() => setExpandedPendingId((current) => (current === player.id ? null : player.id))}
+                  >
+                    {player.name}
+                  </button>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="card p-4">
-          <h4 className="text-lg font-semibold text-emerald-900">Confirmados ({confirmed.length})</h4>
-          <ul className="mt-2 space-y-2 text-sm">
-            {confirmed.map((item) => (
-              <li key={item.playerId} className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2">
-                <span>{item.player.name}</span>
-                <span className="rounded-full bg-emerald-200 px-2 py-0.5 text-xs">
-                  {item.team ?? "Sem time"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                  {expandedPendingId === player.id ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
+                        onClick={() => setPresence(player.id, "CONFIRMED")}
+                        aria-label="Confirmar jogador"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
+                        onClick={() => setPresence(player.id, "CANCELED")}
+                        aria-label="Desconfirmar jogador"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        <div className="card p-4">
-          <h4 className="text-lg font-semibold text-emerald-900">Lista de espera ({waitlist.length})</h4>
-          <ul className="mt-2 space-y-2 text-sm">
-            {waitlist.map((item) => (
-              <li key={item.playerId} className="rounded-lg bg-orange-50 px-3 py-2">
-                {item.player.name}
-              </li>
-            ))}
-          </ul>
-        </div>
+          <div className="card p-4">
+            <h4 className="text-lg font-semibold text-emerald-900">Confirmados ({confirmed.length})</h4>
+            <ul className="mt-2 space-y-2 text-sm">
+              {confirmed.map((item) => (
+                <li key={item.playerId} className="rounded-lg bg-emerald-50 px-3 py-2">
+                  {item.player.name}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        <div className="card p-4">
-          <h4 className="text-lg font-semibold text-emerald-900">Pendentes ({pending.length})</h4>
-          <ul className="mt-2 max-h-56 space-y-2 overflow-auto text-sm">
-            {pending.map((item) => (
-              <li key={item.id} className="rounded-lg bg-zinc-50 px-3 py-2">
-                {item.name}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+          <div className="card p-4">
+            <h4 className="text-lg font-semibold text-emerald-900">Desconfirmados ({canceled.length})</h4>
+            <ul className="mt-2 space-y-2 text-sm">
+              {canceled.map((item) => (
+                <li key={item.playerId} className="rounded-lg bg-red-50 px-3 py-2">
+                  {item.player.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
 
       {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
     </div>

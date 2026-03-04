@@ -1,4 +1,4 @@
-import { MatchStatus, PresenceStatus } from "@prisma/client";
+import { MatchStatus, Position, PresenceStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { canConfirmPresence, pickPresenceStatusForConfirmation } from "@/lib/business";
 import { getPrismaClient } from "@/lib/db";
@@ -129,6 +129,30 @@ export async function cancelPresence(matchId: string, playerId: string) {
     where: { matchId_playerId: { matchId, playerId } },
     update: { presenceStatus: PresenceStatus.CANCELED },
     create: { matchId, playerId, presenceStatus: PresenceStatus.CANCELED },
+  });
+
+  return NextResponse.json(participant);
+}
+
+export async function setPresenceStatus(
+  matchId: string,
+  playerId: string,
+  presenceStatus: "CONFIRMED" | "CANCELED",
+) {
+  const match = await db().match.findUnique({ where: { id: matchId } });
+
+  if (!match) {
+    return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
+  }
+
+  if (match.status === MatchStatus.ARCHIVED) {
+    return NextResponse.json({ error: "Partida arquivada." }, { status: 400 });
+  }
+
+  const participant = await db().matchParticipant.upsert({
+    where: { matchId_playerId: { matchId, playerId } },
+    update: { presenceStatus },
+    create: { matchId, playerId, presenceStatus },
   });
 
   return NextResponse.json(participant);
@@ -451,6 +475,82 @@ export async function getAttendanceReport() {
       attendancePercentage: percentage,
     };
   });
+}
+
+export async function getGeneralStatsOverview() {
+  const finishedMatches = await db().match.findMany({
+    where: { status: MatchStatus.FINISHED },
+    select: { id: true },
+  });
+
+  const matchIds = finishedMatches.map((match) => match.id);
+  const totalMatches = finishedMatches.length;
+
+  if (totalMatches === 0) {
+    return {
+      totalMatches: 0,
+      totalGoals: 0,
+      topScorer: { name: "-", goals: 0 },
+      topAssist: { name: "-", assists: 0 },
+      topConcededGoalkeeper: { name: "-", goalsConceded: 0 },
+    };
+  }
+
+  const totals = await db().matchParticipant.aggregate({
+    where: { matchId: { in: matchIds } },
+    _sum: { goals: true },
+  });
+
+  const grouped = await db().matchParticipant.groupBy({
+    by: ["playerId"],
+    where: { matchId: { in: matchIds } },
+    _sum: {
+      goals: true,
+      assists: true,
+      goalsConceded: true,
+    },
+  });
+
+  const players = await db().player.findMany({
+    where: { id: { in: grouped.map((item) => item.playerId) } },
+    select: { id: true, name: true, position: true },
+  });
+
+  const playerById = new Map(players.map((player) => [player.id, player]));
+
+  const rows = grouped.map((item) => ({
+    playerId: item.playerId,
+    playerName: playerById.get(item.playerId)?.name ?? "Jogador",
+    position: playerById.get(item.playerId)?.position ?? Position.OUTRO,
+    goals: item._sum.goals ?? 0,
+    assists: item._sum.assists ?? 0,
+    goalsConceded: item._sum.goalsConceded ?? 0,
+  }));
+
+  const topScorer = [...rows].sort((a, b) => b.goals - a.goals || a.playerName.localeCompare(b.playerName))[0];
+  const topAssist = [...rows].sort((a, b) => b.assists - a.assists || a.playerName.localeCompare(b.playerName))[0];
+  const goalkeepers = rows.filter((row) => row.position === Position.GOLEIRO);
+  const concededPool = goalkeepers.length > 0 ? goalkeepers : rows;
+  const topConcededGoalkeeper = [...concededPool].sort(
+    (a, b) => b.goalsConceded - a.goalsConceded || a.playerName.localeCompare(b.playerName),
+  )[0];
+
+  return {
+    totalMatches,
+    totalGoals: totals._sum.goals ?? 0,
+    topScorer: {
+      name: topScorer?.playerName ?? "-",
+      goals: topScorer?.goals ?? 0,
+    },
+    topAssist: {
+      name: topAssist?.playerName ?? "-",
+      assists: topAssist?.assists ?? 0,
+    },
+    topConcededGoalkeeper: {
+      name: topConcededGoalkeeper?.playerName ?? "-",
+      goalsConceded: topConcededGoalkeeper?.goalsConceded ?? 0,
+    },
+  };
 }
 
 export async function getPlayerReport(playerId: string) {

@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("marcio");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
 
     setLoading(false);
@@ -40,13 +40,13 @@ export default function AdminLoginPage() {
 
       <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
         <label>
-          <span className="field-label">Email</span>
+          <span className="field-label">Usuario</span>
           <input
             className="field-input"
-            type="email"
+            type="text"
             required
-            value={email}
-            onChange={(event) => setEmail(event.currentTarget.value)}
+            value={username}
+            onChange={(event) => setUsername(event.currentTarget.value)}
           />
         </label>
 

@@ -27,8 +27,8 @@ const players = [
 ] as const;
 
 async function main() {
-  const email = process.env.ADMIN_SEED_EMAIL ?? "admin@peladadaquinta.com";
-  const password = process.env.ADMIN_SEED_PASSWORD ?? "admin123";
+  const email = process.env.ADMIN_SEED_EMAIL ?? "marcio";
+  const password = process.env.ADMIN_SEED_PASSWORD ?? "sop";
   const passwordHash = await hash(password, 10);
 
   await prisma.adminUser.upsert({

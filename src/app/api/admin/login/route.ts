@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
   try {
     await signIn("credentials", {
-      email: parsed.data.email,
+      username: parsed.data.username,
       password: parsed.data.password,
       redirect: false,
     });

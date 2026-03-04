@@ -2,8 +2,8 @@
 import { z } from "zod";
 
 export const loginSchema = z.object({
-  email: z.string().trim().email("Email invalido."),
-  password: z.string().min(6, "Senha deve ter no minimo 6 caracteres."),
+  username: z.string().trim().min(1, "Usuario obrigatorio."),
+  password: z.string().min(1, "Senha obrigatoria."),
 });
 
 export const playerCreateSchema = z.object({
@@ -45,6 +45,11 @@ export const matchScoreSchema = z.object({
 
 export const confirmPresenceSchema = z.object({
   playerId: z.string().uuid(),
+});
+
+export const publicPresenceSchema = z.object({
+  playerId: z.string().uuid(),
+  presenceStatus: z.enum(["CONFIRMED", "CANCELED"]),
 });
 
 export const participantsPresenceSchema = z.object({

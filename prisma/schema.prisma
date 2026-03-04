@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Position {
+  GOLEIRO
+  ZAGUEIRO
+  MEIA
+  ATACANTE
+  OUTRO
+}
+
+enum MatchStatus {
+  DRAFT
+  CONFIRMATION_OPEN
+  TEAMS_LOCKED
+  FINISHED
+  ARCHIVED
+}
+
+enum PresenceStatus {
+  CONFIRMED
+  WAITLIST
+  CANCELED
+}
+
+enum Team {
+  A
+  B
+}
+
+model Player {
+  id                    String             @id @default(uuid())
+  name                  String             @unique
+  position              Position           @default(OUTRO)
+  shirtNumberPreference Int?
+  isActive              Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  participants          MatchParticipant[]
+  ratingsGiven          MatchRating[]      @relation("RatingsGiven")
+  ratingsReceived       MatchRating[]      @relation("RatingsReceived")
+  statsUpdatedEntries   MatchParticipant[] @relation("StatsUpdatedBy")
+
+  @@index([name])
+  @@map("players")
+}
+
+model Match {
+  id           String             @id @default(uuid())
+  matchDate    DateTime           @db.Date
+  location     String?
+  startTime    String             @default("19:00")
+  status       MatchStatus        @default(DRAFT)
+  teamAName    String             @default("Time A")
+  teamBName    String             @default("Time B")
+  teamAScore   Int?
+  teamBScore   Int?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  participants MatchParticipant[]
+  ratings      MatchRating[]
+
+  @@index([matchDate, status])
+  @@map("matches")
+}
+
+model MatchParticipant {
+  id                     String         @id @default(uuid())
+  matchId                String
+  playerId               String
+  presenceStatus         PresenceStatus @default(CANCELED)
+  team                   Team?
+  playedAsGoalkeeper     Boolean        @default(false)
+  goals                  Int            @default(0)
+  assists                Int            @default(0)
+  goalsConceded          Int            @default(0)
+  statsUpdatedByPlayerId String?
+  statsUpdatedAt         DateTime?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  match                Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player               Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  statsUpdatedByPlayer Player? @relation("StatsUpdatedBy", fields: [statsUpdatedByPlayerId], references: [id], onDelete: SetNull)
+
+  @@unique([matchId, playerId])
+  @@index([matchId, presenceStatus])
+  @@index([playerId])
+  @@map("match_participants")
+}
+
+model MatchRating {
+  id            String   @id @default(uuid())
+  matchId       String
+  raterPlayerId String
+  ratedPlayerId String
+  rating        Int
+  createdAt     DateTime @default(now())
+
+  match       Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  raterPlayer Player @relation("RatingsGiven", fields: [raterPlayerId], references: [id], onDelete: Cascade)
+  ratedPlayer Player @relation("RatingsReceived", fields: [ratedPlayerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, raterPlayerId, ratedPlayerId])
+  @@index([matchId, ratedPlayerId])
+  @@map("match_ratings")
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@map("admin_users")
+}

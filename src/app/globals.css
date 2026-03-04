@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  --font-heading: "Rajdhani", sans-serif;
+  --font-body: "Work Sans", sans-serif;
+}
+
+@theme inline {
+  --font-heading: var(--font-heading);
+  --font-sans: var(--font-body);
+  --color-canvas: #f7faf8;
+  --color-ink: #10281d;
+  --color-pitch: #0e6b3d;
+  --color-accent: #f97316;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: #10281d;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+}
+
+.card {
+  border: 1px solid #cae6d6;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 12px 24px -20px rgba(16, 40, 29, 0.45);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1f4f39;
+}
+
+.field-input {
+  width: 100%;
+  border: 1px solid #9ecdb4;
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  background: #fff;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: #0e6b3d;
+  box-shadow: 0 0 0 3px rgba(14, 107, 61, 0.15);
+}
+
+.btn {
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  transition: all 120ms ease;
+}
+
+.btn-primary {
+  background: #0e6b3d;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #0b5a33;
+}
+
+.btn-accent {
+  background: #f97316;
+  color: #fff;
+}
+
+.btn-accent:hover {
+  background: #ea580c;
+}
+
+.btn-ghost {
+  border: 1px solid #9ecdb4;
+  background: #fff;
+  color: #15452f;
+}
+
+.btn-ghost:hover {
+  border-color: #0e6b3d;
+}

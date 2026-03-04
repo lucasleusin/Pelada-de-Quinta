@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { formatDatePtBr } from "@/lib/date-format";
 
+type PlayerPosition = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
+
 type Overview = {
   totalMatches: number;
   totalGoals: number;
@@ -17,7 +19,12 @@ type Player = {
 };
 
 type PlayerStats = {
-  player: { name: string };
+  player: {
+    id: string;
+    name: string;
+    position: PlayerPosition;
+    shirtNumberPreference: number | null;
+  };
   totals: {
     matches: number;
     goals: number;
@@ -36,6 +43,14 @@ type PlayerStats = {
     assists: number;
     goalsConceded: number;
   }>;
+};
+
+const positionLabel: Record<PlayerPosition, string> = {
+  GOLEIRO: "Goleiro",
+  ZAGUEIRO: "Zagueiro",
+  MEIA: "Meio Campo",
+  ATACANTE: "Atacante",
+  OUTRO: "Outro",
 };
 
 export default function EstatisticasPage() {
@@ -133,21 +148,56 @@ export default function EstatisticasPage() {
 
         {selectedPlayerStats ? (
           <div className="mt-4 space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
-              <div className="rounded-xl bg-emerald-50 p-3">
-                Partidas: <strong>{selectedPlayerStats.totals.matches}</strong>
+            <div className="relative overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-white to-orange-100 p-4 shadow-sm md:p-5">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-200/50" />
+              <div className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-orange-200/40" />
+
+              <div className="relative grid grid-cols-[84px_minmax(0,1fr)] items-center gap-4">
+                <div className="rounded-2xl border border-emerald-300 bg-white/90 px-3 py-4 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">Numero</p>
+                  <p className="mt-1 text-3xl font-black leading-none text-emerald-950">
+                    {selectedPlayerStats.player.shirtNumberPreference ?? "--"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                    Card do Jogador
+                  </p>
+                  <p className="mt-1 text-2xl font-black leading-tight text-emerald-950">
+                    {selectedPlayerStats.player.name}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold uppercase tracking-[0.12em] text-emerald-800">
+                    {positionLabel[selectedPlayerStats.player.position]}
+                  </p>
+                </div>
               </div>
-              <div className="rounded-xl bg-emerald-50 p-3">
-                Gols: <strong>{selectedPlayerStats.totals.goals}</strong>
-              </div>
-              <div className="rounded-xl bg-emerald-50 p-3">
-                Assistencias: <strong>{selectedPlayerStats.totals.assists}</strong>
-              </div>
-              <div className="rounded-xl bg-emerald-50 p-3">
-                Gols sofridos: <strong>{selectedPlayerStats.totals.goalsConceded}</strong>
-              </div>
-              <div className="rounded-xl bg-orange-50 p-3">
-                Nota media: <strong>{selectedPlayerStats.totals.avgRating.toFixed(2)}</strong>
+
+              <div
+                className={`relative mt-4 grid gap-2 text-sm ${selectedPlayerStats.totals.goalsConceded > 0 ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-4"}`}
+              >
+                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Partidas</p>
+                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.matches}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Gols</p>
+                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.goals}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Assistencias</p>
+                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.assists}</p>
+                </div>
+                {selectedPlayerStats.totals.goalsConceded > 0 ? (
+                  <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Gols sofridos</p>
+                    <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.goalsConceded}</p>
+                  </div>
+                ) : null}
+                <div className="rounded-xl border border-orange-200 bg-white/90 p-2">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Nota geral</p>
+                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.avgRating.toFixed(2)}</p>
+                </div>
               </div>
             </div>
 

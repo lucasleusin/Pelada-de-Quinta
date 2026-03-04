@@ -5,14 +5,20 @@ import { clsx } from "clsx";
 type StarRatingProps = {
   value: number;
   onChange: (next: number) => void;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
 };
 
 export function StarRating({ value, onChange, size = "md" }: StarRatingProps) {
-  const buttonClass = size === "sm" ? "h-7 w-7 text-[11px]" : "h-8 w-8 text-xs";
+  const buttonClass =
+    size === "xs"
+      ? "h-6 w-6 text-[10px]"
+      : size === "sm"
+        ? "h-7 w-7 text-[11px]"
+        : "h-8 w-8 text-xs";
+  const gapClass = size === "xs" ? "gap-0.5" : "gap-1";
 
   return (
-    <div className="flex items-center gap-1">
+    <div className={`flex items-center ${gapClass}`}>
       {[1, 2, 3, 4, 5].map((score) => (
         <button
           type="button"

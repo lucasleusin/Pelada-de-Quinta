@@ -357,62 +357,62 @@ export default function PartidasPassadasPage() {
         {participants.length === 0 ? (
           <p className="mt-2 text-sm text-emerald-800">Sem jogadores neste time.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <div className="min-w-[820px]">
-              <div className="grid grid-cols-[minmax(180px,1.6fr)_90px_120px_130px_260px] gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-900">
-                <span>Jogador</span>
-                <span>G</span>
-                <span>A</span>
-                <span>GS</span>
-                <span>Nota</span>
-              </div>
+          <div className="mt-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_52px_52px_52px_140px] items-center gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-900">
+              <span>Jogador</span>
+              <span className="text-center">G</span>
+              <span className="text-center">A</span>
+              <span className="text-center">GS</span>
+              <span className="text-center">Nota</span>
+            </div>
 
-              <ul className="mt-2 space-y-2">
-                {participants.map((participant) => (
-                  <li
-                    key={participant.playerId}
-                    className="grid grid-cols-[minmax(180px,1.6fr)_90px_120px_130px_260px] items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2"
-                  >
-                    <span className="text-sm font-medium text-emerald-950">{participant.player.name}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={99}
-                      className="field-input h-9"
-                      value={stats[participant.playerId]?.goals ?? 0}
-                      onChange={(event) =>
-                        updateStat(participant.playerId, "goals", Number(event.currentTarget.value))
-                      }
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      max={99}
-                      className="field-input h-9"
-                      value={stats[participant.playerId]?.assists ?? 0}
-                      onChange={(event) =>
-                        updateStat(participant.playerId, "assists", Number(event.currentTarget.value))
-                      }
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      max={99}
-                      className="field-input h-9"
-                      value={stats[participant.playerId]?.goalsConceded ?? 0}
-                      onChange={(event) =>
-                        updateStat(participant.playerId, "goalsConceded", Number(event.currentTarget.value))
-                      }
-                    />
+            <ul className="mt-2 space-y-2">
+              {participants.map((participant) => (
+                <li
+                  key={participant.playerId}
+                  className="grid grid-cols-[minmax(0,1fr)_52px_52px_52px_140px] items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2"
+                >
+                  <span className="truncate pr-1 text-sm font-medium text-emerald-950">{participant.player.name}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={99}
+                    className="field-input h-8 w-12 justify-self-center px-1 text-center"
+                    value={stats[participant.playerId]?.goals ?? 0}
+                    onChange={(event) =>
+                      updateStat(participant.playerId, "goals", Number(event.currentTarget.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={99}
+                    className="field-input h-8 w-12 justify-self-center px-1 text-center"
+                    value={stats[participant.playerId]?.assists ?? 0}
+                    onChange={(event) =>
+                      updateStat(participant.playerId, "assists", Number(event.currentTarget.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={99}
+                    className="field-input h-8 w-12 justify-self-center px-1 text-center"
+                    value={stats[participant.playerId]?.goalsConceded ?? 0}
+                    onChange={(event) =>
+                      updateStat(participant.playerId, "goalsConceded", Number(event.currentTarget.value))
+                    }
+                  />
+                  <div className="justify-self-center">
                     <StarRating
-                      size="sm"
-                      value={ratings[participant.playerId] ?? 0}
+                      size="xs"
+                      value={ratings[participant.playerId] ?? 1}
                       onChange={(value) => updateRating(participant.playerId, value)}
                     />
-                  </li>
-                ))}
-              </ul>
-            </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

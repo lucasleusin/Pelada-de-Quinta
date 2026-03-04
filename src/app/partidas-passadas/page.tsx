@@ -31,6 +31,8 @@ type MatchRating = {
 };
 
 type MatchDetails = MatchSummary & {
+  teamAScore: number | null;
+  teamBScore: number | null;
   participants: Participant[];
   ratings: MatchRating[];
 };
@@ -41,15 +43,67 @@ type StatRow = {
   goalsConceded: number;
 };
 
-function getYesterdayIsoDate() {
+type ScoreState = {
+  teamAScore: string;
+  teamBScore: string;
+};
+
+function getTodayIsoDate() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  today.setDate(today.getDate() - 1);
   return today.toISOString().slice(0, 10);
 }
 
 function sortByName<T extends { player: { name: string } }>(list: T[]) {
   return [...list].sort((a, b) => a.player.name.localeCompare(b.player.name));
+}
+
+function parseNullableScore(value: string): number | null {
+  if (value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : Math.max(0, Math.trunc(parsed));
+}
+
+function validateGoalsVsScore(
+  participants: Participant[],
+  stats: Record<string, StatRow>,
+  score: ScoreState,
+): string | null {
+  const teamAScore = parseNullableScore(score.teamAScore);
+  const teamBScore = parseNullableScore(score.teamBScore);
+
+  let teamAGoals = 0;
+  let teamBGoals = 0;
+
+  for (const participant of participants) {
+    const goals = stats[participant.playerId]?.goals ?? 0;
+
+    if (participant.team === "A") {
+      teamAGoals += goals;
+    }
+
+    if (participant.team === "B") {
+      teamBGoals += goals;
+    }
+  }
+
+  if (teamAScore === null && teamAGoals > 0) {
+    return "Informe o placar do Time A antes de salvar gols.";
+  }
+
+  if (teamBScore === null && teamBGoals > 0) {
+    return "Informe o placar do Time B antes de salvar gols.";
+  }
+
+  if (teamAScore !== null && teamAGoals > teamAScore) {
+    return "Os gols dos jogadores do Time A nao podem ultrapassar o placar do Time A.";
+  }
+
+  if (teamBScore !== null && teamBGoals > teamBScore) {
+    return "Os gols dos jogadores do Time B nao podem ultrapassar o placar do Time B.";
+  }
+
+  return null;
 }
 
 export default function PartidasPassadasPage() {
@@ -58,13 +112,15 @@ export default function PartidasPassadasPage() {
   const [match, setMatch] = useState<MatchDetails | null>(null);
   const [stats, setStats] = useState<Record<string, StatRow>>({});
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [score, setScore] = useState<ScoreState>({ teamAScore: "", teamBScore: "" });
   const [statsDirty, setStatsDirty] = useState(false);
   const [ratingsDirty, setRatingsDirty] = useState(false);
+  const [scoreDirty, setScoreDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch(`/api/matches?to=${getYesterdayIsoDate()}`)
+    fetch(`/api/matches?to=${getTodayIsoDate()}`)
       .then((res) => res.json())
       .then((payload: MatchSummary[]) => {
         const sorted = payload.sort(
@@ -72,7 +128,7 @@ export default function PartidasPassadasPage() {
         );
         setMatches(sorted);
       })
-      .catch(() => setMessage("Falha ao carregar partidas passadas."));
+      .catch(() => setMessage("Falha ao carregar partidas."));
   }, []);
 
   useEffect(() => {
@@ -104,8 +160,13 @@ export default function PartidasPassadasPage() {
         setMatch(payload);
         setStats(nextStats);
         setRatings(nextRatings);
+        setScore({
+          teamAScore: payload.teamAScore === null ? "" : String(payload.teamAScore),
+          teamBScore: payload.teamBScore === null ? "" : String(payload.teamBScore),
+        });
         setStatsDirty(false);
         setRatingsDirty(false);
+        setScoreDirty(false);
         setSaveStatus("idle");
         setMessage("");
       })
@@ -115,18 +176,40 @@ export default function PartidasPassadasPage() {
       });
   }, [selectedMatchId]);
 
-  function handleSelectMatch(nextMatchId: string) {
-    setSelectedMatchId(nextMatchId);
-
-    if (nextMatchId) return;
-
+  function resetSelection() {
     setMatch(null);
     setStats({});
     setRatings({});
+    setScore({ teamAScore: "", teamBScore: "" });
     setStatsDirty(false);
     setRatingsDirty(false);
+    setScoreDirty(false);
     setSaveStatus("idle");
     setMessage("");
+  }
+
+  function handleSelectMatch(nextMatchId: string) {
+    setSelectedMatchId(nextMatchId);
+
+    if (!nextMatchId) {
+      resetSelection();
+    }
+  }
+
+  async function persistScore(selected: MatchDetails, currentScore: ScoreState) {
+    const response = await fetch(`/api/matches/${selected.id}/score`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamAScore: parseNullableScore(currentScore.teamAScore),
+        teamBScore: parseNullableScore(currentScore.teamBScore),
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "Erro ao salvar placar." }));
+      throw new Error(payload.error ?? "Erro ao salvar placar.");
+    }
   }
 
   async function persistStats(selected: MatchDetails, currentStats: Record<string, StatRow>) {
@@ -170,12 +253,23 @@ export default function PartidasPassadasPage() {
 
   useEffect(() => {
     if (!match) return;
-    if (!statsDirty && !ratingsDirty) return;
+    if (!scoreDirty && !statsDirty && !ratingsDirty) return;
 
     const timeout = setTimeout(async () => {
       setSaveStatus("saving");
 
+      const validationError = validateGoalsVsScore(match.participants, stats, score);
+      if (validationError) {
+        setSaveStatus("error");
+        setMessage(validationError);
+        return;
+      }
+
       try {
+        if (scoreDirty) {
+          await persistScore(match, score);
+        }
+
         if (statsDirty) {
           await persistStats(match, stats);
         }
@@ -184,6 +278,7 @@ export default function PartidasPassadasPage() {
           await persistRatings(match, ratings);
         }
 
+        setScoreDirty(false);
         setStatsDirty(false);
         setRatingsDirty(false);
         setSaveStatus("saved");
@@ -195,7 +290,7 @@ export default function PartidasPassadasPage() {
     }, 700);
 
     return () => clearTimeout(timeout);
-  }, [match, ratings, ratingsDirty, stats, statsDirty]);
+  }, [match, ratings, ratingsDirty, score, scoreDirty, stats, statsDirty]);
 
   const teamA = useMemo(
     () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "A")),
@@ -205,6 +300,11 @@ export default function PartidasPassadasPage() {
     () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "B")),
     [match],
   );
+
+  function updateScore(field: keyof ScoreState, value: string) {
+    setScore((prev) => ({ ...prev, [field]: value }));
+    setScoreDirty(true);
+  }
 
   function updateStat(playerId: string, field: keyof StatRow, value: number) {
     setStats((prev) => ({
@@ -286,7 +386,7 @@ export default function PartidasPassadasPage() {
       <section className="card p-5">
         <h2 className="text-3xl font-bold text-emerald-950">Partidas Passadas</h2>
         <p className="text-sm text-emerald-800">
-          Selecione a partida, ajuste stats e notas. O salvamento e automatico.
+          Selecione a partida de hoje ou anteriores, ajuste stats, notas e placar. O salvamento e automatico.
         </p>
 
         <label className="field-label mt-4" htmlFor="past-match-select">
@@ -313,25 +413,53 @@ export default function PartidasPassadasPage() {
       </section>
 
       {match ? (
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="card p-4">
-            <h3 className="text-2xl font-bold text-emerald-950">{match.teamAName || "Time A"}</h3>
-            {teamA.length === 0 ? (
-              <p className="mt-2 text-sm text-emerald-800">Sem jogadores no Time A.</p>
-            ) : (
-              <ul className="mt-3 space-y-3">{teamA.map((participant) => renderPlayerCard(participant))}</ul>
-            )}
-          </div>
+        <>
+          <section className="card p-4">
+            <h3 className="text-2xl font-bold text-emerald-950">Placar</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label>
+                <span className="field-label">{match.teamAName || "Time A"}</span>
+                <input
+                  type="number"
+                  min={0}
+                  className="field-input"
+                  value={score.teamAScore}
+                  onChange={(event) => updateScore("teamAScore", event.currentTarget.value)}
+                />
+              </label>
+              <label>
+                <span className="field-label">{match.teamBName || "Time B"}</span>
+                <input
+                  type="number"
+                  min={0}
+                  className="field-input"
+                  value={score.teamBScore}
+                  onChange={(event) => updateScore("teamBScore", event.currentTarget.value)}
+                />
+              </label>
+            </div>
+          </section>
 
-          <div className="card p-4">
-            <h3 className="text-2xl font-bold text-emerald-950">{match.teamBName || "Time B"}</h3>
-            {teamB.length === 0 ? (
-              <p className="mt-2 text-sm text-emerald-800">Sem jogadores no Time B.</p>
-            ) : (
-              <ul className="mt-3 space-y-3">{teamB.map((participant) => renderPlayerCard(participant))}</ul>
-            )}
-          </div>
-        </section>
+          <section className="grid gap-4 md:grid-cols-2">
+            <div className="card p-4">
+              <h3 className="text-2xl font-bold text-emerald-950">{match.teamAName || "Time A"}</h3>
+              {teamA.length === 0 ? (
+                <p className="mt-2 text-sm text-emerald-800">Sem jogadores no Time A.</p>
+              ) : (
+                <ul className="mt-3 space-y-3">{teamA.map((participant) => renderPlayerCard(participant))}</ul>
+              )}
+            </div>
+
+            <div className="card p-4">
+              <h3 className="text-2xl font-bold text-emerald-950">{match.teamBName || "Time B"}</h3>
+              {teamB.length === 0 ? (
+                <p className="mt-2 text-sm text-emerald-800">Sem jogadores no Time B.</p>
+              ) : (
+                <ul className="mt-3 space-y-3">{teamB.map((participant) => renderPlayerCard(participant))}</ul>
+              )}
+            </div>
+          </section>
+        </>
       ) : null}
     </div>
   );

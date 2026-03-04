@@ -6,5 +6,5 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  return updateMatchScore(id, body);
+  return updateMatchScore(id, body, true);
 }

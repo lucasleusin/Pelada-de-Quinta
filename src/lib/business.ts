@@ -16,6 +16,10 @@ export function isMatchInPast(matchDate: Date, now: Date = new Date()): boolean 
   return toStartOfDay(matchDate).getTime() < toStartOfDay(now).getTime();
 }
 
+export function isMatchOnOrBeforeToday(matchDate: Date, now: Date = new Date()): boolean {
+  return toStartOfDay(matchDate).getTime() <= toStartOfDay(now).getTime();
+}
+
 export function pickPresenceStatusForConfirmation(confirmedCount: number): PresenceStatus {
   return confirmedCount >= MAX_CONFIRMED_PLAYERS
     ? PresenceStatus.WAITLIST

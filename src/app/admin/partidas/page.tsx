@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { DragEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Player = {
   id: string;
@@ -25,15 +25,14 @@ type Match = {
   participants: Participant[];
 };
 
-const presenceLabel: Record<Participant["presenceStatus"], string> = {
-  CONFIRMED: "Confirmado",
-  WAITLIST: "Pendente",
-  CANCELED: "Desconfirmado",
-};
+type TeamColumn = "POOL" | "A" | "B";
+
+function sortByName<T extends { player: { name: string } }>(list: T[]) {
+  return [...list].sort((a, b) => a.player.name.localeCompare(b.player.name));
+}
 
 export default function AdminPartidasPage() {
   const [matches, setMatches] = useState<Match[]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
@@ -44,17 +43,41 @@ export default function AdminPartidasPage() {
     [matches, selectedMatchId],
   );
 
-  async function loadData() {
-    const [matchesRes, playersRes] = await Promise.all([
-      fetch("/api/admin/matches"),
-      fetch("/api/players?active=true"),
-    ]);
+  const confirmedWithoutTeam = useMemo(
+    () =>
+      sortByName(
+        (selectedMatch?.participants ?? []).filter(
+          (participant) => participant.presenceStatus === "CONFIRMED" && participant.team === null,
+        ),
+      ),
+    [selectedMatch],
+  );
 
+  const teamAPlayers = useMemo(
+    () =>
+      sortByName(
+        (selectedMatch?.participants ?? []).filter(
+          (participant) => participant.presenceStatus === "CONFIRMED" && participant.team === "A",
+        ),
+      ),
+    [selectedMatch],
+  );
+
+  const teamBPlayers = useMemo(
+    () =>
+      sortByName(
+        (selectedMatch?.participants ?? []).filter(
+          (participant) => participant.presenceStatus === "CONFIRMED" && participant.team === "B",
+        ),
+      ),
+    [selectedMatch],
+  );
+
+  async function loadData() {
+    const matchesRes = await fetch("/api/admin/matches");
     const matchesPayload = (await matchesRes.json()) as Match[];
-    const playersPayload = (await playersRes.json()) as Player[];
 
     setMatches(matchesPayload);
-    setPlayers(playersPayload);
 
     if (!selectedMatchId && matchesPayload[0]) {
       setSelectedMatchId(matchesPayload[0].id);
@@ -102,7 +125,8 @@ export default function AdminPartidasPage() {
     });
 
     if (!response.ok) {
-      setMessage("Falha ao salvar placar.");
+      const payload = await response.json().catch(() => ({ error: "Falha ao salvar placar." }));
+      setMessage(payload.error ?? "Falha ao salvar placar.");
       return;
     }
 
@@ -110,40 +134,53 @@ export default function AdminPartidasPage() {
     await loadData();
   }
 
-  async function updateParticipantPresence(playerId: string, presenceStatus: string) {
+  async function assignTeam(playerId: string, column: TeamColumn) {
     if (!selectedMatch) return;
 
-    const response = await fetch(`/api/admin/matches/${selectedMatch.id}/participants/${playerId}/presence`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ presenceStatus }),
-    });
-
-    if (!response.ok) {
-      setMessage("Falha ao atualizar presenca.");
-      return;
-    }
-
-    setMessage("Presenca atualizada.");
-    await loadData();
-  }
-
-  async function updateTeam(playerId: string, team: "A" | "B" | null) {
-    if (!selectedMatch) return;
-
+    const targetTeam = column === "POOL" ? null : column;
     const response = await fetch(`/api/admin/matches/${selectedMatch.id}/teams`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ assignments: [{ playerId, team }] }),
+      body: JSON.stringify({ assignments: [{ playerId, team: targetTeam }] }),
     });
 
     if (!response.ok) {
-      setMessage("Falha ao atualizar time.");
+      setMessage("Falha ao mover jogador entre colunas.");
       return;
     }
 
-    setMessage("Times atualizados.");
     await loadData();
+  }
+
+  function onPlayerDragStart(event: DragEvent<HTMLDivElement>, playerId: string) {
+    event.dataTransfer.setData("text/plain", playerId);
+    event.dataTransfer.effectAllowed = "move";
+  }
+
+  function onColumnDragOver(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  function onColumnDrop(event: DragEvent<HTMLElement>, column: TeamColumn) {
+    event.preventDefault();
+    const playerId = event.dataTransfer.getData("text/plain");
+    if (!playerId) return;
+
+    assignTeam(playerId, column).catch(() => setMessage("Falha ao mover jogador."));
+  }
+
+  function renderPlayerCard(participant: Participant) {
+    return (
+      <div
+        key={participant.playerId}
+        draggable
+        onDragStart={(event) => onPlayerDragStart(event, participant.playerId)}
+        className="cursor-move rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm"
+      >
+        {participant.player.name}
+      </div>
+    );
   }
 
   return (
@@ -181,6 +218,7 @@ export default function AdminPartidasPage() {
           {matches.map((match) => (
             <option key={match.id} value={match.id}>
               {new Date(match.matchDate).toLocaleDateString("pt-BR")}
+              {match.location ? ` - ${match.location}` : " - Local a definir"}
             </option>
           ))}
         </select>
@@ -191,49 +229,88 @@ export default function AdminPartidasPage() {
           <section className="card p-4">
             <h3 className="text-xl font-semibold text-emerald-950">Placar</h3>
             <form className="mt-3 grid gap-2 md:grid-cols-3" onSubmit={saveScore}>
-              <input name="teamAScore" type="number" min={0} defaultValue={selectedMatch.teamAScore ?? ""} className="field-input" />
-              <input name="teamBScore" type="number" min={0} defaultValue={selectedMatch.teamBScore ?? ""} className="field-input" />
-              <button className="btn btn-accent" type="submit">
-                Salvar placar
-              </button>
+              <label>
+                <span className="field-label">{selectedMatch.teamAName}</span>
+                <input
+                  name="teamAScore"
+                  type="number"
+                  min={0}
+                  defaultValue={selectedMatch.teamAScore ?? ""}
+                  className="field-input"
+                />
+              </label>
+              <label>
+                <span className="field-label">{selectedMatch.teamBName}</span>
+                <input
+                  name="teamBScore"
+                  type="number"
+                  min={0}
+                  defaultValue={selectedMatch.teamBScore ?? ""}
+                  className="field-input"
+                />
+              </label>
+              <div className="flex items-end">
+                <button className="btn btn-accent w-full" type="submit">
+                  Salvar placar
+                </button>
+              </div>
             </form>
           </section>
 
           <section className="card p-4">
-            <h3 className="text-xl font-semibold text-emerald-950">Participantes e times</h3>
-            <ul className="mt-3 space-y-2 text-sm">
-              {players.map((player) => {
-                const participant = selectedMatch.participants.find((item) => item.playerId === player.id);
-                return (
-                  <li key={player.id} className="grid gap-2 rounded-xl border border-emerald-100 p-3 md:grid-cols-4 md:items-center">
-                    <span className="font-medium text-emerald-900">{player.name}</span>
-                    <select
-                      className="field-input"
-                      value={participant?.presenceStatus ?? "CANCELED"}
-                      onChange={(event) => updateParticipantPresence(player.id, event.currentTarget.value)}
-                    >
-                      <option value="CONFIRMED">Confirmado</option>
-                      <option value="WAITLIST">Pendente</option>
-                      <option value="CANCELED">Desconfirmado</option>
-                    </select>
-                    <select
-                      className="field-input"
-                      value={participant?.team ?? ""}
-                      onChange={(event) =>
-                        updateTeam(player.id, event.currentTarget.value ? (event.currentTarget.value as "A" | "B") : null)
-                      }
-                    >
-                      <option value="">Sem time</option>
-                      <option value="A">Time A</option>
-                      <option value="B">Time B</option>
-                    </select>
-                    <span className="text-xs uppercase tracking-[0.12em] text-emerald-700">
-                      {presenceLabel[participant?.presenceStatus ?? "CANCELED"]}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <h3 className="text-xl font-semibold text-emerald-950">Definicao dos times (drag and drop)</h3>
+            <p className="mt-1 text-sm text-emerald-800">
+              Arraste jogadores confirmados entre as colunas para montar os times.
+            </p>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <section
+                onDragOver={onColumnDragOver}
+                onDrop={(event) => onColumnDrop(event, "POOL")}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
+              >
+                <h4 className="font-semibold text-emerald-950">
+                  Confirmados sem time ({confirmedWithoutTeam.length})
+                </h4>
+                <div className="mt-3 space-y-2">
+                  {confirmedWithoutTeam.length === 0 ? (
+                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                  ) : (
+                    confirmedWithoutTeam.map((participant) => renderPlayerCard(participant))
+                  )}
+                </div>
+              </section>
+
+              <section
+                onDragOver={onColumnDragOver}
+                onDrop={(event) => onColumnDrop(event, "A")}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
+              >
+                <h4 className="font-semibold text-emerald-950">{selectedMatch.teamAName} ({teamAPlayers.length})</h4>
+                <div className="mt-3 space-y-2">
+                  {teamAPlayers.length === 0 ? (
+                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                  ) : (
+                    teamAPlayers.map((participant) => renderPlayerCard(participant))
+                  )}
+                </div>
+              </section>
+
+              <section
+                onDragOver={onColumnDragOver}
+                onDrop={(event) => onColumnDrop(event, "B")}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
+              >
+                <h4 className="font-semibold text-emerald-950">{selectedMatch.teamBName} ({teamBPlayers.length})</h4>
+                <div className="mt-3 space-y-2">
+                  {teamBPlayers.length === 0 ? (
+                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                  ) : (
+                    teamBPlayers.map((participant) => renderPlayerCard(participant))
+                  )}
+                </div>
+              </section>
+            </div>
           </section>
         </>
       ) : null}

@@ -1,6 +1,10 @@
 import { MatchStatus, Position, PresenceStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { isMatchInPast, isMatchOpenForPresence, pickPresenceStatusForConfirmation } from "@/lib/business";
+import {
+  isMatchOnOrBeforeToday,
+  isMatchOpenForPresence,
+  pickPresenceStatusForConfirmation,
+} from "@/lib/business";
 import { getPrismaClient } from "@/lib/db";
 import {
   confirmPresenceSchema,
@@ -27,6 +31,53 @@ function startOfToday() {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   return now;
+}
+
+function sumGoalsByTeam(
+  participants: Array<{ playerId: string; team: "A" | "B" | null; goals: number }>,
+  overrides: Map<string, number>,
+) {
+  let teamAGoals = 0;
+  let teamBGoals = 0;
+
+  for (const participant of participants) {
+    const goals = overrides.get(participant.playerId) ?? participant.goals;
+
+    if (participant.team === "A") {
+      teamAGoals += goals;
+    }
+
+    if (participant.team === "B") {
+      teamBGoals += goals;
+    }
+  }
+
+  return { teamAGoals, teamBGoals };
+}
+
+function validateScoreAgainstTeamGoals(
+  teamAGoals: number,
+  teamBGoals: number,
+  teamAScore: number | null,
+  teamBScore: number | null,
+) {
+  if (teamAScore === null && teamAGoals > 0) {
+    return "Informe o placar do Time A antes de registrar gols.";
+  }
+
+  if (teamBScore === null && teamBGoals > 0) {
+    return "Informe o placar do Time B antes de registrar gols.";
+  }
+
+  if (teamAScore !== null && teamAGoals > teamAScore) {
+    return "Os gols dos jogadores do Time A nao podem ultrapassar o placar do Time A.";
+  }
+
+  if (teamBScore !== null && teamBGoals > teamBScore) {
+    return "Os gols dos jogadores do Time B nao podem ultrapassar o placar do Time B.";
+  }
+
+  return null;
 }
 
 export async function listMatches(request: Request) {
@@ -191,11 +242,29 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
-  if (!adminMode && !isMatchInPast(match.matchDate)) {
+  if (!adminMode && !isMatchOnOrBeforeToday(match.matchDate)) {
     return NextResponse.json(
-      { error: "Estatisticas so podem ser enviadas em partidas passadas." },
+      { error: "Estatisticas so podem ser enviadas em partidas de hoje ou anteriores." },
       { status: 400 },
     );
+  }
+
+  const existingParticipants = await db().matchParticipant.findMany({
+    where: { matchId },
+    select: { playerId: true, team: true, goals: true },
+  });
+
+  const nextGoalsByPlayer = new Map(parsed.data.stats.map((entry) => [entry.playerId, entry.goals]));
+  const { teamAGoals, teamBGoals } = sumGoalsByTeam(existingParticipants, nextGoalsByPlayer);
+  const scoreValidationError = validateScoreAgainstTeamGoals(
+    teamAGoals,
+    teamBGoals,
+    match.teamAScore,
+    match.teamBScore,
+  );
+
+  if (scoreValidationError) {
+    return NextResponse.json({ error: scoreValidationError }, { status: 400 });
   }
 
   const now = new Date();
@@ -243,9 +312,9 @@ export async function saveRatings(matchId: string, body: unknown) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
-  if (!isMatchInPast(match.matchDate)) {
+  if (!isMatchOnOrBeforeToday(match.matchDate)) {
     return NextResponse.json(
-      { error: "Avaliacoes so podem ser enviadas em partidas passadas." },
+      { error: "Avaliacoes so podem ser enviadas em partidas de hoje ou anteriores." },
       { status: 400 },
     );
   }
@@ -353,14 +422,54 @@ export async function updateMatchStatus(matchId: string, body: unknown) {
   return NextResponse.json(match);
 }
 
-export async function updateMatchScore(matchId: string, body: unknown) {
+export async function updateMatchScore(matchId: string, body: unknown, adminMode = false) {
   const parsed = matchScoreSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await db().match.update({
+  const match = await db().match.findUnique({
+    where: { id: matchId },
+    select: {
+      id: true,
+      matchDate: true,
+    },
+  });
+
+  if (!match) {
+    return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
+  }
+
+  if (!adminMode && !isMatchOnOrBeforeToday(match.matchDate)) {
+    return NextResponse.json(
+      { error: "Placar so pode ser informado para partidas de hoje ou anteriores." },
+      { status: 400 },
+    );
+  }
+
+  const participants = await db().matchParticipant.findMany({
+    where: { matchId },
+    select: {
+      playerId: true,
+      team: true,
+      goals: true,
+    },
+  });
+
+  const { teamAGoals, teamBGoals } = sumGoalsByTeam(participants, new Map());
+  const scoreValidationError = validateScoreAgainstTeamGoals(
+    teamAGoals,
+    teamBGoals,
+    parsed.data.teamAScore,
+    parsed.data.teamBScore,
+  );
+
+  if (scoreValidationError) {
+    return NextResponse.json({ error: scoreValidationError }, { status: 400 });
+  }
+
+  const updatedMatch = await db().match.update({
     where: { id: matchId },
     data: {
       teamAScore: parsed.data.teamAScore,
@@ -368,7 +477,7 @@ export async function updateMatchScore(matchId: string, body: unknown) {
     },
   });
 
-  return NextResponse.json(match);
+  return NextResponse.json(updatedMatch);
 }
 
 export async function updateTeams(matchId: string, body: unknown) {

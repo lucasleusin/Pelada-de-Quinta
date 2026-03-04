@@ -2,6 +2,7 @@ import { PresenceStatus } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   isMatchInPast,
+  isMatchOnOrBeforeToday,
   isMatchOpenForPresence,
   MAX_CONFIRMED_PLAYERS,
   pickPresenceStatusForConfirmation,
@@ -22,6 +23,14 @@ describe("business rules", () => {
 
     expect(isMatchInPast(new Date(2026, 2, 3, 0, 0, 0), now)).toBe(true);
     expect(isMatchInPast(new Date(2026, 2, 4, 0, 0, 0), now)).toBe(false);
+  });
+
+  it("allows post-game actions for matches on or before today", () => {
+    const now = new Date(2026, 2, 4, 15, 0, 0);
+
+    expect(isMatchOnOrBeforeToday(new Date(2026, 2, 3, 0, 0, 0), now)).toBe(true);
+    expect(isMatchOnOrBeforeToday(new Date(2026, 2, 4, 0, 0, 0), now)).toBe(true);
+    expect(isMatchOnOrBeforeToday(new Date(2026, 2, 5, 0, 0, 0), now)).toBe(false);
   });
 
   it("sends overflow players to waitlist after 18 confirmations", () => {

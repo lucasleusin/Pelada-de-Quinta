@@ -16,7 +16,7 @@ export default function AdminHomePage() {
 
         <Link href="/admin/partidas" className="card p-4 hover:border-emerald-400">
           <h3 className="text-xl font-semibold text-emerald-950">Partidas</h3>
-          <p className="text-sm text-emerald-800">Status, times, presencas e placar.</p>
+          <p className="text-sm text-emerald-800">Datas, times, presencas e placar.</p>
         </Link>
 
         <Link href="/admin/relatorios" className="card p-4 hover:border-emerald-400">

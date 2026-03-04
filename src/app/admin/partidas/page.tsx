@@ -18,7 +18,6 @@ type Match = {
   id: string;
   matchDate: string;
   location: string | null;
-  status: string;
   teamAName: string;
   teamBName: string;
   teamAScore: number | null;
@@ -26,7 +25,11 @@ type Match = {
   participants: Participant[];
 };
 
-const statuses = ["DRAFT", "CONFIRMATION_OPEN", "TEAMS_LOCKED", "FINISHED", "ARCHIVED"];
+const presenceLabel: Record<Participant["presenceStatus"], string> = {
+  CONFIRMED: "Confirmado",
+  WAITLIST: "Pendente",
+  CANCELED: "Desconfirmado",
+};
 
 export default function AdminPartidasPage() {
   const [matches, setMatches] = useState<Match[]>([]);
@@ -79,23 +82,6 @@ export default function AdminPartidasPage() {
     setDate("");
     setLocation("");
     setMessage("Partida criada.");
-    await loadData();
-  }
-
-  async function setStatus(status: string) {
-    if (!selectedMatch) return;
-    const response = await fetch(`/api/admin/matches/${selectedMatch.id}/status`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-
-    if (!response.ok) {
-      setMessage("Falha ao atualizar status.");
-      return;
-    }
-
-    setMessage("Status atualizado.");
     await loadData();
   }
 
@@ -194,7 +180,7 @@ export default function AdminPartidasPage() {
           <option value="">-- selecione --</option>
           {matches.map((match) => (
             <option key={match.id} value={match.id}>
-              {new Date(match.matchDate).toLocaleDateString("pt-BR")} - {match.status}
+              {new Date(match.matchDate).toLocaleDateString("pt-BR")}
             </option>
           ))}
         </select>
@@ -202,22 +188,6 @@ export default function AdminPartidasPage() {
 
       {selectedMatch ? (
         <>
-          <section className="card p-4">
-            <h3 className="text-xl font-semibold text-emerald-950">Status da partida</h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {statuses.map((status) => (
-                <button
-                  key={status}
-                  className={`btn ${selectedMatch.status === status ? "btn-primary" : "btn-ghost"}`}
-                  type="button"
-                  onClick={() => setStatus(status)}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-          </section>
-
           <section className="card p-4">
             <h3 className="text-xl font-semibold text-emerald-950">Placar</h3>
             <form className="mt-3 grid gap-2 md:grid-cols-3" onSubmit={saveScore}>
@@ -242,9 +212,9 @@ export default function AdminPartidasPage() {
                       value={participant?.presenceStatus ?? "CANCELED"}
                       onChange={(event) => updateParticipantPresence(player.id, event.currentTarget.value)}
                     >
-                      <option value="CONFIRMED">CONFIRMED</option>
-                      <option value="WAITLIST">WAITLIST</option>
-                      <option value="CANCELED">CANCELED</option>
+                      <option value="CONFIRMED">Confirmado</option>
+                      <option value="WAITLIST">Pendente</option>
+                      <option value="CANCELED">Desconfirmado</option>
                     </select>
                     <select
                       className="field-input"
@@ -258,7 +228,7 @@ export default function AdminPartidasPage() {
                       <option value="B">Time B</option>
                     </select>
                     <span className="text-xs uppercase tracking-[0.12em] text-emerald-700">
-                      {participant?.presenceStatus ?? "CANCELED"}
+                      {presenceLabel[participant?.presenceStatus ?? "CANCELED"]}
                     </span>
                   </li>
                 );

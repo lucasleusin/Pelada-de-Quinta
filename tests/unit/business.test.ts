@@ -1,12 +1,27 @@
-import { MatchStatus, PresenceStatus } from "@prisma/client";
+import { PresenceStatus } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { canConfirmPresence, MAX_CONFIRMED_PLAYERS, pickPresenceStatusForConfirmation, ratingIsValid } from "@/lib/business";
+import {
+  isMatchInPast,
+  isMatchOpenForPresence,
+  MAX_CONFIRMED_PLAYERS,
+  pickPresenceStatusForConfirmation,
+  ratingIsValid,
+} from "@/lib/business";
 
 describe("business rules", () => {
-  it("allow confirmation only in CONFIRMATION_OPEN", () => {
-    expect(canConfirmPresence(MatchStatus.CONFIRMATION_OPEN)).toBe(true);
-    expect(canConfirmPresence(MatchStatus.DRAFT)).toBe(false);
-    expect(canConfirmPresence(MatchStatus.FINISHED)).toBe(false);
+  it("allows confirmation only for matches on or after today", () => {
+    const now = new Date(2026, 2, 4, 15, 0, 0);
+
+    expect(isMatchOpenForPresence(new Date(2026, 2, 4, 0, 0, 0), now)).toBe(true);
+    expect(isMatchOpenForPresence(new Date(2026, 2, 5, 0, 0, 0), now)).toBe(true);
+    expect(isMatchOpenForPresence(new Date(2026, 2, 3, 0, 0, 0), now)).toBe(false);
+  });
+
+  it("identifies past matches by date", () => {
+    const now = new Date(2026, 2, 4, 15, 0, 0);
+
+    expect(isMatchInPast(new Date(2026, 2, 3, 0, 0, 0), now)).toBe(true);
+    expect(isMatchInPast(new Date(2026, 2, 4, 0, 0, 0), now)).toBe(false);
   });
 
   it("sends overflow players to waitlist after 18 confirmations", () => {

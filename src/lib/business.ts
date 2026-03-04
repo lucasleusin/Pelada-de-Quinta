@@ -1,9 +1,19 @@
-﻿import { MatchStatus, PresenceStatus } from "@prisma/client";
+import { PresenceStatus } from "@prisma/client";
 
 export const MAX_CONFIRMED_PLAYERS = 18;
 
-export function canConfirmPresence(status: MatchStatus): boolean {
-  return status === MatchStatus.CONFIRMATION_OPEN;
+function toStartOfDay(date: Date): Date {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+}
+
+export function isMatchOpenForPresence(matchDate: Date, now: Date = new Date()): boolean {
+  return toStartOfDay(matchDate).getTime() >= toStartOfDay(now).getTime();
+}
+
+export function isMatchInPast(matchDate: Date, now: Date = new Date()): boolean {
+  return toStartOfDay(matchDate).getTime() < toStartOfDay(now).getTime();
 }
 
 export function pickPresenceStatusForConfirmation(confirmedCount: number): PresenceStatus {

@@ -1,6 +1,6 @@
 import { MatchStatus, Position, PresenceStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { canConfirmPresence, pickPresenceStatusForConfirmation } from "@/lib/business";
+import { isMatchInPast, isMatchOpenForPresence, pickPresenceStatusForConfirmation } from "@/lib/business";
 import { getPrismaClient } from "@/lib/db";
 import {
   confirmPresenceSchema,
@@ -21,6 +21,12 @@ function parseDateFilter(value: string | null) {
   if (!value) return undefined;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function startOfToday() {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
 }
 
 export async function listMatches(request: Request) {
@@ -50,13 +56,11 @@ export async function listMatches(request: Request) {
 }
 
 export async function getNextMatch() {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  const today = startOfToday();
 
   return db().match.findFirst({
     where: {
-      matchDate: { gte: now },
-      status: { not: MatchStatus.ARCHIVED },
+      matchDate: { gte: today },
     },
     include: {
       participants: {
@@ -90,9 +94,9 @@ export async function confirmPresence(matchId: string, playerId: string) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
-  if (!canConfirmPresence(match.status)) {
+  if (!isMatchOpenForPresence(match.matchDate)) {
     return NextResponse.json(
-      { error: "Confirmacao indisponivel para o status atual da partida." },
+      { error: "Confirmacao indisponivel para partidas passadas." },
       { status: 400 },
     );
   }
@@ -125,6 +129,19 @@ export async function confirmPresence(matchId: string, playerId: string) {
 }
 
 export async function cancelPresence(matchId: string, playerId: string) {
+  const match = await db().match.findUnique({ where: { id: matchId } });
+
+  if (!match) {
+    return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
+  }
+
+  if (!isMatchOpenForPresence(match.matchDate)) {
+    return NextResponse.json(
+      { error: "Desconfirmacao indisponivel para partidas passadas." },
+      { status: 400 },
+    );
+  }
+
   const participant = await db().matchParticipant.upsert({
     where: { matchId_playerId: { matchId, playerId } },
     update: { presenceStatus: PresenceStatus.CANCELED },
@@ -137,7 +154,7 @@ export async function cancelPresence(matchId: string, playerId: string) {
 export async function setPresenceStatus(
   matchId: string,
   playerId: string,
-  presenceStatus: "CONFIRMED" | "CANCELED",
+  presenceStatus: "CONFIRMED" | "WAITLIST" | "CANCELED",
 ) {
   const match = await db().match.findUnique({ where: { id: matchId } });
 
@@ -145,8 +162,11 @@ export async function setPresenceStatus(
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
-  if (match.status === MatchStatus.ARCHIVED) {
-    return NextResponse.json({ error: "Partida arquivada." }, { status: 400 });
+  if (!isMatchOpenForPresence(match.matchDate)) {
+    return NextResponse.json(
+      { error: "Ajustes de presenca so sao permitidos em partidas em aberto." },
+      { status: 400 },
+    );
   }
 
   const participant = await db().matchParticipant.upsert({
@@ -171,9 +191,9 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
-  if (!adminMode && match.status !== MatchStatus.FINISHED) {
+  if (!adminMode && !isMatchInPast(match.matchDate)) {
     return NextResponse.json(
-      { error: "Estatisticas so podem ser enviadas com a partida finalizada." },
+      { error: "Estatisticas so podem ser enviadas em partidas passadas." },
       { status: 400 },
     );
   }
@@ -223,15 +243,11 @@ export async function saveRatings(matchId: string, body: unknown) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
-  if (match.status !== MatchStatus.FINISHED) {
+  if (!isMatchInPast(match.matchDate)) {
     return NextResponse.json(
-      { error: "Avaliacoes so podem ser enviadas com a partida finalizada." },
+      { error: "Avaliacoes so podem ser enviadas em partidas passadas." },
       { status: 400 },
     );
-  }
-
-  if (parsed.data.ratings.some((item) => item.raterPlayerId === item.ratedPlayerId)) {
-    return NextResponse.json({ error: "Nao e permitido autoavaliacao." }, { status: 400 });
   }
 
   await db().$transaction(
@@ -450,8 +466,10 @@ export async function getLeaderboards() {
 }
 
 export async function getAttendanceReport() {
+  const today = startOfToday();
+
   const eligibleMatches = await db().match.count({
-    where: { status: { in: [MatchStatus.CONFIRMATION_OPEN, MatchStatus.TEAMS_LOCKED, MatchStatus.FINISHED] } },
+    where: { matchDate: { lt: today } },
   });
 
   const players = await db().player.findMany({ orderBy: { name: "asc" } });
@@ -478,8 +496,10 @@ export async function getAttendanceReport() {
 }
 
 export async function getGeneralStatsOverview() {
+  const today = startOfToday();
+
   const finishedMatches = await db().match.findMany({
-    where: { status: MatchStatus.FINISHED },
+    where: { matchDate: { lt: today } },
     select: { id: true },
   });
 

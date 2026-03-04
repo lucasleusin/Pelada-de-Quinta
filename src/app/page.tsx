@@ -1,17 +1,18 @@
 "use client";
 
-import { Check, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useEffect } from "react";
+import { Check, RotateCcw, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 type Player = {
   id: string;
   name: string;
 };
 
+type PresenceStatus = "CONFIRMED" | "WAITLIST" | "CANCELED";
+
 type Participant = {
   playerId: string;
-  presenceStatus: "CONFIRMED" | "WAITLIST" | "CANCELED";
+  presenceStatus: PresenceStatus;
   team: "A" | "B" | null;
   player: Player;
 };
@@ -21,22 +22,25 @@ type Match = {
   matchDate: string;
   location: string | null;
   startTime: string;
-  status: string;
   participants: Participant[];
 };
 
-function getTomorrowIsoDate() {
-  const tomorrow = new Date();
-  tomorrow.setHours(0, 0, 0, 0);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().slice(0, 10);
+type ExpandedAction = {
+  list: "pending" | "confirmed" | "canceled";
+  playerId: string;
+};
+
+function getTodayIsoDate() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.toISOString().slice(0, 10);
 }
 
 export default function HomePage() {
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const [expandedPendingId, setExpandedPendingId] = useState<string | null>(null);
+  const [expandedAction, setExpandedAction] = useState<ExpandedAction | null>(null);
   const [message, setMessage] = useState<string>("");
 
   const selectedMatch = useMemo(
@@ -74,19 +78,19 @@ export default function HomePage() {
   async function loadData(keepSelection = true) {
     const [playersRes, matchesRes] = await Promise.all([
       fetch("/api/players?active=true"),
-      fetch(`/api/matches?from=${getTomorrowIsoDate()}`),
+      fetch(`/api/matches?from=${getTodayIsoDate()}`),
     ]);
 
     const players = ((await playersRes.json()) as Player[]).sort((a, b) => a.name.localeCompare(b.name));
     const upcomingMatches = (await matchesRes.json()) as Match[];
-    const sortedMatches = upcomingMatches
-      .filter((match) => match.status !== "ARCHIVED")
-      .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+    const sortedMatches = upcomingMatches.sort(
+      (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime(),
+    );
 
     setAllPlayers(players);
     setMatches(sortedMatches);
 
-    if (!keepSelection && sortedMatches.length > 0) {
+    if (!keepSelection) {
       setSelectedMatchId(null);
       return;
     }
@@ -101,7 +105,17 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function setPresence(playerId: string, presenceStatus: "CONFIRMED" | "CANCELED") {
+  function toggleAction(list: ExpandedAction["list"], playerId: string) {
+    setExpandedAction((current) => {
+      if (current?.list === list && current.playerId === playerId) {
+        return null;
+      }
+
+      return { list, playerId };
+    });
+  }
+
+  async function setPresence(playerId: string, presenceStatus: PresenceStatus) {
     if (!selectedMatch) return;
 
     const response = await fetch(`/api/matches/${selectedMatch.id}/presence`, {
@@ -116,8 +130,16 @@ export default function HomePage() {
       return;
     }
 
-    setExpandedPendingId(null);
-    setMessage(presenceStatus === "CONFIRMED" ? "Jogador confirmado." : "Jogador desconfirmado.");
+    setExpandedAction(null);
+
+    if (presenceStatus === "CONFIRMED") {
+      setMessage("Jogador confirmado.");
+    } else if (presenceStatus === "CANCELED") {
+      setMessage("Jogador desconfirmado.");
+    } else {
+      setMessage("Jogador retornou para pendentes.");
+    }
+
     await loadData(true);
   }
 
@@ -126,7 +148,7 @@ export default function HomePage() {
       <section className="card p-5">
         <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
         {matches.length === 0 ? (
-          <p className="mt-2 text-sm text-emerald-900">Nenhuma partida futura cadastrada.</p>
+          <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {matches.map((match) => {
@@ -146,7 +168,7 @@ export default function HomePage() {
                       {new Date(match.matchDate).toLocaleDateString("pt-BR")}
                     </p>
                     <p className="text-xs uppercase tracking-[0.1em] text-emerald-700">
-                      {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"} | {match.status}
+                      {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"}
                     </p>
                   </button>
                 </li>
@@ -161,60 +183,123 @@ export default function HomePage() {
           <div className="card p-4">
             <h4 className="text-lg font-semibold text-emerald-900">Pendentes ({pending.length})</h4>
             <ul className="mt-2 space-y-2 text-sm">
-              {pending.map((player) => (
-                <li key={player.id} className="rounded-lg bg-zinc-50 px-3 py-2">
-                  <button
-                    type="button"
-                    className="w-full text-left font-medium text-emerald-950"
-                    onClick={() => setExpandedPendingId((current) => (current === player.id ? null : player.id))}
-                  >
-                    {player.name}
-                  </button>
+              {pending.map((player) => {
+                const isExpanded = expandedAction?.list === "pending" && expandedAction.playerId === player.id;
+                return (
+                  <li key={player.id} className="rounded-lg bg-zinc-50 px-3 py-2">
+                    <button
+                      type="button"
+                      className="w-full text-left font-medium text-emerald-950"
+                      onClick={() => toggleAction("pending", player.id)}
+                    >
+                      {player.name}
+                    </button>
 
-                  {expandedPendingId === player.id ? (
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
-                        onClick={() => setPresence(player.id, "CONFIRMED")}
-                        aria-label="Confirmar jogador"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
-                        onClick={() => setPresence(player.id, "CANCELED")}
-                        aria-label="Desconfirmar jogador"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : null}
-                </li>
-              ))}
+                    {isExpanded ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
+                          onClick={() => setPresence(player.id, "CONFIRMED")}
+                          aria-label="Confirmar jogador"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
+                          onClick={() => setPresence(player.id, "CANCELED")}
+                          aria-label="Desconfirmar jogador"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
           <div className="card p-4">
             <h4 className="text-lg font-semibold text-emerald-900">Confirmados ({confirmed.length})</h4>
             <ul className="mt-2 space-y-2 text-sm">
-              {confirmed.map((item) => (
-                <li key={item.playerId} className="rounded-lg bg-emerald-50 px-3 py-2">
-                  {item.player.name}
-                </li>
-              ))}
+              {confirmed.map((item) => {
+                const isExpanded = expandedAction?.list === "confirmed" && expandedAction.playerId === item.playerId;
+                return (
+                  <li key={item.playerId} className="rounded-lg bg-emerald-50 px-3 py-2">
+                    <button
+                      type="button"
+                      className="w-full text-left font-medium text-emerald-950"
+                      onClick={() => toggleAction("confirmed", item.playerId)}
+                    >
+                      {item.player.name}
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
+                          onClick={() => setPresence(item.playerId, "CANCELED")}
+                          aria-label="Desconfirmar jogador"
+                        >
+                          <X size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-full bg-amber-400 p-1.5 text-white hover:bg-amber-500"
+                          onClick={() => setPresence(item.playerId, "WAITLIST")}
+                          aria-label="Voltar jogador para pendentes"
+                        >
+                          <RotateCcw size={16} />
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
           <div className="card p-4">
             <h4 className="text-lg font-semibold text-emerald-900">Desconfirmados ({canceled.length})</h4>
             <ul className="mt-2 space-y-2 text-sm">
-              {canceled.map((item) => (
-                <li key={item.playerId} className="rounded-lg bg-red-50 px-3 py-2">
-                  {item.player.name}
-                </li>
-              ))}
+              {canceled.map((item) => {
+                const isExpanded = expandedAction?.list === "canceled" && expandedAction.playerId === item.playerId;
+                return (
+                  <li key={item.playerId} className="rounded-lg bg-red-50 px-3 py-2">
+                    <button
+                      type="button"
+                      className="w-full text-left font-medium text-emerald-950"
+                      onClick={() => toggleAction("canceled", item.playerId)}
+                    >
+                      {item.player.name}
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
+                          onClick={() => setPresence(item.playerId, "CONFIRMED")}
+                          aria-label="Confirmar jogador"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-full bg-amber-400 p-1.5 text-white hover:bg-amber-500"
+                          onClick={() => setPresence(item.playerId, "WAITLIST")}
+                          aria-label="Voltar jogador para pendentes"
+                        >
+                          <RotateCcw size={16} />
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </section>

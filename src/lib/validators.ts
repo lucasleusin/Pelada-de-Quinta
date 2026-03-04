@@ -49,7 +49,7 @@ export const confirmPresenceSchema = z.object({
 
 export const publicPresenceSchema = z.object({
   playerId: z.string().uuid(),
-  presenceStatus: z.enum(["CONFIRMED", "CANCELED"]),
+  presenceStatus: z.enum(["CONFIRMED", "WAITLIST", "CANCELED"]),
 });
 
 export const participantsPresenceSchema = z.object({

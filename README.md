@@ -127,3 +127,7 @@ Workflow em `.github/workflows/ci.yml` executa:
 - typecheck
 - testes unitarios/integracao
 - build
+
+## Observacao (Windows ARM)
+
+Se voce estiver em Windows ARM e encontrar erro de engine do Prisma, rode o projeto com Node x64.

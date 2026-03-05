@@ -490,7 +490,7 @@ export default function PartidasPassadasPage() {
                   value={score.teamAScore}
                   onChange={(event) => updateScore("teamAScore", event.currentTarget.value)}
                 />
-                {missingGoals.teamA !== null ? (
+                {missingGoals.teamA !== null && missingGoals.teamA > 0 ? (
                   <p className="mt-1 text-xs font-semibold text-red-700">
                     {missingGoals.teamA} gols sem jogador
                   </p>
@@ -507,7 +507,7 @@ export default function PartidasPassadasPage() {
                   value={score.teamBScore}
                   onChange={(event) => updateScore("teamBScore", event.currentTarget.value)}
                 />
-                {missingGoals.teamB !== null ? (
+                {missingGoals.teamB !== null && missingGoals.teamB > 0 ? (
                   <p className="mt-1 text-xs font-semibold text-red-700">
                     {missingGoals.teamB} gols sem jogador
                   </p>

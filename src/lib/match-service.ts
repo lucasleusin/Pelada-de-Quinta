@@ -728,15 +728,49 @@ export async function getPlayerReport(playerId: string) {
     },
   });
 
+  let wins = 0;
+  let losses = 0;
+  let draws = 0;
+  let resultMatches = 0;
+
+  for (const item of history) {
+    if (!item.team) continue;
+    if (item.match.teamAScore === null || item.match.teamBScore === null) continue;
+
+    resultMatches += 1;
+
+    const ownScore = item.team === "A" ? item.match.teamAScore : item.match.teamBScore;
+    const opponentScore = item.team === "A" ? item.match.teamBScore : item.match.teamAScore;
+
+    if (ownScore > opponentScore) wins += 1;
+    else if (ownScore < opponentScore) losses += 1;
+    else draws += 1;
+  }
+
+  const matches = stats._count._all;
+  const goals = stats._sum.goals ?? 0;
+  const assists = stats._sum.assists ?? 0;
+  const goalsConceded = stats._sum.goalsConceded ?? 0;
+  const avgRating = Number(ratings._avg.rating?.toFixed(2) ?? 0);
+  const ratingsCount = ratings._count._all;
+  const goalsPerMatch = matches > 0 ? Number((goals / matches).toFixed(2)) : 0;
+  const efficiency =
+    resultMatches > 0 ? Number((((wins * 3 + draws) / (resultMatches * 3)) * 100).toFixed(1)) : 0;
+
   return {
     player,
     totals: {
-      matches: stats._count._all,
-      goals: stats._sum.goals ?? 0,
-      assists: stats._sum.assists ?? 0,
-      goalsConceded: stats._sum.goalsConceded ?? 0,
-      avgRating: Number(ratings._avg.rating?.toFixed(2) ?? 0),
-      ratingsCount: ratings._count._all,
+      matches,
+      goals,
+      assists,
+      goalsConceded,
+      avgRating,
+      ratingsCount,
+      wins,
+      losses,
+      draws,
+      goalsPerMatch,
+      efficiency,
     },
     history,
   };

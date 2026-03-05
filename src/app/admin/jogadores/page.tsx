@@ -23,6 +23,11 @@ type PlayerReport = {
     goalsConceded: number;
     avgRating: number;
     ratingsCount: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    goalsPerMatch: number;
+    efficiency: number;
   };
   history: Array<{
     goals: number;
@@ -303,6 +308,11 @@ export default function AdminJogadoresPage() {
                           <p>Gols: <strong>{report.totals.goals}</strong></p>
                           <p>Assistencias: <strong>{report.totals.assists}</strong></p>
                           <p>Gols sofridos: <strong>{report.totals.goalsConceded}</strong></p>
+                          <p>Vitorias: <strong>{report.totals.wins}</strong></p>
+                          <p>Derrotas: <strong>{report.totals.losses}</strong></p>
+                          <p>Empates: <strong>{report.totals.draws}</strong></p>
+                          <p>Media gol/jogo: <strong>{report.totals.goalsPerMatch.toFixed(2)}</strong></p>
+                          <p>Aproveitamento: <strong>{report.totals.efficiency.toFixed(1)}%</strong></p>
                           <p>Nota media: <strong>{report.totals.avgRating.toFixed(2)}</strong></p>
                           <p>Avaliacoes: <strong>{report.totals.ratingsCount}</strong></p>
                         </div>

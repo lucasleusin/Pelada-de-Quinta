@@ -28,6 +28,7 @@ type Match = {
 };
 
 type ListViewFilter = "ALL" | "PENDING" | "CONFIRMED" | "CANCELED";
+type MatchCardVariant = "default" | "desktopSecondary" | "mobileSecondary";
 
 function getTodayIsoDate() {
   const today = new Date();
@@ -58,7 +59,7 @@ function formatPlayerLabel(player: Player) {
 function normalizeText(value: string) {
   return value
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
 }
@@ -92,13 +93,16 @@ function MatchSummaryCard({
   match,
   active,
   onClick,
-  compact = false,
+  variant = "default",
 }: {
   match: Match;
   active: boolean;
   onClick: () => void;
-  compact?: boolean;
+  variant?: MatchCardVariant;
 }) {
+  const isMobileSecondary = variant === "mobileSecondary";
+  const isDesktopSecondary = variant === "desktopSecondary";
+
   return (
     <button
       type="button"
@@ -107,12 +111,26 @@ function MatchSummaryCard({
         active
           ? "border-emerald-700 bg-emerald-100"
           : "border-emerald-200 bg-white hover:border-emerald-400"
-      } ${compact ? "min-w-[220px] snap-start" : ""}`}
+      } ${
+        isMobileSecondary
+          ? "w-[140px] shrink-0 snap-start px-3 py-2"
+          : isDesktopSecondary
+            ? "h-full min-w-0"
+            : "min-w-0"
+      }`}
     >
-      <p className="text-base font-semibold text-emerald-950">{formatDatePtBr(match.matchDate)}</p>
-      <p className="text-xs uppercase tracking-[0.1em] text-emerald-700">
-        {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"}
+      <p
+        className={`font-semibold text-emerald-950 ${
+          isMobileSecondary ? "text-sm leading-tight" : "text-base"
+        }`}
+      >
+        {formatDatePtBr(match.matchDate)}
       </p>
+      {isMobileSecondary ? null : (
+        <p className="truncate text-xs uppercase tracking-[0.1em] text-emerald-700">
+          {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"}
+        </p>
+      )}
     </button>
   );
 }
@@ -273,7 +291,7 @@ export default function HomePage() {
             <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
           </>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.5fr)_minmax(0,1fr)]">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
               <div className="mt-3">
@@ -286,28 +304,29 @@ export default function HomePage() {
             </div>
 
             {otherMatches.length > 0 ? (
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Outras Partidas</p>
 
-                <div className="mt-3 hidden space-y-2 xl:block">
+                <div className="mt-3 hidden grid-cols-2 gap-2 xl:grid">
                   {otherMatches.map((match) => (
                     <MatchSummaryCard
                       key={match.id}
                       match={match}
                       active={false}
                       onClick={() => setSelectedMatchId(match.id)}
+                      variant="desktopSecondary"
                     />
                   ))}
                 </div>
 
-                <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 xl:hidden">
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 pr-1 xl:hidden">
                   {otherMatches.map((match) => (
                     <MatchSummaryCard
                       key={match.id}
                       match={match}
                       active={false}
                       onClick={() => setSelectedMatchId(match.id)}
-                      compact
+                      variant="mobileSecondary"
                     />
                   ))}
                 </div>

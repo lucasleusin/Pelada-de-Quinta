@@ -1,4 +1,4 @@
-import { MatchStatus, Position, PresenceStatus } from "@prisma/client";
+import { MatchStatus, Position, PresenceStatus, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import {
   isMatchOnOrBeforeToday,
@@ -108,17 +108,29 @@ export async function listMatches(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = parseDateFilter(searchParams.get("from"));
   const to = parseDateFilter(searchParams.get("to"));
+  const playerId = searchParams.get("playerId")?.trim() || undefined;
+
+  const where: Prisma.MatchWhereInput = {
+    matchDate:
+      from || to
+        ? {
+            gte: from,
+            lte: to,
+          }
+        : undefined,
+  };
+
+  if (playerId) {
+    where.participants = {
+      some: {
+        playerId,
+        OR: [{ presenceStatus: PresenceStatus.CONFIRMED }, { team: { not: null } }],
+      },
+    };
+  }
 
   return db().match.findMany({
-    where: {
-      matchDate:
-        from || to
-          ? {
-              gte: from,
-              lte: to,
-            }
-          : undefined,
-    },
+    where,
     include: {
       participants: {
         include: {

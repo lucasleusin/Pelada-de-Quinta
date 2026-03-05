@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { StarRating } from "@/components/star-rating";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 
@@ -73,22 +73,42 @@ export default function VotacaoPage() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
 
+  const resetSelectedMatchState = useCallback(() => {
+    setMatch(null);
+    setVotes({});
+    setDirtyVoteIds([]);
+    setSaveStatus("idle");
+    setMessage("");
+  }, []);
+
   useEffect(() => {
-    Promise.all([fetch("/api/players?active=true"), fetch(`/api/matches?to=${getTodayIsoDate()}`)])
-      .then(async ([playersRes, matchesRes]) => {
+    fetch("/api/players?active=true")
+      .then(async (playersRes) => {
         const playersPayload = ((await playersRes.json()) as Player[]).sort((a, b) =>
           a.name.localeCompare(b.name),
         );
-        const matchesPayload = (await matchesRes.json()) as MatchSummary[];
-        const sortedMatches = matchesPayload.sort(
+        setPlayers(playersPayload);
+      })
+      .catch(() => setMessage("Falha ao carregar jogadores da votacao."));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedRaterId) return;
+
+    fetch(`/api/matches?to=${getTodayIsoDate()}&playerId=${selectedRaterId}`)
+      .then((res) => res.json())
+      .then((payload: MatchSummary[]) => {
+        const sortedMatches = payload.sort(
           (a, b) => getDateSortValue(b.matchDate) - getDateSortValue(a.matchDate),
         );
 
-        setPlayers(playersPayload);
         setMatches(sortedMatches);
       })
-      .catch(() => setMessage("Falha ao carregar dados da votacao."));
-  }, []);
+      .catch(() => {
+        setMatches([]);
+        setMessage("Falha ao carregar partidas desse jogador.");
+      });
+  }, [selectedRaterId]);
 
   useEffect(() => {
     if (!selectedMatchId) return;
@@ -107,14 +127,6 @@ export default function VotacaoPage() {
         setSaveStatus("error");
       });
   }, [selectedMatchId, selectedRaterId]);
-
-  function resetSelectedMatchState() {
-    setMatch(null);
-    setVotes({});
-    setDirtyVoteIds([]);
-    setSaveStatus("idle");
-    setMessage("");
-  }
 
   function handleSelectMatch(nextMatchId: string) {
     setSelectedMatchId(nextMatchId);
@@ -276,7 +288,15 @@ export default function VotacaoPage() {
             <select
               className="field-input"
               value={selectedRaterId}
-              onChange={(event) => setSelectedRaterId(event.currentTarget.value)}
+              onChange={(event) => {
+                const nextRaterId = event.currentTarget.value;
+                setSelectedRaterId(nextRaterId);
+                setMatches([]);
+                setSelectedMatchId("");
+                resetSelectedMatchState();
+                setSaveStatus("idle");
+                setMessage("");
+              }}
             >
               <option value="">Selecione...</option>
               {players.map((player) => (
@@ -310,6 +330,14 @@ export default function VotacaoPage() {
         {saveStatus === "saved" ? <p className="mt-3 text-sm text-emerald-800">{message}</p> : null}
         {saveStatus === "error" ? <p className="mt-3 text-sm text-red-700">{message}</p> : null}
       </section>
+
+      {selectedRaterId && !selectedMatchId && matches.length === 0 ? (
+        <section className="card p-4">
+          <p className="text-sm font-medium text-emerald-900">
+            Esse jogador nao tem partidas disponiveis para votacao.
+          </p>
+        </section>
+      ) : null}
 
       {selectedRaterId && match ? (
         <>

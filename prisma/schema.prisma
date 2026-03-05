@@ -40,6 +40,8 @@ model Player {
   name                  String             @unique
   position              Position           @default(OUTRO)
   shirtNumberPreference Int?
+  email                 String?            @unique
+  phone                 String?
   photoUrl              String?
   photoPath             String?
   isActive              Boolean            @default(true)

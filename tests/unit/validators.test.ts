@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ratingsBatchSchema, statsBatchSchema } from "@/lib/validators";
+import {
+  playerCreateSchema,
+  playerProfileUpdateSchema,
+  ratingsBatchSchema,
+  statsBatchSchema,
+} from "@/lib/validators";
 
 describe("validators", () => {
   it("rejects rating outside range 1..5", () => {
@@ -30,5 +35,37 @@ describe("validators", () => {
     });
 
     expect(parsed.success).toBe(true);
+  });
+
+  it("rejects invalid email on player create", () => {
+    const parsed = playerCreateSchema.safeParse({
+      name: "Jogador Teste",
+      position: "MEIA",
+      shirtNumberPreference: 8,
+      email: "email-invalido",
+      phone: "(51) 99999-9999",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects invalid phone on player create", () => {
+    const parsed = playerCreateSchema.safeParse({
+      name: "Jogador Teste",
+      position: "MEIA",
+      shirtNumberPreference: 8,
+      email: "jogador@teste.com",
+      phone: "abc123",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects OUTRO on profile update", () => {
+    const parsed = playerProfileUpdateSchema.safeParse({
+      position: "OUTRO",
+    });
+
+    expect(parsed.success).toBe(false);
   });
 });

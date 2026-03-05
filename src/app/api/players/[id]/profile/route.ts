@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/db";
-import { requireAdminApi } from "@/lib/admin";
-import { playerUpdateSchema } from "@/lib/validators";
+import { playerProfileUpdateSchema } from "@/lib/validators";
 
 type PrismaUniqueErrorLike = {
   code?: string;
@@ -34,18 +33,29 @@ function uniqueConstraintMessage(error: PrismaUniqueErrorLike) {
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const adminCheck = await requireAdminApi();
-  if (!adminCheck.ok) return adminCheck.response;
-
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  const parsed = playerUpdateSchema.safeParse(body);
+  const parsed = playerProfileUpdateSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
   const prisma = getPrismaClient();
+  const existingPlayer = await prisma.player.findFirst({
+    where: {
+      id,
+      isActive: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingPlayer) {
+    return NextResponse.json({ error: "Jogador ativo nao encontrado." }, { status: 404 });
+  }
+
   try {
     const player = await prisma.player.update({
       where: { id },
@@ -58,6 +68,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: uniqueConstraintMessage(error) }, { status: 409 });
     }
 
-    return NextResponse.json({ error: "Nao foi possivel atualizar jogador." }, { status: 500 });
+    return NextResponse.json({ error: "Nao foi possivel atualizar perfil." }, { status: 500 });
   }
 }

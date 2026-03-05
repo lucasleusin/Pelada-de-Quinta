@@ -6,16 +6,56 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Senha obrigatoria."),
 });
 
+const shirtNumberSchema = z.number().int().min(0).max(99).nullable().optional();
+
+const optionalEmailSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed.toLowerCase();
+  },
+  z.string().email("Email invalido.").max(120, "Email muito longo.").nullable().optional(),
+);
+
+const optionalPhoneSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  },
+  z
+    .string()
+    .min(8, "Telefone invalido.")
+    .max(25, "Telefone invalido.")
+    .regex(/^[0-9()+\-\s]+$/u, "Telefone invalido.")
+    .nullable()
+    .optional(),
+);
+
 export const playerCreateSchema = z.object({
   name: z.string().trim().min(2, "Nome obrigatorio."),
   position: z.nativeEnum(Position),
-  shirtNumberPreference: z.number().int().min(0).max(99).nullable().optional(),
+  shirtNumberPreference: shirtNumberSchema,
+  email: optionalEmailSchema,
+  phone: optionalPhoneSchema,
   isActive: z.boolean().optional(),
 });
 
 export const playerUpdateSchema = playerCreateSchema.partial().extend({
   name: z.string().trim().min(2).optional(),
 });
+
+export const playerProfileUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Nome obrigatorio.").optional(),
+    position: z.enum(["GOLEIRO", "ZAGUEIRO", "MEIA", "ATACANTE"]).optional(),
+    shirtNumberPreference: shirtNumberSchema,
+    email: optionalEmailSchema,
+    phone: optionalPhoneSchema,
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo para atualizar.",
+  });
 
 export const activeToggleSchema = z.object({
   isActive: z.boolean(),

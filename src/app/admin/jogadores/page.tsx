@@ -8,6 +8,8 @@ type Player = {
   name: string;
   position: "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
   shirtNumberPreference: number | null;
+  email: string | null;
+  phone: string | null;
   photoUrl: string | null;
   photoPath: string | null;
   isActive: boolean;
@@ -65,11 +67,18 @@ function getInitials(name: string) {
   return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
 }
 
+function toNullableString(value: string) {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 export default function AdminJogadoresPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [name, setName] = useState("");
   const [position, setPosition] = useState<Player["position"]>("MEIA");
   const [shirtNumberPreference, setShirtNumberPreference] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
 
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
@@ -80,6 +89,8 @@ export default function AdminJogadoresPage() {
   const [editName, setEditName] = useState("");
   const [editPosition, setEditPosition] = useState<Player["position"]>("MEIA");
   const [editShirtNumber, setEditShirtNumber] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
   const [photoFilesByPlayerId, setPhotoFilesByPlayerId] = useState<Record<string, File | null>>({});
   const [photoStatusByPlayerId, setPhotoStatusByPlayerId] = useState<Record<string, string>>({});
 
@@ -102,18 +113,23 @@ export default function AdminJogadoresPage() {
         name,
         position,
         shirtNumberPreference: shirtNumberPreference ? Number(shirtNumberPreference) : null,
+        email: toNullableString(email),
+        phone: toNullableString(phone),
         isActive: true,
       }),
     });
 
     if (!response.ok) {
-      setMessage("Nao foi possivel criar jogador.");
+      const payload = await response.json().catch(() => ({ error: "Nao foi possivel criar jogador." }));
+      setMessage(payload.error ?? "Nao foi possivel criar jogador.");
       return;
     }
 
     setName("");
     setPosition("MEIA");
     setShirtNumberPreference("");
+    setEmail("");
+    setPhone("");
     setMessage("Jogador criado.");
     await loadPlayers();
   }
@@ -139,6 +155,8 @@ export default function AdminJogadoresPage() {
     setEditName(player.name);
     setEditPosition(player.position);
     setEditShirtNumber(player.shirtNumberPreference === null ? "" : String(player.shirtNumberPreference));
+    setEditEmail(player.email ?? "");
+    setEditPhone(player.phone ?? "");
   }
 
   function cancelEdit() {
@@ -146,6 +164,8 @@ export default function AdminJogadoresPage() {
     setEditName("");
     setEditPosition("MEIA");
     setEditShirtNumber("");
+    setEditEmail("");
+    setEditPhone("");
   }
 
   async function saveEdit(playerId: string) {
@@ -156,11 +176,14 @@ export default function AdminJogadoresPage() {
         name: editName,
         position: editPosition,
         shirtNumberPreference: editShirtNumber ? Number(editShirtNumber) : null,
+        email: toNullableString(editEmail),
+        phone: toNullableString(editPhone),
       }),
     });
 
     if (!response.ok) {
-      setMessage("Falha ao editar jogador.");
+      const payload = await response.json().catch(() => ({ error: "Falha ao editar jogador." }));
+      setMessage(payload.error ?? "Falha ao editar jogador.");
       return;
     }
 
@@ -253,7 +276,7 @@ export default function AdminJogadoresPage() {
     <div className="space-y-4">
       <section className="card p-5">
         <h2 className="text-3xl font-bold text-emerald-950">Jogadores</h2>
-        <form className="mt-4 grid gap-3 md:grid-cols-4" onSubmit={createPlayer}>
+        <form className="mt-4 grid gap-3 md:grid-cols-6" onSubmit={createPlayer}>
           <label>
             <span className="field-label">Nome</span>
             <input className="field-input" required value={name} onChange={(event) => setName(event.currentTarget.value)} />
@@ -282,6 +305,28 @@ export default function AdminJogadoresPage() {
             />
           </label>
 
+          <label>
+            <span className="field-label">Email</span>
+            <input
+              className="field-input"
+              type="email"
+              placeholder="email@exemplo.com"
+              value={email}
+              onChange={(event) => setEmail(event.currentTarget.value)}
+            />
+          </label>
+
+          <label>
+            <span className="field-label">Telefone</span>
+            <input
+              className="field-input"
+              type="tel"
+              placeholder="(51) 99999-9999"
+              value={phone}
+              onChange={(event) => setPhone(event.currentTarget.value)}
+            />
+          </label>
+
           <div className="flex items-end">
             <button className="btn btn-primary w-full" type="submit">
               Criar jogador
@@ -302,7 +347,7 @@ export default function AdminJogadoresPage() {
               <li key={player.id} className="rounded-xl border border-emerald-100 p-3">
                 {isEditing ? (
                   <div className="space-y-3">
-                    <div className="grid gap-2 md:grid-cols-4 md:items-end">
+                    <div className="grid gap-2 md:grid-cols-6 md:items-end">
                       <label>
                         <span className="field-label">Nome</span>
                         <input
@@ -336,7 +381,25 @@ export default function AdminJogadoresPage() {
                           onChange={(event) => setEditShirtNumber(event.currentTarget.value)}
                         />
                       </label>
-                      <div className="flex gap-2">
+                      <label>
+                        <span className="field-label">Email</span>
+                        <input
+                          className="field-input"
+                          type="email"
+                          value={editEmail}
+                          onChange={(event) => setEditEmail(event.currentTarget.value)}
+                        />
+                      </label>
+                      <label>
+                        <span className="field-label">Telefone</span>
+                        <input
+                          className="field-input"
+                          type="tel"
+                          value={editPhone}
+                          onChange={(event) => setEditPhone(event.currentTarget.value)}
+                        />
+                      </label>
+                      <div className="flex gap-2 md:col-span-6">
                         <button className="btn btn-primary" type="button" onClick={() => saveEdit(player.id)}>
                           Salvar
                         </button>
@@ -413,6 +476,13 @@ export default function AdminJogadoresPage() {
                           {player.shirtNumberPreference !== null ? ` | #${player.shirtNumberPreference}` : ""}
                           {player.isActive ? " | Ativo" : " | Inativo"}
                         </p>
+                        {player.email || player.phone ? (
+                          <p className="text-xs text-emerald-800">
+                            {player.email ? `Email: ${player.email}` : ""}
+                            {player.email && player.phone ? " | " : ""}
+                            {player.phone ? `Telefone: ${player.phone}` : ""}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 

@@ -8,6 +8,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/partidas-passadas", label: "Partidas Passadas" },
   { href: "/votacao", label: "Votacao" },
+  { href: "/meu-perfil", label: "Meu Perfil" },
   { href: "/estatisticas", label: "Estatisticas" },
   { href: "/admin", label: "Admin" },
 ];

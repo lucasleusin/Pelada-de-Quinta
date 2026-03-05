@@ -129,11 +129,23 @@ export default function EstatisticasPage() {
     });
   }
 
-  const topPresence = useMemo(() => overview?.attendance.slice(0, 10) ?? [], [overview]);
-  const topScorers = useMemo(() => overview?.topScorers.slice(0, 10) ?? [], [overview]);
-  const topAssists = useMemo(() => overview?.topAssists.slice(0, 10) ?? [], [overview]);
-  const topConceded = useMemo(() => overview?.mostConceded.slice(0, 10) ?? [], [overview]);
-  const topMvp = useMemo(() => overview?.mvp.slice(0, 10) ?? [], [overview]);
+  const topPresence = useMemo(
+    () =>
+      (overview?.attendance ?? [])
+        .filter((row) => row.confirmed > 0 && row.eligibleMatches > 0 && row.attendancePercentage > 0)
+        .slice(0, 10),
+    [overview],
+  );
+  const topScorers = useMemo(() => (overview?.topScorers ?? []).filter((row) => row.goals > 0).slice(0, 10), [overview]);
+  const topAssists = useMemo(() => (overview?.topAssists ?? []).filter((row) => row.assists > 0).slice(0, 10), [overview]);
+  const topConceded = useMemo(
+    () => (overview?.mostConceded ?? []).filter((row) => row.goalsConceded > 0).slice(0, 10),
+    [overview],
+  );
+  const topMvp = useMemo(
+    () => (overview?.mvp ?? []).filter((row) => row.averageRating > 0 && row.ratingsCount > 0).slice(0, 10),
+    [overview],
+  );
 
   function showGeneralView() {
     setViewMode("GERAL");

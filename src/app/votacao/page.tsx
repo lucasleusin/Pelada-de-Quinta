@@ -167,13 +167,41 @@ export default function VotacaoPage() {
     return () => clearTimeout(timeout);
   }, [dirtyVoteIds, match, selectedMatchId, selectedRaterId, votes]);
 
+  const alreadyRatedIds = useMemo(() => {
+    const ids = new Set<string>();
+
+    for (const [ratedPlayerId, rating] of Object.entries(votes)) {
+      if (rating >= 1 && rating <= 5) {
+        ids.add(ratedPlayerId);
+      }
+    }
+
+    return ids;
+  }, [votes]);
+
   const teamA = useMemo(
-    () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "A")),
-    [match],
+    () =>
+      sortByName(
+        (match?.participants ?? []).filter(
+          (participant) =>
+            participant.team === "A" &&
+            participant.playerId !== selectedRaterId &&
+            !alreadyRatedIds.has(participant.playerId),
+        ),
+      ),
+    [alreadyRatedIds, match, selectedRaterId],
   );
   const teamB = useMemo(
-    () => sortByName((match?.participants ?? []).filter((participant) => participant.team === "B")),
-    [match],
+    () =>
+      sortByName(
+        (match?.participants ?? []).filter(
+          (participant) =>
+            participant.team === "B" &&
+            participant.playerId !== selectedRaterId &&
+            !alreadyRatedIds.has(participant.playerId),
+        ),
+      ),
+    [alreadyRatedIds, match, selectedRaterId],
   );
 
   function updateVote(ratedPlayerId: string, rating: number) {
@@ -284,10 +312,19 @@ export default function VotacaoPage() {
       </section>
 
       {selectedRaterId && match ? (
-        <section className="grid gap-4 xl:grid-cols-2">
-          {renderTeamGrid(match.teamAName || "Time A", teamA)}
-          {renderTeamGrid(match.teamBName || "Time B", teamB)}
-        </section>
+        <>
+          <section className="grid gap-4 xl:grid-cols-2">
+            {renderTeamGrid(match.teamAName || "Time A", teamA)}
+            {renderTeamGrid(match.teamBName || "Time B", teamB)}
+          </section>
+          {teamA.length === 0 && teamB.length === 0 ? (
+            <section className="card p-4">
+              <p className="text-sm font-medium text-emerald-900">
+                Todos os jogadores dessa partida ja receberam sua nota.
+              </p>
+            </section>
+          ) : null}
+        </>
       ) : null}
     </div>
   );

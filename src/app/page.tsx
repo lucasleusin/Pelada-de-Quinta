@@ -27,6 +27,8 @@ type Match = {
   participants: Participant[];
 };
 
+type ListViewFilter = "ALL" | "PENDING" | "CONFIRMED" | "CANCELED";
+
 function getTodayIsoDate() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -53,6 +55,14 @@ function formatPlayerLabel(player: Player) {
   return `${player.name} (${getPositionCode(player.position)})`;
 }
 
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function ActionButton({
   label,
   tone,
@@ -66,10 +76,10 @@ function ActionButton({
 }) {
   const className =
     tone === "green"
-      ? "rounded-full bg-emerald-600 p-1.5 text-white hover:bg-emerald-700"
+      ? "inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
       : tone === "red"
-        ? "rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
-        : "rounded-full bg-amber-400 p-1.5 text-white hover:bg-amber-500";
+        ? "inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
+        : "inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 text-white hover:bg-amber-500";
 
   return (
     <button type="button" className={className} onClick={onClick} aria-label={label}>
@@ -111,7 +121,10 @@ export default function HomePage() {
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [listViewFilter, setListViewFilter] = useState<ListViewFilter>("ALL");
   const [message, setMessage] = useState<string>("");
+  const [actionMessage, setActionMessage] = useState<string>("");
 
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
@@ -152,6 +165,36 @@ export default function HomePage() {
     });
   }, [allPlayers, selectedMatch]);
 
+  const normalizedSearchTerm = useMemo(() => normalizeText(searchTerm), [searchTerm]);
+
+  const filteredPending = useMemo(
+    () =>
+      pending.filter((player) =>
+        normalizedSearchTerm === "" ? true : normalizeText(player.name).includes(normalizedSearchTerm),
+      ),
+    [normalizedSearchTerm, pending],
+  );
+
+  const filteredConfirmed = useMemo(
+    () =>
+      confirmed.filter((item) =>
+        normalizedSearchTerm === "" ? true : normalizeText(item.player.name).includes(normalizedSearchTerm),
+      ),
+    [confirmed, normalizedSearchTerm],
+  );
+
+  const filteredCanceled = useMemo(
+    () =>
+      canceled.filter((item) =>
+        normalizedSearchTerm === "" ? true : normalizeText(item.player.name).includes(normalizedSearchTerm),
+      ),
+    [canceled, normalizedSearchTerm],
+  );
+
+  const showPending = listViewFilter === "ALL" || listViewFilter === "PENDING";
+  const showConfirmed = listViewFilter === "ALL" || listViewFilter === "CONFIRMED";
+  const showCanceled = listViewFilter === "ALL" || listViewFilter === "CANCELED";
+
   async function loadData() {
     const [playersRes, matchesRes] = await Promise.all([
       fetch("/api/players?active=true"),
@@ -184,6 +227,16 @@ export default function HomePage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!actionMessage) return;
+
+    const timer = window.setTimeout(() => {
+      setActionMessage("");
+    }, 3500);
+
+    return () => window.clearTimeout(timer);
+  }, [actionMessage]);
+
   async function setPresence(playerId: string, presenceStatus: PresenceStatus) {
     if (!selectedMatch) return;
 
@@ -199,12 +252,13 @@ export default function HomePage() {
       return;
     }
 
+    setMessage("");
     if (presenceStatus === "CONFIRMED") {
-      setMessage("Jogador confirmado.");
+      setActionMessage("Jogador confirmado.");
     } else if (presenceStatus === "CANCELED") {
-      setMessage("Jogador desconfirmado.");
+      setActionMessage("Jogador desconfirmado.");
     } else {
-      setMessage("Jogador retornou para pendentes.");
+      setActionMessage("Jogador voltou para pendentes.");
     }
 
     await loadData();
@@ -264,100 +318,180 @@ export default function HomePage() {
       </section>
 
       {selectedMatch ? (
-        <section className="grid gap-4 md:grid-cols-3">
-          <div className="card p-4">
-            <h4 className="text-lg font-semibold text-emerald-900">Pendentes ({pending.length})</h4>
-            <ul className="mt-2 space-y-2 text-sm">
-              {pending.map((player) => (
-                <li
-                  key={player.id}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2"
-                >
-                  <span className="font-medium text-emerald-950">{formatPlayerLabel(player)}</span>
-                  <div className="flex items-center gap-2">
-                    <ActionButton
-                      label="Confirmar jogador"
-                      tone="green"
-                      onClick={() => setPresence(player.id, "CONFIRMED")}
-                    >
-                      <Check size={16} />
-                    </ActionButton>
-                    <ActionButton
-                      label="Desconfirmar jogador"
-                      tone="red"
-                      onClick={() => setPresence(player.id, "CANCELED")}
-                    >
-                      <X size={16} />
-                    </ActionButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+        <section className="card p-4">
+          <label>
+            <span className="field-label">Buscar jogador</span>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                className="field-input"
+                type="text"
+                placeholder="Digite o nome do jogador..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.currentTarget.value)}
+              />
+              {searchTerm ? (
+                <button type="button" className="btn btn-ghost" onClick={() => setSearchTerm("")}>Limpar</button>
+              ) : null}
+            </div>
+          </label>
+        </section>
+      ) : null}
 
-          <div className="card p-4">
-            <h4 className="text-lg font-semibold text-emerald-900">Confirmados ({confirmed.length})</h4>
-            <ul className="mt-2 space-y-2 text-sm">
-              {confirmed.map((item) => (
-                <li
-                  key={item.playerId}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2"
-                >
-                  <span className="font-medium text-emerald-950">{formatPlayerLabel(item.player)}</span>
-                  <div className="flex items-center gap-2">
-                    <ActionButton
-                      label="Desconfirmar jogador"
-                      tone="red"
-                      onClick={() => setPresence(item.playerId, "CANCELED")}
-                    >
-                      <X size={16} />
-                    </ActionButton>
-                    <ActionButton
-                      label="Voltar jogador para pendentes"
-                      tone="yellow"
-                      onClick={() => setPresence(item.playerId, "WAITLIST")}
-                    >
-                      <RotateCcw size={16} />
-                    </ActionButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="card p-4">
-            <h4 className="text-lg font-semibold text-emerald-900">Desconfirmados ({canceled.length})</h4>
-            <ul className="mt-2 space-y-2 text-sm">
-              {canceled.map((item) => (
-                <li
-                  key={item.playerId}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2"
-                >
-                  <span className="font-medium text-emerald-950">{formatPlayerLabel(item.player)}</span>
-                  <div className="flex items-center gap-2">
-                    <ActionButton
-                      label="Confirmar jogador"
-                      tone="green"
-                      onClick={() => setPresence(item.playerId, "CONFIRMED")}
-                    >
-                      <Check size={16} />
-                    </ActionButton>
-                    <ActionButton
-                      label="Voltar jogador para pendentes"
-                      tone="yellow"
-                      onClick={() => setPresence(item.playerId, "WAITLIST")}
-                    >
-                      <RotateCcw size={16} />
-                    </ActionButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
+      {selectedMatch ? (
+        <section className="sticky top-20 z-10 rounded-xl border border-emerald-200 bg-white/95 p-2 backdrop-blur">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`btn ${listViewFilter === "ALL" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setListViewFilter("ALL")}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              className={`btn ${listViewFilter === "PENDING" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setListViewFilter("PENDING")}
+            >
+              Pendentes
+            </button>
+            <button
+              type="button"
+              className={`btn ${listViewFilter === "CONFIRMED" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setListViewFilter("CONFIRMED")}
+            >
+              Confirmados
+            </button>
+            <button
+              type="button"
+              className={`btn ${listViewFilter === "CANCELED" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setListViewFilter("CANCELED")}
+            >
+              Desconfirmados
+            </button>
           </div>
         </section>
       ) : null}
 
-      {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
+      {selectedMatch && actionMessage ? (
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">{actionMessage}</p>
+      ) : null}
+
+      {selectedMatch ? (
+        <section className={`grid gap-4 ${listViewFilter === "ALL" ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
+          {showPending ? (
+            <div className="card p-4">
+              <h4 className="text-lg font-semibold text-emerald-900">Pendentes ({filteredPending.length})</h4>
+              <ul className="mt-2 space-y-2 text-sm">
+                {filteredPending.length === 0 ? (
+                  <li className="rounded-lg bg-zinc-50 px-3 py-2 text-emerald-900">
+                    Nenhum jogador encontrado para este filtro.
+                  </li>
+                ) : null}
+                {filteredPending.map((player) => (
+                  <li
+                    key={player.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2"
+                  >
+                    <span className="font-medium text-emerald-950">{formatPlayerLabel(player)}</span>
+                    <div className="flex items-center gap-2">
+                      <ActionButton
+                        label="Confirmar jogador"
+                        tone="green"
+                        onClick={() => setPresence(player.id, "CONFIRMED")}
+                      >
+                        <Check size={16} />
+                      </ActionButton>
+                      <ActionButton
+                        label="Desconfirmar jogador"
+                        tone="red"
+                        onClick={() => setPresence(player.id, "CANCELED")}
+                      >
+                        <X size={16} />
+                      </ActionButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {showConfirmed ? (
+            <div className="card p-4">
+              <h4 className="text-lg font-semibold text-emerald-900">Confirmados ({filteredConfirmed.length})</h4>
+              <ul className="mt-2 space-y-2 text-sm">
+                {filteredConfirmed.length === 0 ? (
+                  <li className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">
+                    Nenhum jogador encontrado para este filtro.
+                  </li>
+                ) : null}
+                {filteredConfirmed.map((item) => (
+                  <li
+                    key={item.playerId}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2"
+                  >
+                    <span className="font-medium text-emerald-950">{formatPlayerLabel(item.player)}</span>
+                    <div className="flex items-center gap-2">
+                      <ActionButton
+                        label="Voltar jogador para pendentes"
+                        tone="yellow"
+                        onClick={() => setPresence(item.playerId, "WAITLIST")}
+                      >
+                        <RotateCcw size={16} />
+                      </ActionButton>
+                      <ActionButton
+                        label="Desconfirmar jogador"
+                        tone="red"
+                        onClick={() => setPresence(item.playerId, "CANCELED")}
+                      >
+                        <X size={16} />
+                      </ActionButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {showCanceled ? (
+            <div className="card p-4">
+              <h4 className="text-lg font-semibold text-emerald-900">Desconfirmados ({filteredCanceled.length})</h4>
+              <ul className="mt-2 space-y-2 text-sm">
+                {filteredCanceled.length === 0 ? (
+                  <li className="rounded-lg bg-red-50 px-3 py-2 text-emerald-900">
+                    Nenhum jogador encontrado para este filtro.
+                  </li>
+                ) : null}
+                {filteredCanceled.map((item) => (
+                  <li
+                    key={item.playerId}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2"
+                  >
+                    <span className="font-medium text-emerald-950">{formatPlayerLabel(item.player)}</span>
+                    <div className="flex items-center gap-2">
+                      <ActionButton
+                        label="Confirmar jogador"
+                        tone="green"
+                        onClick={() => setPresence(item.playerId, "CONFIRMED")}
+                      >
+                        <Check size={16} />
+                      </ActionButton>
+                      <ActionButton
+                        label="Voltar jogador para pendentes"
+                        tone="yellow"
+                        onClick={() => setPresence(item.playerId, "WAITLIST")}
+                      >
+                        <RotateCcw size={16} />
+                      </ActionButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {message ? <p className="text-sm font-medium text-red-700">{message}</p> : null}
     </div>
   );
 }

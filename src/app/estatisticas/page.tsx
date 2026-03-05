@@ -187,8 +187,9 @@ export default function EstatisticasPage() {
         </select>
 
         {selectedPlayerStats ? (
-          <div className="mt-4 space-y-4">
-            <div className={`${styles.card} ${barlow.className}`}>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
+            <div className="flex justify-center lg:justify-start">
+              <div className={`${styles.card} ${barlow.className}`}>
               <div className={styles.cardBg} />
 
               <div className={styles.dot} style={{ width: 8, height: 8, background: "#fff", top: "15%", left: "8%" }} />
@@ -303,10 +304,11 @@ export default function EstatisticasPage() {
                 </div>
               </div>
 
-              <div className={styles.shimmer} />
+                <div className={styles.shimmer} />
+              </div>
             </div>
 
-            <div>
+            <div className="lg:min-w-0">
               <h3 className="text-xl font-semibold text-emerald-950">
                 Partidas de {selectedPlayerStats.player.name}
               </h3>

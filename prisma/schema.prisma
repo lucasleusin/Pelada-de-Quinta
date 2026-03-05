@@ -40,6 +40,8 @@ model Player {
   name                  String             @unique
   position              Position           @default(OUTRO)
   shirtNumberPreference Int?
+  photoUrl              String?
+  photoPath             String?
   isActive              Boolean            @default(true)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt

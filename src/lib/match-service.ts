@@ -779,6 +779,9 @@ export async function getPlayerReport(playerId: string) {
   const avgRating = Number(ratings._avg.rating?.toFixed(2) ?? 0);
   const ratingsCount = ratings._count._all;
   const goalsPerMatch = matches > 0 ? Number((goals / matches).toFixed(2)) : 0;
+  const avgGoalsPerMatch = matches > 0 ? Number((goals / matches).toFixed(2)) : 0;
+  const avgAssistsPerMatch = matches > 0 ? Number((assists / matches).toFixed(2)) : 0;
+  const avgConcededPerMatch = matches > 0 ? Number((goalsConceded / matches).toFixed(2)) : 0;
   const efficiency =
     resultMatches > 0 ? Number((((wins * 3 + draws) / (resultMatches * 3)) * 100).toFixed(1)) : 0;
 
@@ -795,6 +798,9 @@ export async function getPlayerReport(playerId: string) {
       losses,
       draws,
       goalsPerMatch,
+      avgGoalsPerMatch,
+      avgAssistsPerMatch,
+      avgConcededPerMatch,
       efficiency,
     },
     history,

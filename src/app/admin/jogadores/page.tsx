@@ -8,6 +8,8 @@ type Player = {
   name: string;
   position: "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
   shirtNumberPreference: number | null;
+  photoUrl: string | null;
+  photoPath: string | null;
   isActive: boolean;
 };
 
@@ -15,6 +17,7 @@ type PlayerReport = {
   player: {
     id: string;
     name: string;
+    photoUrl?: string | null;
   };
   totals: {
     matches: number;
@@ -27,6 +30,9 @@ type PlayerReport = {
     losses: number;
     draws: number;
     goalsPerMatch: number;
+    avgGoalsPerMatch: number;
+    avgAssistsPerMatch: number;
+    avgConcededPerMatch: number;
     efficiency: number;
   };
   history: Array<{
@@ -52,6 +58,13 @@ const positionLabel: Record<Player["position"], string> = {
   OUTRO: "Outro",
 };
 
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "JG";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
+
 export default function AdminJogadoresPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [name, setName] = useState("");
@@ -67,6 +80,8 @@ export default function AdminJogadoresPage() {
   const [editName, setEditName] = useState("");
   const [editPosition, setEditPosition] = useState<Player["position"]>("MEIA");
   const [editShirtNumber, setEditShirtNumber] = useState("");
+  const [photoFilesByPlayerId, setPhotoFilesByPlayerId] = useState<Record<string, File | null>>({});
+  const [photoStatusByPlayerId, setPhotoStatusByPlayerId] = useState<Record<string, string>>({});
 
   async function loadPlayers() {
     const response = await fetch("/api/players");
@@ -177,6 +192,63 @@ export default function AdminJogadoresPage() {
     }
   }
 
+  async function uploadPhoto(playerId: string) {
+    const file = photoFilesByPlayerId[playerId];
+
+    if (!file) {
+      setPhotoStatusByPlayerId((prev) => ({ ...prev, [playerId]: "Selecione um arquivo antes de enviar." }));
+      return;
+    }
+
+    setPhotoStatusByPlayerId((prev) => ({ ...prev, [playerId]: "Enviando foto..." }));
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`/api/admin/players/${playerId}/photo`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "Falha ao enviar foto." }));
+      setPhotoStatusByPlayerId((prev) => ({ ...prev, [playerId]: payload.error ?? "Falha ao enviar foto." }));
+      return;
+    }
+
+    const payload = (await response.json()) as { photoUrl: string | null; photoPath: string | null };
+
+    setPlayers((prev) =>
+      prev.map((player) =>
+        player.id === playerId ? { ...player, photoUrl: payload.photoUrl, photoPath: payload.photoPath } : player,
+      ),
+    );
+    setPhotoFilesByPlayerId((prev) => ({ ...prev, [playerId]: null }));
+    setPhotoStatusByPlayerId((prev) => ({ ...prev, [playerId]: "Foto atualizada." }));
+  }
+
+  async function removePhoto(playerId: string) {
+    setPhotoStatusByPlayerId((prev) => ({ ...prev, [playerId]: "Removendo foto..." }));
+
+    const response = await fetch(`/api/admin/players/${playerId}/photo`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "Falha ao remover foto." }));
+      setPhotoStatusByPlayerId((prev) => ({ ...prev, [playerId]: payload.error ?? "Falha ao remover foto." }));
+      return;
+    }
+
+    setPlayers((prev) =>
+      prev.map((player) =>
+        player.id === playerId ? { ...player, photoUrl: null, photoPath: null } : player,
+      ),
+    );
+    setPhotoFilesByPlayerId((prev) => ({ ...prev, [playerId]: null }));
+    setPhotoStatusByPlayerId((prev) => ({ ...prev, [playerId]: "Foto removida." }));
+  }
+
   return (
     <div className="space-y-4">
       <section className="card p-5">
@@ -274,13 +346,26 @@ export default function AdminJogadoresPage() {
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-emerald-950">{player.name}</p>
-                      <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">
-                        {positionLabel[player.position]}
-                        {player.shirtNumberPreference !== null ? ` | #${player.shirtNumberPreference}` : ""}
-                        {player.isActive ? " | Ativo" : " | Inativo"}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      {player.photoUrl ? (
+                        <img
+                          src={player.photoUrl}
+                          alt={`Foto de ${player.name}`}
+                          className="h-14 w-14 rounded-xl border border-emerald-200 object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-sm font-bold text-emerald-900">
+                          {getInitials(player.name)}
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-emerald-950">{player.name}</p>
+                        <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">
+                          {positionLabel[player.position]}
+                          {player.shirtNumberPreference !== null ? ` | #${player.shirtNumberPreference}` : ""}
+                          {player.isActive ? " | Ativo" : " | Inativo"}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -297,6 +382,39 @@ export default function AdminJogadoresPage() {
                   </div>
                 )}
 
+                {!isEditing ? (
+                  <div className="mt-3 rounded-lg bg-emerald-50 p-3">
+                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+                      <label>
+                        <span className="field-label">Foto do jogador</span>
+                        <input
+                          className="field-input"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(event) => {
+                            const file = event.currentTarget.files?.[0] ?? null;
+                            setPhotoFilesByPlayerId((prev) => ({ ...prev, [player.id]: file }));
+                          }}
+                        />
+                      </label>
+                      <button className="btn btn-primary" type="button" onClick={() => uploadPhoto(player.id)}>
+                        Enviar foto
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        disabled={!player.photoUrl}
+                        onClick={() => removePhoto(player.id)}
+                      >
+                        Remover foto
+                      </button>
+                    </div>
+                    {photoStatusByPlayerId[player.id] ? (
+                      <p className="mt-2 text-xs font-medium text-emerald-900">{photoStatusByPlayerId[player.id]}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {isExpanded ? (
                   <div className="mt-3 rounded-lg bg-emerald-50 p-3">
                     {loadingReport ? (
@@ -312,6 +430,9 @@ export default function AdminJogadoresPage() {
                           <p>Derrotas: <strong>{report.totals.losses}</strong></p>
                           <p>Empates: <strong>{report.totals.draws}</strong></p>
                           <p>Media gol/jogo: <strong>{report.totals.goalsPerMatch.toFixed(2)}</strong></p>
+                          <p>Media gols: <strong>{report.totals.avgGoalsPerMatch.toFixed(2)}</strong></p>
+                          <p>Media assistencias: <strong>{report.totals.avgAssistsPerMatch.toFixed(2)}</strong></p>
+                          <p>Media gols sofridos: <strong>{report.totals.avgConcededPerMatch.toFixed(2)}</strong></p>
                           <p>Aproveitamento: <strong>{report.totals.efficiency.toFixed(1)}%</strong></p>
                           <p>Nota media: <strong>{report.totals.avgRating.toFixed(2)}</strong></p>
                           <p>Avaliacoes: <strong>{report.totals.ratingsCount}</strong></p>

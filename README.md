@@ -118,6 +118,8 @@ Como voce ja criou os projetos, agora faltam 3 passos:
 - `AUTH_TRUST_HOST`: `true`
 - `ADMIN_SEED_EMAIL` e `ADMIN_SEED_PASSWORD`
 - `ADMIN_LOGIN_USERNAME` e `ADMIN_LOGIN_PASSWORD`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
 2. Criar tabelas no Supabase:
 - opcao A (recomendada): rodar `npm run prisma:migrate:deploy` com `DATABASE_URL` e `DIRECT_URL` apontando para seu Supabase;
@@ -130,6 +132,14 @@ npm run prisma:seed
 ```
 
 Depois disso, o deploy no Vercel ja sobe com banco pronto.
+
+## Fotos de jogadores (Admin)
+
+Para upload de fotos via Admin/Jogadores:
+
+1. Crie no Supabase Storage o bucket `player-photos`.
+2. Configure o bucket como publico (MVP).
+3. Garanta `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no ambiente.
 
 ## Endpoints principais
 

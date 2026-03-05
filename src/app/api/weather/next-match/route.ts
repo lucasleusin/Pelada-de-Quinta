@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
   endpoint.searchParams.set("latitude", String(CACHOEIRA_DO_SUL.latitude));
   endpoint.searchParams.set("longitude", String(CACHOEIRA_DO_SUL.longitude));
-  endpoint.searchParams.set("hourly", "weather_code");
+  endpoint.searchParams.set("hourly", "weather_code,temperature_2m");
   endpoint.searchParams.set("timezone", "America/Sao_Paulo");
   endpoint.searchParams.set("forecast_days", "16");
 
@@ -72,13 +72,20 @@ export async function GET(request: Request) {
   }
 
   const payload = (await response.json()) as {
-    hourly?: { time?: string[]; weather_code?: number[] };
+    hourly?: { time?: string[]; weather_code?: number[]; temperature_2m?: number[] };
   };
 
   const times = payload.hourly?.time ?? [];
   const weatherCodes = payload.hourly?.weather_code ?? [];
+  const temperatures = payload.hourly?.temperature_2m ?? [];
 
-  if (times.length === 0 || weatherCodes.length === 0 || times.length !== weatherCodes.length) {
+  if (
+    times.length === 0 ||
+    weatherCodes.length === 0 ||
+    temperatures.length === 0 ||
+    times.length !== weatherCodes.length ||
+    times.length !== temperatures.length
+  ) {
     return NextResponse.json({ error: "Previsao indisponivel no momento." }, { status: 502 });
   }
 
@@ -104,9 +111,15 @@ export async function GET(request: Request) {
   }
 
   const weatherCode = weatherCodes[bestIndex];
+  const temperature = temperatures[bestIndex];
+
+  if (typeof temperature !== "number" || Number.isNaN(temperature)) {
+    return NextResponse.json({ error: "Previsao indisponivel no momento." }, { status: 502 });
+  }
 
   return NextResponse.json({
     iconKey: mapWeatherCodeToIconKey(weatherCode),
     weatherCode,
+    temperatureC: Math.round(temperature),
   });
 }

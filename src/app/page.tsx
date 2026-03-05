@@ -42,7 +42,7 @@ type Match = {
 
 type ListViewFilter = "ALL" | "PENDING" | "CONFIRMED" | "CANCELED";
 type MatchCardVariant = "default" | "desktopSecondary" | "mobileSecondary";
-type NextMatchWeather = { iconKey: IconKey; weatherCode: number };
+type NextMatchWeather = { iconKey: IconKey; weatherCode: number; temperatureC: number };
 
 function getTodayIsoDate() {
   const today = new Date();
@@ -366,8 +366,15 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
                   {nextMatchWeather ? (
-                    <span aria-label="Previsao do tempo da partida" title="Previsao do tempo da partida">
+                    <span
+                      className="inline-flex items-center gap-1"
+                      aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
+                    >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
+                      <span className="text-[10px] font-semibold leading-none text-emerald-800">
+                        {nextMatchWeather.temperatureC}°C
+                      </span>
                     </span>
                   ) : null}
                 </div>
@@ -403,8 +410,15 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
                   {nextMatchWeather ? (
-                    <span aria-label="Previsao do tempo da partida" title="Previsao do tempo da partida">
+                    <span
+                      className="inline-flex items-center gap-1"
+                      aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
+                    >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
+                      <span className="text-[10px] font-semibold leading-none text-emerald-800">
+                        {nextMatchWeather.temperatureC}°C
+                      </span>
                     </span>
                   ) : null}
                 </div>

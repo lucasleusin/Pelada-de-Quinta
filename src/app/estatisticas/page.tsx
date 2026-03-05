@@ -136,7 +136,10 @@ export default function EstatisticasPage() {
         .slice(0, 10),
     [overview],
   );
-  const topScorers = useMemo(() => (overview?.topScorers ?? []).filter((row) => row.goals > 0).slice(0, 10), [overview]);
+  const topScorers = useMemo(
+    () => (overview?.topScorers ?? []).filter((row) => row.goals > 0),
+    [overview],
+  );
   const topAssists = useMemo(() => (overview?.topAssists ?? []).filter((row) => row.assists > 0).slice(0, 10), [overview]);
   const topConceded = useMemo(
     () => (overview?.mostConceded ?? []).filter((row) => row.goalsConceded > 0).slice(0, 10),

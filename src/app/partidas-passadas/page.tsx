@@ -397,6 +397,9 @@ export default function PartidasPassadasPage() {
   }
 
   function renderTeamGrid(title: string, participants: Participant[]) {
+    const gridColumnsClass =
+      "grid-cols-[minmax(0,1fr)_30px_30px_30px_64px] sm:grid-cols-[minmax(0,1fr)_52px_52px_52px_140px]";
+
     return (
       <div className="card p-4">
         <h3 className="text-2xl font-bold text-emerald-950">{title}</h3>
@@ -404,7 +407,9 @@ export default function PartidasPassadasPage() {
           <p className="mt-2 text-sm text-emerald-800">Sem jogadores neste time.</p>
         ) : (
           <div className="mt-3">
-            <div className="grid grid-cols-[minmax(0,1fr)_52px_52px_52px_140px] items-center gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-900">
+            <div
+              className={`grid ${gridColumnsClass} items-center gap-1 rounded-lg bg-emerald-100 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-900 sm:gap-2 sm:px-3 sm:text-xs`}
+            >
               <span>Jogador</span>
               <span className="text-center">G</span>
               <span className="text-center">A</span>
@@ -416,15 +421,17 @@ export default function PartidasPassadasPage() {
               {participants.map((participant) => (
                 <li
                   key={participant.playerId}
-                  className="grid grid-cols-[minmax(0,1fr)_52px_52px_52px_140px] items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2"
+                  className={`grid ${gridColumnsClass} items-center gap-1 rounded-lg border border-emerald-100 bg-white px-2 py-2 sm:gap-2 sm:px-3`}
                 >
-                  <span className="truncate pr-1 text-sm font-medium text-emerald-950">{formatPlayerLabel(participant.player)}</span>
+                  <span className="pr-1 text-xs font-medium leading-tight text-emerald-950 sm:text-sm">
+                    {formatPlayerLabel(participant.player)}
+                  </span>
                   <input
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={2}
-                    className="field-input h-8 w-12 justify-self-center px-1 text-center"
+                    className="field-input h-8 w-8 justify-self-center px-1 text-center text-xs sm:w-12 sm:text-sm"
                     value={stats[participant.playerId]?.goals ?? 0}
                     onChange={(event) =>
                       updateStat(participant.playerId, "goals", event.currentTarget.value)
@@ -435,7 +442,7 @@ export default function PartidasPassadasPage() {
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={2}
-                    className="field-input h-8 w-12 justify-self-center px-1 text-center"
+                    className="field-input h-8 w-8 justify-self-center px-1 text-center text-xs sm:w-12 sm:text-sm"
                     value={stats[participant.playerId]?.assists ?? 0}
                     onChange={(event) =>
                       updateStat(participant.playerId, "assists", event.currentTarget.value)
@@ -446,13 +453,13 @@ export default function PartidasPassadasPage() {
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={2}
-                    className="field-input h-8 w-12 justify-self-center px-1 text-center"
+                    className="field-input h-8 w-8 justify-self-center px-1 text-center text-xs sm:w-12 sm:text-sm"
                     value={stats[participant.playerId]?.goalsConceded ?? 0}
                     onChange={(event) =>
                       updateStat(participant.playerId, "goalsConceded", event.currentTarget.value)
                     }
                   />
-                  <span className="justify-self-center text-sm font-semibold text-emerald-900">
+                  <span className="justify-self-center text-xs font-semibold text-emerald-900 sm:text-sm">
                     {averageVoteByPlayerId[participant.playerId] ?? "-"}
                   </span>
                 </li>

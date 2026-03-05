@@ -1,15 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDatePtBr } from "@/lib/date-format";
 import { PlayerFifaCard, type PlayerCardPosition } from "@/components/player-fifa-card";
+
+type RankingRow = {
+  playerId: string;
+  playerName: string;
+  goals: number;
+  assists: number;
+  goalsConceded: number;
+  averageRating: number;
+  ratingsCount: number;
+};
+
+type AttendanceRow = {
+  playerId: string;
+  playerName: string;
+  confirmed: number;
+  eligibleMatches: number;
+  attendancePercentage: number;
+};
 
 type Overview = {
   totalMatches: number;
   totalGoals: number;
+  totalAssists: number;
   topScorer: { name: string; goals: number };
   topAssist: { name: string; assists: number };
   topConcededGoalkeeper: { name: string; goalsConceded: number };
+  attendance: AttendanceRow[];
+  topScorers: RankingRow[];
+  topAssists: RankingRow[];
+  mostConceded: RankingRow[];
+  mvp: RankingRow[];
 };
 
 type Player = {
@@ -56,11 +80,14 @@ type PlayerStats = {
   }>;
 };
 
+type StatsViewMode = "GERAL" | "POR_JOGADOR";
+
 export default function EstatisticasPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [selectedPlayerStats, setSelectedPlayerStats] = useState<PlayerStats | null>(null);
+  const [viewMode, setViewMode] = useState<StatsViewMode>("GERAL");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -100,64 +127,92 @@ export default function EstatisticasPage() {
     });
   }
 
+  const topPresence = useMemo(() => overview?.attendance.slice(0, 10) ?? [], [overview]);
+  const topScorers = useMemo(() => overview?.topScorers.slice(0, 10) ?? [], [overview]);
+  const topAssists = useMemo(() => overview?.topAssists.slice(0, 10) ?? [], [overview]);
+  const topConceded = useMemo(() => overview?.mostConceded.slice(0, 10) ?? [], [overview]);
+  const topMvp = useMemo(() => overview?.mvp.slice(0, 10) ?? [], [overview]);
+
   return (
     <div className="space-y-5">
       <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Historico Geral</h2>
-        {overview ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm">
-              <p className="font-semibold text-emerald-900">Numero de Partidas</p>
-              <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalMatches}</p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm">
-              <p className="font-semibold text-emerald-900">Numero de Gols</p>
-              <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalGoals}</p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm">
-              <p className="font-semibold text-emerald-900">Artilheiro</p>
-              <p className="mt-1 text-base font-bold text-emerald-950">
-                {overview.topScorer.name} ({overview.topScorer.goals})
-              </p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm">
-              <p className="font-semibold text-emerald-900">Lider de Assistencia</p>
-              <p className="mt-1 text-base font-bold text-emerald-950">
-                {overview.topAssist.name} ({overview.topAssist.assists})
-              </p>
-            </div>
-            <div className="rounded-xl bg-orange-50 p-3 text-sm">
-              <p className="font-semibold text-emerald-900">Frangueiro</p>
-              <p className="mt-1 text-base font-bold text-emerald-950">
-                {overview.topConcededGoalkeeper.name} ({overview.topConcededGoalkeeper.goalsConceded})
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-emerald-900">Carregando historico geral...</p>
-        )}
+        <h2 className="text-3xl font-bold text-emerald-950">Estatisticas</h2>
+
+        <div className="mt-4 flex flex-wrap items-end gap-2">
+          <button
+            type="button"
+            className={`btn ${viewMode === "GERAL" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setViewMode("GERAL")}
+          >
+            Geral
+          </button>
+          <button
+            type="button"
+            className={`btn ${viewMode === "POR_JOGADOR" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setViewMode("POR_JOGADOR")}
+          >
+            Por Jogador
+          </button>
+
+          <label className="min-w-[220px] flex-1">
+            <span className="field-label">Jogador</span>
+            <select
+              id="player-select"
+              className="field-input"
+              value={selectedPlayerId}
+              onChange={(event) => handleSelectPlayer(event.currentTarget.value)}
+            >
+              <option value="">Selecione...</option>
+              {players.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </section>
 
-      <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Estatistica por jogador</h2>
-        <label className="field-label mt-4" htmlFor="player-select">
-          Escolha o jogador
-        </label>
-        <select
-          id="player-select"
-          className="field-input max-w-md"
-          value={selectedPlayerId}
-          onChange={(event) => handleSelectPlayer(event.currentTarget.value)}
-        >
-          <option value="">Selecione...</option>
-          {players.map((player) => (
-            <option key={player.id} value={player.id}>
-              {player.name}
-            </option>
-          ))}
-        </select>
+      {viewMode === "GERAL" ? (
+        <>
+          <section className="card p-5">
+            <h3 className="text-2xl font-bold text-emerald-950">Resumo Geral</h3>
+            {overview ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl bg-emerald-50 p-3 text-sm">
+                  <p className="font-semibold text-emerald-900">Numero de Partidas</p>
+                  <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalMatches}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-3 text-sm">
+                  <p className="font-semibold text-emerald-900">Total de Gols</p>
+                  <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalGoals}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-3 text-sm">
+                  <p className="font-semibold text-emerald-900">Total de Assistencias</p>
+                  <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalAssists}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-emerald-900">Carregando resumo geral...</p>
+            )}
+          </section>
 
-        {selectedPlayerStats ? (
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <RankingCard
+              title="Presenca"
+              rows={topPresence}
+              metric={(row) => `${row.attendancePercentage.toFixed(1)}%`}
+            />
+            <RankingCard title="Artilharia" rows={topScorers} metric={(row) => String(row.goals)} />
+            <RankingCard title="Assistencias" rows={topAssists} metric={(row) => String(row.assists)} />
+            <RankingCard title="Gols Tomados" rows={topConceded} metric={(row) => String(row.goalsConceded)} />
+            <RankingCard title="Nota Media" rows={topMvp} metric={(row) => row.averageRating.toFixed(2)} />
+          </section>
+        </>
+      ) : selectedPlayerStats ? (
+        <section className="card p-5">
+          <h3 className="text-2xl font-bold text-emerald-950">Estatistica por jogador</h3>
+
           <div className="mt-4 grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
             <div>
               <PlayerFifaCard
@@ -173,27 +228,63 @@ export default function EstatisticasPage() {
             </div>
 
             <div className="lg:min-w-0">
-              <h3 className="text-xl font-semibold text-emerald-950">Partidas de {selectedPlayerStats.player.name}</h3>
+              <h3 className="text-xl font-semibold text-emerald-950">
+                Partidas de {selectedPlayerStats.player.name}
+              </h3>
               <ul className="mt-3 space-y-3 text-sm">
                 {selectedPlayerStats.history.map((item) => (
                   <li key={item.match.id} className="rounded-xl bg-zinc-50 p-3">
                     <p className="font-semibold text-emerald-900">
-                      {formatDatePtBr(item.match.matchDate)} - {item.match.teamAScore ?? "-"} x {item.match.teamBScore ?? "-"}
+                      {formatDatePtBr(item.match.matchDate)} - {item.match.teamAScore ?? "-"} x{" "}
+                      {item.match.teamBScore ?? "-"}
                     </p>
                     <p>
-                      Gols: {item.goals} | Assistencias: {item.assists} | Gols sofridos: {item.goalsConceded}
+                      Gols: {item.goals} | Assistencias: {item.assists} | Gols sofridos:{" "}
+                      {item.goalsConceded}
                     </p>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-emerald-900">Escolha um jogador para visualizar os dados.</p>
-        )}
-      </section>
+        </section>
+      ) : (
+        <section className="card p-5">
+          <p className="text-sm text-emerald-900">
+            Selecione um jogador para visualizar as estatisticas individuais.
+          </p>
+        </section>
+      )}
 
       {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
     </div>
+  );
+}
+
+function RankingCard<T extends { playerId: string; playerName: string }>({
+  title,
+  rows,
+  metric,
+}: {
+  title: string;
+  rows: T[];
+  metric: (row: T) => string;
+}) {
+  return (
+    <section className="card p-4">
+      <h4 className="text-xl font-semibold text-emerald-950">{title}</h4>
+      <ul className="mt-3 space-y-2 text-sm">
+        {rows.length === 0 ? (
+          <li className="rounded-lg bg-zinc-50 px-3 py-2 text-emerald-800">Sem dados.</li>
+        ) : (
+          rows.map((row) => (
+            <li key={row.playerId} className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2">
+              <span className="truncate">{row.playerName}</span>
+              <span className="font-semibold">{metric(row)}</span>
+            </li>
+          ))
+        )}
+      </ul>
+    </section>
   );
 }

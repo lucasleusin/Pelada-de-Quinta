@@ -186,6 +186,9 @@ export default function VotacaoPage() {
   }
 
   function renderTeamGrid(title: string, participants: Participant[]) {
+    const gridColumnsClass =
+      "grid-cols-[minmax(0,1fr)_30px_30px_30px_132px] sm:grid-cols-[minmax(0,1fr)_52px_52px_52px_140px]";
+
     return (
       <div className="card p-4">
         <h3 className="text-2xl font-bold text-emerald-950">{title}</h3>
@@ -193,7 +196,9 @@ export default function VotacaoPage() {
           <p className="mt-2 text-sm text-emerald-800">Sem jogadores neste time.</p>
         ) : (
           <div className="mt-3">
-            <div className="grid grid-cols-[minmax(0,1fr)_52px_52px_52px_140px] items-center gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-900">
+            <div
+              className={`grid ${gridColumnsClass} items-center gap-1 rounded-lg bg-emerald-100 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-900 sm:gap-2 sm:px-3 sm:text-xs`}
+            >
               <span>Jogador</span>
               <span className="text-center">G</span>
               <span className="text-center">A</span>
@@ -205,12 +210,14 @@ export default function VotacaoPage() {
               {participants.map((participant) => (
                 <li
                   key={participant.playerId}
-                  className="grid grid-cols-[minmax(0,1fr)_52px_52px_52px_140px] items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2"
+                  className={`grid ${gridColumnsClass} items-center gap-1 rounded-lg border border-emerald-100 bg-white px-2 py-2 sm:gap-2 sm:px-3`}
                 >
-                  <span className="truncate pr-1 text-sm font-medium text-emerald-950">{participant.player.name}</span>
-                  <span className="text-center text-sm text-emerald-900">{participant.goals}</span>
-                  <span className="text-center text-sm text-emerald-900">{participant.assists}</span>
-                  <span className="text-center text-sm text-emerald-900">{participant.goalsConceded}</span>
+                  <span className="pr-1 text-xs font-medium leading-tight text-emerald-950 sm:text-sm">
+                    {participant.player.name}
+                  </span>
+                  <span className="text-center text-xs text-emerald-900 sm:text-sm">{participant.goals}</span>
+                  <span className="text-center text-xs text-emerald-900 sm:text-sm">{participant.assists}</span>
+                  <span className="text-center text-xs text-emerald-900 sm:text-sm">{participant.goalsConceded}</span>
                   <div className="justify-self-center">
                     <StarRating
                       size="xs"

@@ -102,17 +102,18 @@ function MatchSummaryCard({
 }) {
   const isMobileSecondary = variant === "mobileSecondary";
   const isDesktopSecondary = variant === "desktopSecondary";
+  const isDefault = variant === "default";
   const widthClass = isMobileSecondary
     ? "w-fit shrink-0 snap-start px-3 py-2"
     : isDesktopSecondary
       ? "w-full h-full min-w-0"
-      : "w-full min-w-0";
+      : "w-fit min-w-0 px-3 py-2 sm:w-full";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`${widthClass} rounded-xl border px-4 py-3 text-left transition ${
+      className={`${widthClass} rounded-xl border px-3 py-2 text-left transition ${
         active
           ? "border-emerald-700 bg-emerald-100"
           : "border-emerald-200 bg-white hover:border-emerald-400"
@@ -120,14 +121,19 @@ function MatchSummaryCard({
     >
       <p
         className={`font-semibold text-emerald-950 ${
-          isMobileSecondary ? "whitespace-nowrap text-sm leading-tight" : "text-base"
+          isMobileSecondary ? "whitespace-nowrap text-sm leading-tight" : "text-sm sm:text-base"
         }`}
       >
         {formatDatePtBr(match.matchDate)}
+        {isDefault ? ` - ${match.startTime}` : ""}
       </p>
       {isMobileSecondary ? null : (
-        <p className="truncate text-xs uppercase tracking-[0.1em] text-emerald-700">
-          {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"}
+        <p
+          className={`truncate uppercase text-emerald-700 ${
+            isDefault ? "text-[0.45rem] tracking-[0.08em] sm:text-[0.6rem]" : "text-xs tracking-[0.1em]"
+          }`}
+        >
+          {match.location ? match.location : "Local a definir"}
         </p>
       )}
     </button>
@@ -283,18 +289,18 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="card p-5">
+    <div className="space-y-3 sm:space-y-5">
+      <section className="card p-3 sm:p-5">
         {matches.length === 0 || !primaryMatch ? (
           <>
-            <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
             <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
           </>
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.5fr)_minmax(0,1fr)]">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
-              <div className="mt-3">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+              <div className="mt-2">
                 <MatchSummaryCard
                   match={primaryMatch}
                   active={selectedMatchId === primaryMatch.id}
@@ -305,9 +311,9 @@ export default function HomePage() {
 
             {otherMatches.length > 0 ? (
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Outras Partidas</p>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Outras Partidas</p>
 
-                <div className="mt-3 hidden grid-cols-2 gap-2 xl:grid">
+                <div className="mt-2 hidden grid-cols-2 gap-2 xl:grid">
                   {otherMatches.map((match) => (
                     <MatchSummaryCard
                       key={match.id}
@@ -319,7 +325,7 @@ export default function HomePage() {
                   ))}
                 </div>
 
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 pr-1 xl:hidden">
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1 pr-1 xl:hidden">
                   {otherMatches.map((match) => (
                     <MatchSummaryCard
                       key={match.id}
@@ -337,7 +343,7 @@ export default function HomePage() {
       </section>
 
       {selectedMatch ? (
-        <section className="card p-4">
+        <section className="card p-3 sm:p-4">
           <label>
             <span className="field-label">Buscar jogador</span>
             <div className="mt-1 flex items-center gap-2">
@@ -357,7 +363,7 @@ export default function HomePage() {
       ) : null}
 
       {selectedMatch ? (
-        <section className="sticky top-20 z-10 rounded-xl border border-emerald-200 bg-white/95 p-2 backdrop-blur">
+        <section className="sticky top-20 z-10 rounded-xl border border-emerald-200 bg-white/95 p-1.5 sm:p-2 backdrop-blur">
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -368,24 +374,42 @@ export default function HomePage() {
             </button>
             <button
               type="button"
-              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "PENDING" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn h-8 w-8 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+                listViewFilter === "PENDING"
+                  ? "bg-amber-500 text-white hover:bg-amber-600 sm:bg-emerald-700 sm:hover:bg-emerald-800"
+                  : "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
+              }`}
               onClick={() => setListViewFilter("PENDING")}
+              aria-label="Filtrar pendentes"
             >
-              Pendentes
+              <RotateCcw size={14} className="sm:hidden" />
+              <span className="hidden sm:inline">Pendentes</span>
             </button>
             <button
               type="button"
-              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "CONFIRMED" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn h-8 w-8 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+                listViewFilter === "CONFIRMED"
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
+              }`}
               onClick={() => setListViewFilter("CONFIRMED")}
+              aria-label="Filtrar confirmados"
             >
-              Confirmados
+              <Check size={14} className="sm:hidden" />
+              <span className="hidden sm:inline">Confirmados</span>
             </button>
             <button
               type="button"
-              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "CANCELED" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn h-8 w-8 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+                listViewFilter === "CANCELED"
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
+              }`}
               onClick={() => setListViewFilter("CANCELED")}
+              aria-label="Filtrar desconfirmados"
             >
-              Desconfirmados
+              <X size={14} className="sm:hidden" />
+              <span className="hidden sm:inline">Desconfirmados</span>
             </button>
           </div>
         </section>

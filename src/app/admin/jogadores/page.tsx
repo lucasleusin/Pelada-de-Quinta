@@ -301,47 +301,95 @@ export default function AdminJogadoresPage() {
             return (
               <li key={player.id} className="rounded-xl border border-emerald-100 p-3">
                 {isEditing ? (
-                  <div className="grid gap-2 md:grid-cols-4 md:items-end">
-                    <label>
-                      <span className="field-label">Nome</span>
-                      <input
-                        className="field-input"
-                        value={editName}
-                        onChange={(event) => setEditName(event.currentTarget.value)}
-                      />
-                    </label>
-                    <label>
-                      <span className="field-label">Posicao</span>
-                      <select
-                        className="field-input"
-                        value={editPosition}
-                        onChange={(event) => setEditPosition(event.currentTarget.value as Player["position"])}
-                      >
-                        <option value="GOLEIRO">Goleiro</option>
-                        <option value="ZAGUEIRO">Zagueiro</option>
-                        <option value="MEIA">Meia</option>
-                        <option value="ATACANTE">Atacante</option>
-                        <option value="OUTRO">Outro</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span className="field-label">Numero</span>
-                      <input
-                        className="field-input"
-                        type="number"
-                        min={0}
-                        max={99}
-                        value={editShirtNumber}
-                        onChange={(event) => setEditShirtNumber(event.currentTarget.value)}
-                      />
-                    </label>
-                    <div className="flex gap-2">
-                      <button className="btn btn-primary" type="button" onClick={() => saveEdit(player.id)}>
-                        Salvar
-                      </button>
-                      <button className="btn btn-ghost" type="button" onClick={cancelEdit}>
-                        Cancelar
-                      </button>
+                  <div className="space-y-3">
+                    <div className="grid gap-2 md:grid-cols-4 md:items-end">
+                      <label>
+                        <span className="field-label">Nome</span>
+                        <input
+                          className="field-input"
+                          value={editName}
+                          onChange={(event) => setEditName(event.currentTarget.value)}
+                        />
+                      </label>
+                      <label>
+                        <span className="field-label">Posicao</span>
+                        <select
+                          className="field-input"
+                          value={editPosition}
+                          onChange={(event) => setEditPosition(event.currentTarget.value as Player["position"])}
+                        >
+                          <option value="GOLEIRO">Goleiro</option>
+                          <option value="ZAGUEIRO">Zagueiro</option>
+                          <option value="MEIA">Meia</option>
+                          <option value="ATACANTE">Atacante</option>
+                          <option value="OUTRO">Outro</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span className="field-label">Numero</span>
+                        <input
+                          className="field-input"
+                          type="number"
+                          min={0}
+                          max={99}
+                          value={editShirtNumber}
+                          onChange={(event) => setEditShirtNumber(event.currentTarget.value)}
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <button className="btn btn-primary" type="button" onClick={() => saveEdit(player.id)}>
+                          Salvar
+                        </button>
+                        <button className="btn btn-ghost" type="button" onClick={cancelEdit}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-emerald-50 p-3">
+                      <div className="mb-3 flex items-center gap-3">
+                        {player.photoUrl ? (
+                          <img
+                            src={player.photoUrl}
+                            alt={`Foto de ${player.name}`}
+                            className="h-14 w-14 rounded-xl border border-emerald-200 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-sm font-bold text-emerald-900">
+                            {getInitials(player.name)}
+                          </div>
+                        )}
+                        <p className="text-sm font-medium text-emerald-900">Foto do jogador</p>
+                      </div>
+
+                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+                        <label>
+                          <span className="field-label">Arquivo</span>
+                          <input
+                            className="field-input"
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={(event) => {
+                              const file = event.currentTarget.files?.[0] ?? null;
+                              setPhotoFilesByPlayerId((prev) => ({ ...prev, [player.id]: file }));
+                            }}
+                          />
+                        </label>
+                        <button className="btn btn-primary" type="button" onClick={() => uploadPhoto(player.id)}>
+                          Enviar foto
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          disabled={!player.photoUrl}
+                          onClick={() => removePhoto(player.id)}
+                        >
+                          Remover foto
+                        </button>
+                      </div>
+                      {photoStatusByPlayerId[player.id] ? (
+                        <p className="mt-2 text-xs font-medium text-emerald-900">{photoStatusByPlayerId[player.id]}</p>
+                      ) : null}
                     </div>
                   </div>
                 ) : (
@@ -381,39 +429,6 @@ export default function AdminJogadoresPage() {
                     </div>
                   </div>
                 )}
-
-                {!isEditing ? (
-                  <div className="mt-3 rounded-lg bg-emerald-50 p-3">
-                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
-                      <label>
-                        <span className="field-label">Foto do jogador</span>
-                        <input
-                          className="field-input"
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          onChange={(event) => {
-                            const file = event.currentTarget.files?.[0] ?? null;
-                            setPhotoFilesByPlayerId((prev) => ({ ...prev, [player.id]: file }));
-                          }}
-                        />
-                      </label>
-                      <button className="btn btn-primary" type="button" onClick={() => uploadPhoto(player.id)}>
-                        Enviar foto
-                      </button>
-                      <button
-                        className="btn btn-ghost"
-                        type="button"
-                        disabled={!player.photoUrl}
-                        onClick={() => removePhoto(player.id)}
-                      >
-                        Remover foto
-                      </button>
-                    </div>
-                    {photoStatusByPlayerId[player.id] ? (
-                      <p className="mt-2 text-xs font-medium text-emerald-900">{photoStatusByPlayerId[player.id]}</p>
-                    ) : null}
-                  </div>
-                ) : null}
 
                 {isExpanded ? (
                   <div className="mt-3 rounded-lg bg-emerald-50 p-3">

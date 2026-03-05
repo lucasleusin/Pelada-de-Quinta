@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Bebas_Neue, Barlow_Condensed } from "next/font/google";
 import { formatDatePtBr } from "@/lib/date-format";
+import styles from "./player-card.module.css";
 
 type PlayerPosition = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 
@@ -62,11 +64,33 @@ const positionLabel: Record<PlayerPosition, string> = {
   OUTRO: "Outro",
 };
 
+const bebas = Bebas_Neue({
+  weight: "400",
+  subsets: ["latin"],
+});
+
+const barlow = Barlow_Condensed({
+  weight: ["400", "600", "700", "900"],
+  subsets: ["latin"],
+});
+
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "JG";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
+
+function splitNameForAccent(name: string) {
+  const normalized = name.trim().toUpperCase();
+  if (!normalized) return { accent: "", rest: "" };
+  if (normalized.length <= 5) return { accent: normalized, rest: "" };
+  return { accent: normalized.slice(0, 5), rest: normalized.slice(5) };
+}
+
+function getFilledStars(avgRating: number) {
+  const clamped = Math.max(0, Math.min(5, avgRating));
+  return Math.round(clamped);
 }
 
 export default function EstatisticasPage() {
@@ -164,80 +188,122 @@ export default function EstatisticasPage() {
 
         {selectedPlayerStats ? (
           <div className="mt-4 space-y-4">
-            <div className="relative overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-white to-orange-100 p-4 shadow-sm md:p-5">
-              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-200/50" />
-              <div className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-orange-200/40" />
+            <div className={`${styles.card} ${barlow.className}`}>
+              <div className={styles.cardBg} />
 
-              <div className="relative grid grid-cols-[72px_minmax(0,1fr)_72px] items-center gap-2 md:grid-cols-[96px_minmax(0,1fr)_96px]">
-                <div className="justify-self-start">
+              <div className={styles.dot} style={{ width: 8, height: 8, background: "#fff", top: "15%", left: "8%" }} />
+              <div className={styles.dot} style={{ width: 5, height: 5, background: "#FFDF00", top: "25%", left: "88%" }} />
+              <div className={styles.dot} style={{ width: 6, height: 6, background: "#fff", top: "52%", left: "5%" }} />
+              <div className={styles.dot} style={{ width: 10, height: 10, background: "#FFDF00", top: "10%", left: "55%", opacity: 0.3 }} />
+
+              <div className={`${styles.bigNumber} ${bebas.className}`}>
+                {selectedPlayerStats.player.shirtNumberPreference ?? "--"}
+              </div>
+
+              <div className={styles.topBar}>
+                <div className={`${styles.editionBadge} ${bebas.className}`}>PELADA DE QUINTA</div>
+                <div className={`${styles.shirtNumberBadge} ${bebas.className}`}>
+                  #{selectedPlayerStats.player.shirtNumberPreference ?? "--"}
+                </div>
+              </div>
+
+              <div className={styles.stars} aria-label="avaliacao media">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <span
+                    key={index}
+                    className={index < getFilledStars(selectedPlayerStats.totals.avgRating) ? styles.starFilled : styles.starEmpty}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+
+              <div className={styles.playerWrap}>
+                <div className={styles.playerPlaceholder}>
                   {selectedPlayerStats.player.photoUrl ? (
                     <img
                       src={selectedPlayerStats.player.photoUrl}
                       alt={`Foto de ${selectedPlayerStats.player.name}`}
-                      className="h-16 w-16 rounded-2xl border border-emerald-300 object-cover md:h-20 md:w-20"
+                      className={styles.playerImage}
                     />
                   ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-300 bg-white/90 text-lg font-black text-emerald-900 md:h-20 md:w-20">
-                      {getInitials(selectedPlayerStats.player.name)}
-                    </div>
+                    <>
+                      <span className={styles.placeholderIcon}>📷</span>
+                      <span className={styles.placeholderText}>
+                        {getInitials(selectedPlayerStats.player.name)}
+                        <br />
+                        Sem foto
+                      </span>
+                    </>
                   )}
                 </div>
+              </div>
 
-                <div className="text-center">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                    Card do Jogador
-                  </p>
-                  <p className="mt-1 text-2xl font-black leading-tight text-emerald-950 md:text-3xl">
-                    {selectedPlayerStats.player.name}
-                  </p>
-                  <div className="mt-2 flex items-center justify-center gap-3 text-sm font-bold uppercase tracking-[0.08em] text-emerald-900">
-                    <span>#{selectedPlayerStats.player.shirtNumberPreference ?? "--"}</span>
-                    <span className="opacity-60">|</span>
-                    <span>{positionLabel[selectedPlayerStats.player.position]}</span>
+              <div className={styles.playerGlow} />
+
+              <div className={styles.infoPanel}>
+                {(() => {
+                  const split = splitNameForAccent(selectedPlayerStats.player.name);
+                  return (
+                    <div className={`${styles.playerName} ${bebas.className}`}>
+                      <span className={styles.playerNameAccent}>{split.accent}</span>
+                      {split.rest}
+                    </div>
+                  );
+                })()}
+                <div className={styles.subtitle}>
+                  {positionLabel[selectedPlayerStats.player.position]}
+                </div>
+
+                <div className={styles.statsGrid}>
+                  <div className={styles.statsRow}>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.matches}</div>
+                      <div className={styles.statLabel}>Partidas Jogadas</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.avgRating.toFixed(1)}</div>
+                      <div className={styles.statLabel}>Nota Geral</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.efficiency.toFixed(1)}%</div>
+                      <div className={styles.statLabel}>Aproveitamento</div>
+                    </div>
+                  </div>
+
+                  <div className={styles.statsRow}>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.goals}</div>
+                      <div className={styles.statLabel}>Gols</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.assists}</div>
+                      <div className={styles.statLabel}>Assistencias</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.goalsConceded}</div>
+                      <div className={styles.statLabel}>Gols Sofridos</div>
+                    </div>
+                  </div>
+
+                  <div className={styles.statsRow}>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.avgGoalsPerMatch.toFixed(2)}</div>
+                      <div className={styles.statLabel}>Media Gols</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.avgAssistsPerMatch.toFixed(2)}</div>
+                      <div className={styles.statLabel}>Media Assist.</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.avgConcededPerMatch.toFixed(2)}</div>
+                      <div className={styles.statLabel}>Media G. Sofridos</div>
+                    </div>
                   </div>
                 </div>
-
-                <div aria-hidden className="h-16 w-16 md:h-20 md:w-20" />
               </div>
 
-              <div className="relative mt-4 grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Partidas jogadas</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.matches}</p>
-                </div>
-                <div className="rounded-xl border border-orange-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Nota geral</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.avgRating.toFixed(2)}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Aproveitamento</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.efficiency.toFixed(1)}%</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Gols marcados</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.goals}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Assistencias</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.assists}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Gols sofridos</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.goalsConceded}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Media gols</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.avgGoalsPerMatch.toFixed(2)}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Media assistencia</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.avgAssistsPerMatch.toFixed(2)}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/90 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">Media gols sofrido</p>
-                  <p className="text-lg font-bold text-emerald-950">{selectedPlayerStats.totals.avgConcededPerMatch.toFixed(2)}</p>
-                </div>
-              </div>
+              <div className={styles.shimmer} />
             </div>
 
             <div>

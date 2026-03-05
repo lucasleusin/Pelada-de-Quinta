@@ -18,7 +18,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "votes:reset": "prisma db execute --schema prisma/schema.prisma --file scripts/reset-votes.sql"
   },
   "dependencies": {
     "@prisma/client": "^6.17.1",

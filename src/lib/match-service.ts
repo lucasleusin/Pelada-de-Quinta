@@ -408,10 +408,12 @@ export async function createMatch(body: unknown) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  const normalizedLocation = parsed.data.location?.trim();
+
   const match = await db().match.create({
     data: {
       matchDate: new Date(parsed.data.matchDate),
-      location: parsed.data.location ?? null,
+      location: normalizedLocation && normalizedLocation.length > 0 ? normalizedLocation : "Arena dos Coqueiros",
       startTime: parsed.data.startTime ?? "19:00",
       teamAName: parsed.data.teamAName ?? "Time A",
       teamBName: parsed.data.teamBName ?? "Time B",

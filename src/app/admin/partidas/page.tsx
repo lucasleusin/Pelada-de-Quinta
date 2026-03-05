@@ -71,7 +71,7 @@ export default function AdminPartidasPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [date, setDate] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState("Arena dos Coqueiros");
   const [score, setScore] = useState<ScoreState>({ teamAScore: "", teamBScore: "" });
   const [scoreDirty, setScoreDirty] = useState(false);
   const [scoreSaveStatus, setScoreSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -232,7 +232,7 @@ export default function AdminPartidasPage() {
     }
 
     setDate("");
-    setLocation("");
+    setLocation("Arena dos Coqueiros");
     setMessage("Partida criada.");
     await loadData();
   }

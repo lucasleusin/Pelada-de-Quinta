@@ -78,6 +78,35 @@ function ActionButton({
   );
 }
 
+function MatchSummaryCard({
+  match,
+  active,
+  onClick,
+  compact = false,
+}: {
+  match: Match;
+  active: boolean;
+  onClick: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+        active
+          ? "border-emerald-700 bg-emerald-100"
+          : "border-emerald-200 bg-white hover:border-emerald-400"
+      } ${compact ? "min-w-[220px] snap-start" : ""}`}
+    >
+      <p className="text-base font-semibold text-emerald-950">{formatDatePtBr(match.matchDate)}</p>
+      <p className="text-xs uppercase tracking-[0.1em] text-emerald-700">
+        {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"}
+      </p>
+    </button>
+  );
+}
+
 export default function HomePage() {
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -86,6 +115,11 @@ export default function HomePage() {
 
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
+    [matches, selectedMatchId],
+  );
+
+  const otherMatches = useMemo(
+    () => matches.filter((match) => match.id !== selectedMatchId),
     [matches, selectedMatchId],
   );
 
@@ -118,7 +152,7 @@ export default function HomePage() {
     });
   }, [allPlayers, selectedMatch]);
 
-  async function loadData(keepSelection = true) {
+  async function loadData() {
     const [playersRes, matchesRes] = await Promise.all([
       fetch("/api/players?active=true"),
       fetch(`/api/matches?from=${getTodayIsoDate()}`),
@@ -133,19 +167,21 @@ export default function HomePage() {
     setAllPlayers(players);
     setMatches(sortedMatches);
 
-    if (!keepSelection) {
-      setSelectedMatchId(null);
-      return;
-    }
-
-    if (selectedMatchId && !sortedMatches.some((match) => match.id === selectedMatchId)) {
-      setSelectedMatchId(null);
-    }
+    setSelectedMatchId((currentSelection) => {
+      if (sortedMatches.length === 0) return null;
+      if (currentSelection && sortedMatches.some((match) => match.id === currentSelection)) {
+        return currentSelection;
+      }
+      return sortedMatches[0].id;
+    });
   }
 
   useEffect(() => {
-    loadData(false).catch(() => setMessage("Falha ao carregar dados da home."));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const timer = window.setTimeout(() => {
+      loadData().catch(() => setMessage("Falha ao carregar dados da home."));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function setPresence(playerId: string, presenceStatus: PresenceStatus) {
@@ -171,41 +207,59 @@ export default function HomePage() {
       setMessage("Jogador retornou para pendentes.");
     }
 
-    await loadData(true);
+    await loadData();
   }
 
   return (
     <div className="space-y-5">
       <section className="card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
-        {matches.length === 0 ? (
-          <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
+        {matches.length === 0 || !selectedMatch ? (
+          <>
+            <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
+            <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
+          </>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {matches.map((match) => {
-              const active = match.id === selectedMatchId;
-              return (
-                <li key={match.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMatchId(match.id)}
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
-                      active
-                        ? "border-emerald-700 bg-emerald-100"
-                        : "border-emerald-200 bg-white hover:border-emerald-400"
-                    }`}
-                  >
-                    <p className="text-base font-semibold text-emerald-950">
-                      {formatDatePtBr(match.matchDate)}
-                    </p>
-                    <p className="text-xs uppercase tracking-[0.1em] text-emerald-700">
-                      {match.startTime} {match.location ? `| ${match.location}` : "| Local a definir"}
-                    </p>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+              <div className="mt-3">
+                <MatchSummaryCard
+                  match={selectedMatch}
+                  active
+                  onClick={() => setSelectedMatchId(selectedMatch.id)}
+                />
+              </div>
+            </div>
+
+            {otherMatches.length > 0 ? (
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Outras Partidas</p>
+
+                <div className="mt-3 hidden space-y-2 xl:block">
+                  {otherMatches.map((match) => (
+                    <MatchSummaryCard
+                      key={match.id}
+                      match={match}
+                      active={false}
+                      onClick={() => setSelectedMatchId(match.id)}
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 xl:hidden">
+                  {otherMatches.map((match) => (
+                    <MatchSummaryCard
+                      key={match.id}
+                      match={match}
+                      active={false}
+                      onClick={() => setSelectedMatchId(match.id)}
+                      compact
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         )}
       </section>
 

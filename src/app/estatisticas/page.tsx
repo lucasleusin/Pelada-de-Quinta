@@ -109,6 +109,8 @@ export default function EstatisticasPage() {
       return;
     }
 
+    setViewMode("POR_JOGADOR");
+
     const response = await fetch(`/api/players/${playerId}/history`, { cache: "no-store" });
     if (!response.ok) {
       setMessage("Nao foi possivel carregar estatisticas do jogador.");
@@ -133,6 +135,12 @@ export default function EstatisticasPage() {
   const topConceded = useMemo(() => overview?.mostConceded.slice(0, 10) ?? [], [overview]);
   const topMvp = useMemo(() => overview?.mvp.slice(0, 10) ?? [], [overview]);
 
+  function showGeneralView() {
+    setViewMode("GERAL");
+    setSelectedPlayerId("");
+    setSelectedPlayerStats(null);
+  }
+
   return (
     <div className="space-y-5">
       <section className="card p-5">
@@ -142,20 +150,13 @@ export default function EstatisticasPage() {
           <button
             type="button"
             className={`btn ${viewMode === "GERAL" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setViewMode("GERAL")}
+            onClick={showGeneralView}
           >
             Geral
           </button>
-          <button
-            type="button"
-            className={`btn ${viewMode === "POR_JOGADOR" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setViewMode("POR_JOGADOR")}
-          >
-            Por Jogador
-          </button>
 
           <label className="min-w-[220px] flex-1">
-            <span className="field-label">Jogador</span>
+            <span className="field-label">Por Jogador</span>
             <select
               id="player-select"
               className="field-input"

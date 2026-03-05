@@ -285,7 +285,7 @@ export default function MeuPerfilPage() {
       </section>
 
       {canRenderProfile && profileData ? (
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+        <section className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
           <div className="order-1 card p-4 lg:order-2">
             <h3 className="text-xl font-semibold text-emerald-950">Edicao de dados</h3>
 

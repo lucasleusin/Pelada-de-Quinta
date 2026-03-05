@@ -24,9 +24,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/partidas" className="btn btn-ghost">
             Partidas
           </Link>
-          <Link href="/admin/relatorios" className="btn btn-ghost">
-            Relatorios
-          </Link>
         </div>
         <AdminLogoutButton />
       </div>

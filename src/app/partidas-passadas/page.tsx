@@ -105,16 +105,21 @@ function validateGoalsVsScore(
 
   let teamAGoals = 0;
   let teamBGoals = 0;
+  let teamAGoalsConceded = 0;
+  let teamBGoalsConceded = 0;
 
   for (const participant of participants) {
     const goals = stats[participant.playerId]?.goals ?? 0;
+    const goalsConceded = stats[participant.playerId]?.goalsConceded ?? 0;
 
     if (participant.team === "A") {
       teamAGoals += goals;
+      teamAGoalsConceded += goalsConceded;
     }
 
     if (participant.team === "B") {
       teamBGoals += goals;
+      teamBGoalsConceded += goalsConceded;
     }
   }
 
@@ -132,6 +137,22 @@ function validateGoalsVsScore(
 
   if (teamBScore !== null && teamBGoals > teamBScore) {
     return "Os gols dos jogadores do Time B nao podem ultrapassar o placar do Time B.";
+  }
+
+  if (teamBScore === null && teamAGoalsConceded > 0) {
+    return "Informe o placar do Time B antes de salvar gols sofridos do Time A.";
+  }
+
+  if (teamAScore === null && teamBGoalsConceded > 0) {
+    return "Informe o placar do Time A antes de salvar gols sofridos do Time B.";
+  }
+
+  if (teamBScore !== null && teamAGoalsConceded > teamBScore) {
+    return "A soma de gols sofridos do Time A nao pode ultrapassar os gols do Time B no placar.";
+  }
+
+  if (teamAScore !== null && teamBGoalsConceded > teamAScore) {
+    return "A soma de gols sofridos do Time B nao pode ultrapassar os gols do Time A no placar.";
   }
 
   return null;

@@ -1,8 +1,21 @@
 "use client";
 
-import { Check, RotateCcw, X } from "lucide-react";
+import {
+  Check,
+  Cloud,
+  CloudDrizzle,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  RotateCcw,
+  Sun,
+  X,
+} from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
+import type { IconKey } from "@/lib/weather-icons";
 
 type Player = {
   id: string;
@@ -29,6 +42,7 @@ type Match = {
 
 type ListViewFilter = "ALL" | "PENDING" | "CONFIRMED" | "CANCELED";
 type MatchCardVariant = "default" | "desktopSecondary" | "mobileSecondary";
+type NextMatchWeather = { iconKey: IconKey; weatherCode: number };
 
 function getTodayIsoDate() {
   const today = new Date();
@@ -138,6 +152,19 @@ function MatchSummaryCard({
   );
 }
 
+function WeatherIcon({ iconKey }: { iconKey: IconKey }) {
+  const className = "h-5 w-5 text-emerald-800";
+
+  if (iconKey === "SUN") return <Sun className={className} />;
+  if (iconKey === "CLOUD_SUN") return <CloudSun className={className} />;
+  if (iconKey === "FOG") return <CloudFog className={className} />;
+  if (iconKey === "DRIZZLE") return <CloudDrizzle className={className} />;
+  if (iconKey === "RAIN") return <CloudRain className={className} />;
+  if (iconKey === "STORM") return <CloudLightning className={className} />;
+  if (iconKey === "SNOW") return <CloudSnow className={className} />;
+  return <Cloud className={className} />;
+}
+
 export default function HomePage() {
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -146,6 +173,7 @@ export default function HomePage() {
   const [listViewFilter, setListViewFilter] = useState<ListViewFilter>("ALL");
   const [message, setMessage] = useState<string>("");
   const [actionMessage, setActionMessage] = useState<string>("");
+  const [nextMatchWeather, setNextMatchWeather] = useState<NextMatchWeather | null>(null);
 
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
@@ -259,6 +287,43 @@ export default function HomePage() {
     return () => window.clearTimeout(timer);
   }, [actionMessage]);
 
+  useEffect(() => {
+    if (!primaryMatch) return;
+
+    let cancelled = false;
+
+    const loadWeather = async () => {
+      const matchDate = primaryMatch.matchDate.slice(0, 10);
+      const startTime = primaryMatch.startTime || "19:00";
+      const query = new URLSearchParams({ matchDate, startTime });
+
+      try {
+        const response = await fetch(`/api/weather/next-match?${query.toString()}`);
+        if (!response.ok) {
+          if (!cancelled) setNextMatchWeather(null);
+          return;
+        }
+
+        const payload = (await response.json()) as NextMatchWeather;
+        if (!cancelled && payload?.iconKey) {
+          setNextMatchWeather(payload);
+        } else if (!cancelled) {
+          setNextMatchWeather(null);
+        }
+      } catch {
+        if (!cancelled) setNextMatchWeather(null);
+      }
+    };
+
+    loadWeather().catch(() => {
+      if (!cancelled) setNextMatchWeather(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [primaryMatch]);
+
   async function setPresence(playerId: string, presenceStatus: PresenceStatus) {
     if (!selectedMatch) return;
 
@@ -298,7 +363,14 @@ export default function HomePage() {
           <>
             <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-2 md:hidden">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                  {nextMatchWeather ? (
+                    <span aria-label="Previsao do tempo da partida" title="Previsao do tempo da partida">
+                      <WeatherIcon iconKey={nextMatchWeather.iconKey} />
+                    </span>
+                  ) : null}
+                </div>
                 <div className="mt-2">
                   <MatchSummaryCard
                     match={primaryMatch}
@@ -328,7 +400,14 @@ export default function HomePage() {
 
             <div className="hidden gap-4 md:grid xl:grid-cols-[minmax(280px,0.5fr)_minmax(0,1fr)]">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                  {nextMatchWeather ? (
+                    <span aria-label="Previsao do tempo da partida" title="Previsao do tempo da partida">
+                      <WeatherIcon iconKey={nextMatchWeather.iconKey} />
+                    </span>
+                  ) : null}
+                </div>
                 <div className="mt-2">
                   <MatchSummaryCard
                     match={primaryMatch}

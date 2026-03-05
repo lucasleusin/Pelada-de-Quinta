@@ -102,26 +102,25 @@ function MatchSummaryCard({
 }) {
   const isMobileSecondary = variant === "mobileSecondary";
   const isDesktopSecondary = variant === "desktopSecondary";
+  const widthClass = isMobileSecondary
+    ? "w-fit shrink-0 snap-start px-3 py-2"
+    : isDesktopSecondary
+      ? "w-full h-full min-w-0"
+      : "w-full min-w-0";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+      className={`${widthClass} rounded-xl border px-4 py-3 text-left transition ${
         active
           ? "border-emerald-700 bg-emerald-100"
           : "border-emerald-200 bg-white hover:border-emerald-400"
-      } ${
-        isMobileSecondary
-          ? "w-[140px] shrink-0 snap-start px-3 py-2"
-          : isDesktopSecondary
-            ? "h-full min-w-0"
-            : "min-w-0"
       }`}
     >
       <p
         className={`font-semibold text-emerald-950 ${
-          isMobileSecondary ? "text-sm leading-tight" : "text-base"
+          isMobileSecondary ? "whitespace-nowrap text-sm leading-tight" : "text-base"
         }`}
       >
         {formatDatePtBr(match.matchDate)}
@@ -148,10 +147,11 @@ export default function HomePage() {
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
     [matches, selectedMatchId],
   );
+  const primaryMatch = useMemo(() => matches[0] ?? null, [matches]);
 
   const otherMatches = useMemo(
-    () => matches.filter((match) => match.id !== selectedMatchId),
-    [matches, selectedMatchId],
+    () => matches.slice(1),
+    [matches],
   );
 
   const confirmed = useMemo(
@@ -285,7 +285,7 @@ export default function HomePage() {
   return (
     <div className="space-y-5">
       <section className="card p-5">
-        {matches.length === 0 || !selectedMatch ? (
+        {matches.length === 0 || !primaryMatch ? (
           <>
             <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
             <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
@@ -296,9 +296,9 @@ export default function HomePage() {
               <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
               <div className="mt-3">
                 <MatchSummaryCard
-                  match={selectedMatch}
-                  active
-                  onClick={() => setSelectedMatchId(selectedMatch.id)}
+                  match={primaryMatch}
+                  active={selectedMatchId === primaryMatch.id}
+                  onClick={() => setSelectedMatchId(primaryMatch.id)}
                 />
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function HomePage() {
                     <MatchSummaryCard
                       key={match.id}
                       match={match}
-                      active={false}
+                      active={selectedMatchId === match.id}
                       onClick={() => setSelectedMatchId(match.id)}
                       variant="desktopSecondary"
                     />
@@ -324,7 +324,7 @@ export default function HomePage() {
                     <MatchSummaryCard
                       key={match.id}
                       match={match}
-                      active={false}
+                      active={selectedMatchId === match.id}
                       onClick={() => setSelectedMatchId(match.id)}
                       variant="mobileSecondary"
                     />
@@ -361,28 +361,28 @@ export default function HomePage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={`btn ${listViewFilter === "ALL" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "ALL" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setListViewFilter("ALL")}
             >
               Todos
             </button>
             <button
               type="button"
-              className={`btn ${listViewFilter === "PENDING" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "PENDING" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setListViewFilter("PENDING")}
             >
               Pendentes
             </button>
             <button
               type="button"
-              className={`btn ${listViewFilter === "CONFIRMED" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "CONFIRMED" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setListViewFilter("CONFIRMED")}
             >
               Confirmados
             </button>
             <button
               type="button"
-              className={`btn ${listViewFilter === "CANCELED" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "CANCELED" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setListViewFilter("CANCELED")}
             >
               Desconfirmados

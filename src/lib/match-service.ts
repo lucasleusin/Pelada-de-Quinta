@@ -33,6 +33,30 @@ function startOfToday() {
   return now;
 }
 
+function startOfTomorrow() {
+  const tomorrow = startOfToday();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow;
+}
+
+function finishedMatchWhereClause(today: Date) {
+  const tomorrow = startOfTomorrow();
+
+  return {
+    OR: [
+      { matchDate: { lt: today } },
+      {
+        AND: [
+          { matchDate: { gte: today } },
+          { matchDate: { lt: tomorrow } },
+          { teamAScore: { not: null } },
+          { teamBScore: { not: null } },
+        ],
+      },
+    ],
+  };
+}
+
 function sumGoalsByTeam(
   participants: Array<{ playerId: string; team: "A" | "B" | null; goals: number }>,
   overrides: Map<string, number>,
@@ -609,7 +633,7 @@ export async function getGeneralStatsOverview() {
   const today = startOfToday();
 
   const finishedMatches = await db().match.findMany({
-    where: { matchDate: { lte: today } },
+    where: finishedMatchWhereClause(today),
     select: { id: true },
   });
 
@@ -685,6 +709,7 @@ export async function getGeneralStatsOverview() {
 
 export async function getPlayerReport(playerId: string) {
   const today = startOfToday();
+  const finishedMatchWhere = finishedMatchWhereClause(today);
   const player = await db().player.findUnique({ where: { id: playerId } });
 
   if (!player) {
@@ -694,7 +719,7 @@ export async function getPlayerReport(playerId: string) {
   const stats = await db().matchParticipant.aggregate({
     where: {
       playerId,
-      match: { matchDate: { lte: today } },
+      match: finishedMatchWhere,
     },
     _sum: {
       goals: true,
@@ -707,7 +732,7 @@ export async function getPlayerReport(playerId: string) {
   const ratings = await db().matchRating.aggregate({
     where: {
       ratedPlayerId: playerId,
-      match: { matchDate: { lte: today } },
+      match: finishedMatchWhere,
     },
     _avg: { rating: true },
     _count: { _all: true },
@@ -716,7 +741,7 @@ export async function getPlayerReport(playerId: string) {
   const history = await db().matchParticipant.findMany({
     where: {
       playerId,
-      match: { matchDate: { lte: today } },
+      match: finishedMatchWhere,
     },
     include: {
       match: true,

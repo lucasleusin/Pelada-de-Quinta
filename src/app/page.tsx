@@ -295,48 +295,80 @@ export default function HomePage() {
             <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
           </>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.5fr)_minmax(0,1fr)]">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
-              <div className="mt-2">
-                <MatchSummaryCard
-                  match={primaryMatch}
-                  active={selectedMatchId === primaryMatch.id}
-                  onClick={() => setSelectedMatchId(primaryMatch.id)}
-                />
+          <>
+            <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-2 md:hidden">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                <div className="mt-2">
+                  <MatchSummaryCard
+                    match={primaryMatch}
+                    active={selectedMatchId === primaryMatch.id}
+                    onClick={() => setSelectedMatchId(primaryMatch.id)}
+                  />
+                </div>
               </div>
+
+              {otherMatches.length > 0 ? (
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Outras Partidas</p>
+                  <div className="mt-2 flex flex-col gap-2">
+                    {otherMatches.slice(0, 2).map((match) => (
+                      <MatchSummaryCard
+                        key={match.id}
+                        match={match}
+                        active={selectedMatchId === match.id}
+                        onClick={() => setSelectedMatchId(match.id)}
+                        variant="mobileSecondary"
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
-            {otherMatches.length > 0 ? (
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Outras Partidas</p>
-
-                <div className="mt-2 hidden grid-cols-2 gap-2 xl:grid">
-                  {otherMatches.map((match) => (
-                    <MatchSummaryCard
-                      key={match.id}
-                      match={match}
-                      active={selectedMatchId === match.id}
-                      onClick={() => setSelectedMatchId(match.id)}
-                      variant="desktopSecondary"
-                    />
-                  ))}
-                </div>
-
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1 pr-1 xl:hidden">
-                  {otherMatches.map((match) => (
-                    <MatchSummaryCard
-                      key={match.id}
-                      match={match}
-                      active={selectedMatchId === match.id}
-                      onClick={() => setSelectedMatchId(match.id)}
-                      variant="mobileSecondary"
-                    />
-                  ))}
+            <div className="hidden gap-4 md:grid xl:grid-cols-[minmax(280px,0.5fr)_minmax(0,1fr)]">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                <div className="mt-2">
+                  <MatchSummaryCard
+                    match={primaryMatch}
+                    active={selectedMatchId === primaryMatch.id}
+                    onClick={() => setSelectedMatchId(primaryMatch.id)}
+                  />
                 </div>
               </div>
-            ) : null}
-          </div>
+
+              {otherMatches.length > 0 ? (
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Outras Partidas</p>
+
+                  <div className="mt-2 hidden grid-cols-2 gap-2 xl:grid">
+                    {otherMatches.map((match) => (
+                      <MatchSummaryCard
+                        key={match.id}
+                        match={match}
+                        active={selectedMatchId === match.id}
+                        onClick={() => setSelectedMatchId(match.id)}
+                        variant="desktopSecondary"
+                      />
+                    ))}
+                  </div>
+
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1 pr-1 xl:hidden">
+                    {otherMatches.map((match) => (
+                      <MatchSummaryCard
+                        key={match.id}
+                        match={match}
+                        active={selectedMatchId === match.id}
+                        onClick={() => setSelectedMatchId(match.id)}
+                        variant="mobileSecondary"
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </>
         )}
       </section>
 
@@ -365,14 +397,14 @@ export default function HomePage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={`btn px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "ALL" ? "btn-primary" : "btn-ghost"}`}
+              className={`btn inline-flex items-center justify-center px-2 py-1 text-center text-xs leading-none sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "ALL" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setListViewFilter("ALL")}
             >
               Todos
             </button>
             <button
               type="button"
-              className={`btn h-8 w-16 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              className={`btn inline-flex h-8 w-16 items-center justify-center p-0 text-center text-xs leading-none sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
                 listViewFilter === "PENDING"
                   ? "bg-amber-500 text-white hover:bg-amber-600 sm:bg-emerald-700 sm:hover:bg-emerald-800"
                   : "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
@@ -380,14 +412,12 @@ export default function HomePage() {
               onClick={() => setListViewFilter("PENDING")}
               aria-label="Filtrar pendentes"
             >
-              <span className="inline-flex h-8 w-16 items-center justify-center sm:h-auto sm:w-auto">
-                <RotateCcw size={14} className="sm:hidden" />
-                <span className="hidden sm:inline">Pendentes</span>
-              </span>
+              <RotateCcw size={14} className="sm:hidden" />
+              <span className="hidden sm:inline">Pendentes</span>
             </button>
             <button
               type="button"
-              className={`btn h-8 w-16 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              className={`btn inline-flex h-8 w-16 items-center justify-center p-0 text-center text-xs leading-none sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
                 listViewFilter === "CONFIRMED"
                   ? "bg-emerald-600 text-white hover:bg-emerald-700"
                   : "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
@@ -395,14 +425,12 @@ export default function HomePage() {
               onClick={() => setListViewFilter("CONFIRMED")}
               aria-label="Filtrar confirmados"
             >
-              <span className="inline-flex h-8 w-16 items-center justify-center sm:h-auto sm:w-auto">
-                <Check size={14} className="sm:hidden" />
-                <span className="hidden sm:inline">Confirmados</span>
-              </span>
+              <Check size={14} className="sm:hidden" />
+              <span className="hidden sm:inline">Confirmados</span>
             </button>
             <button
               type="button"
-              className={`btn h-8 w-16 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              className={`btn inline-flex h-8 w-16 items-center justify-center p-0 text-center text-xs leading-none sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
                 listViewFilter === "CANCELED"
                   ? "bg-red-600 text-white hover:bg-red-700"
                   : "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
@@ -410,10 +438,8 @@ export default function HomePage() {
               onClick={() => setListViewFilter("CANCELED")}
               aria-label="Filtrar desconfirmados"
             >
-              <span className="inline-flex h-8 w-16 items-center justify-center sm:h-auto sm:w-auto">
-                <X size={14} className="sm:hidden" />
-                <span className="hidden sm:inline">Desconfirmados</span>
-              </span>
+              <X size={14} className="sm:hidden" />
+              <span className="hidden sm:inline">Desconfirmados</span>
             </button>
           </div>
         </section>

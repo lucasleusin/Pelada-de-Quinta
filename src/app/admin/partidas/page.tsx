@@ -148,7 +148,13 @@ export default function AdminPartidasPage() {
     setMatches(matchesPayload);
     setPlayers(playersPayload);
 
-    if (!selectedMatchId && matchesPayload[0]) {
+    if (matchesPayload.length === 0) {
+      setSelectedMatchId("");
+      return;
+    }
+
+    const selectionStillExists = matchesPayload.some((match) => match.id === selectedMatchId);
+    if (!selectedMatchId || !selectionStillExists) {
       setSelectedMatchId(matchesPayload[0].id);
     }
   }
@@ -252,6 +258,28 @@ export default function AdminPartidasPage() {
       return;
     }
 
+    await loadData();
+  }
+
+  async function archiveSelectedMatch() {
+    if (!selectedMatch) return;
+
+    const confirmed = window.confirm("Tem certeza que deseja excluir esta partida?");
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/admin/matches/${selectedMatch.id}/status`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "ARCHIVED" }),
+    });
+
+    if (!response.ok) {
+      setMessage("Falha ao excluir partida.");
+      return;
+    }
+
+    setSelectedMatchId("");
+    setMessage("Partida excluida.");
     await loadData();
   }
 
@@ -406,6 +434,17 @@ export default function AdminPartidasPage() {
               onChange={(event) => updateScore("teamBScore", event.currentTarget.value)}
             />
           </label>
+        </div>
+
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!selectedMatch}
+            onClick={() => archiveSelectedMatch().catch(() => setMessage("Falha ao excluir partida."))}
+          >
+            Excluir partida
+          </button>
         </div>
 
         {scoreSaveStatus === "saving" ? <p className="mt-2 text-sm text-amber-700">Salvando placar...</p> : null}

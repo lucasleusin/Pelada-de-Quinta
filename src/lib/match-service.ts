@@ -43,6 +43,7 @@ function finishedMatchWhereClause(today: Date) {
   const tomorrow = startOfTomorrow();
 
   return {
+    status: { not: MatchStatus.ARCHIVED },
     OR: [
       { matchDate: { lt: today } },
       {
@@ -111,6 +112,7 @@ export async function listMatches(request: Request) {
   const playerId = searchParams.get("playerId")?.trim() || undefined;
 
   const where: Prisma.MatchWhereInput = {
+    status: { not: MatchStatus.ARCHIVED },
     matchDate:
       from || to
         ? {
@@ -147,6 +149,7 @@ export async function getNextMatch() {
 
   return db().match.findFirst({
     where: {
+      status: { not: MatchStatus.ARCHIVED },
       matchDate: { gte: today },
     },
     include: {
@@ -162,8 +165,11 @@ export async function getNextMatch() {
 }
 
 export async function getMatchById(id: string) {
-  return db().match.findUnique({
-    where: { id },
+  return db().match.findFirst({
+    where: {
+      id,
+      status: { not: MatchStatus.ARCHIVED },
+    },
     include: {
       participants: {
         include: { player: true },
@@ -175,7 +181,12 @@ export async function getMatchById(id: string) {
 }
 
 export async function confirmPresence(matchId: string, playerId: string) {
-  const match = await db().match.findUnique({ where: { id: matchId } });
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
+  });
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
@@ -216,7 +227,12 @@ export async function confirmPresence(matchId: string, playerId: string) {
 }
 
 export async function cancelPresence(matchId: string, playerId: string) {
-  const match = await db().match.findUnique({ where: { id: matchId } });
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
+  });
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
@@ -243,7 +259,12 @@ export async function setPresenceStatus(
   playerId: string,
   presenceStatus: "CONFIRMED" | "WAITLIST" | "CANCELED",
 ) {
-  const match = await db().match.findUnique({ where: { id: matchId } });
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
+  });
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
@@ -272,7 +293,12 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await db().match.findUnique({ where: { id: matchId } });
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
+  });
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
@@ -342,7 +368,12 @@ export async function saveRatings(matchId: string, body: unknown) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await db().match.findUnique({ where: { id: matchId } });
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
+  });
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
@@ -467,8 +498,11 @@ export async function updateMatchScore(matchId: string, body: unknown, adminMode
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await db().match.findUnique({
-    where: { id: matchId },
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
     select: {
       id: true,
       matchDate: true,
@@ -525,6 +559,18 @@ export async function updateTeams(matchId: string, body: unknown) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
+    select: { id: true },
+  });
+
+  if (!match) {
+    return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
+  }
+
   await db().$transaction(
     parsed.data.assignments.map((assignment) =>
       db().matchParticipant.upsert({
@@ -556,6 +602,18 @@ export async function updateParticipantPresence(matchId: string, playerId: strin
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const match = await db().match.findFirst({
+    where: {
+      id: matchId,
+      status: { not: MatchStatus.ARCHIVED },
+    },
+    select: { id: true },
+  });
+
+  if (!match) {
+    return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
   const participant = await db().matchParticipant.upsert({

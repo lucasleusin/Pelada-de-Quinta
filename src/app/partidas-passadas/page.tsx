@@ -315,6 +315,30 @@ export default function PartidasPassadasPage() {
     return averages;
   }, [match]);
 
+  const goalsByTeam = useMemo(() => {
+    let teamAGoals = 0;
+    let teamBGoals = 0;
+
+    for (const participant of match?.participants ?? []) {
+      const goals = stats[participant.playerId]?.goals ?? 0;
+
+      if (participant.team === "A") teamAGoals += goals;
+      if (participant.team === "B") teamBGoals += goals;
+    }
+
+    return { teamAGoals, teamBGoals };
+  }, [match, stats]);
+
+  const missingGoals = useMemo(() => {
+    const teamAScore = parseNullableScore(score.teamAScore);
+    const teamBScore = parseNullableScore(score.teamBScore);
+
+    return {
+      teamA: teamAScore === null ? null : Math.max(0, teamAScore - goalsByTeam.teamAGoals),
+      teamB: teamBScore === null ? null : Math.max(0, teamBScore - goalsByTeam.teamBGoals),
+    };
+  }, [goalsByTeam.teamAGoals, goalsByTeam.teamBGoals, score.teamAScore, score.teamBScore]);
+
   function updateScore(field: keyof ScoreState, value: string) {
     const sanitized = sanitizeTwoDigitInput(value);
     setScore((prev) => ({ ...prev, [field]: sanitized }));
@@ -466,6 +490,11 @@ export default function PartidasPassadasPage() {
                   value={score.teamAScore}
                   onChange={(event) => updateScore("teamAScore", event.currentTarget.value)}
                 />
+                {missingGoals.teamA !== null ? (
+                  <p className="mt-1 text-xs font-semibold text-red-700">
+                    {missingGoals.teamA} gols sem jogador
+                  </p>
+                ) : null}
               </label>
               <label>
                 <span className="field-label">{match.teamBName || "Time B"}</span>
@@ -478,6 +507,11 @@ export default function PartidasPassadasPage() {
                   value={score.teamBScore}
                   onChange={(event) => updateScore("teamBScore", event.currentTarget.value)}
                 />
+                {missingGoals.teamB !== null ? (
+                  <p className="mt-1 text-xs font-semibold text-red-700">
+                    {missingGoals.teamB} gols sem jogador
+                  </p>
+                ) : null}
               </label>
             </div>
           </section>

@@ -103,6 +103,8 @@ function MatchSummaryCard({
   const isMobileSecondary = variant === "mobileSecondary";
   const isDesktopSecondary = variant === "desktopSecondary";
   const isDefault = variant === "default";
+  const locationTextClass =
+    "truncate uppercase text-emerald-700 text-[0.45rem] tracking-[0.08em] sm:text-[0.6rem]";
   const widthClass = isMobileSecondary
     ? "w-fit shrink-0 snap-start px-3 py-2"
     : isDesktopSecondary
@@ -128,11 +130,7 @@ function MatchSummaryCard({
         {isDefault ? ` - ${match.startTime}` : ""}
       </p>
       {isMobileSecondary ? null : (
-        <p
-          className={`truncate uppercase text-emerald-700 ${
-            isDefault ? "text-[0.45rem] tracking-[0.08em] sm:text-[0.6rem]" : "text-xs tracking-[0.1em]"
-          }`}
-        >
+        <p className={locationTextClass}>
           {match.location ? match.location : "Local a definir"}
         </p>
       )}
@@ -374,7 +372,7 @@ export default function HomePage() {
             </button>
             <button
               type="button"
-              className={`btn h-8 w-8 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              className={`btn h-8 w-16 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
                 listViewFilter === "PENDING"
                   ? "bg-amber-500 text-white hover:bg-amber-600 sm:bg-emerald-700 sm:hover:bg-emerald-800"
                   : "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
@@ -382,12 +380,14 @@ export default function HomePage() {
               onClick={() => setListViewFilter("PENDING")}
               aria-label="Filtrar pendentes"
             >
-              <RotateCcw size={14} className="sm:hidden" />
-              <span className="hidden sm:inline">Pendentes</span>
+              <span className="inline-flex h-8 w-16 items-center justify-center sm:h-auto sm:w-auto">
+                <RotateCcw size={14} className="sm:hidden" />
+                <span className="hidden sm:inline">Pendentes</span>
+              </span>
             </button>
             <button
               type="button"
-              className={`btn h-8 w-8 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              className={`btn h-8 w-16 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
                 listViewFilter === "CONFIRMED"
                   ? "bg-emerald-600 text-white hover:bg-emerald-700"
                   : "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
@@ -395,12 +395,14 @@ export default function HomePage() {
               onClick={() => setListViewFilter("CONFIRMED")}
               aria-label="Filtrar confirmados"
             >
-              <Check size={14} className="sm:hidden" />
-              <span className="hidden sm:inline">Confirmados</span>
+              <span className="inline-flex h-8 w-16 items-center justify-center sm:h-auto sm:w-auto">
+                <Check size={14} className="sm:hidden" />
+                <span className="hidden sm:inline">Confirmados</span>
+              </span>
             </button>
             <button
               type="button"
-              className={`btn h-8 w-8 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              className={`btn h-8 w-16 p-0 text-xs sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
                 listViewFilter === "CANCELED"
                   ? "bg-red-600 text-white hover:bg-red-700"
                   : "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
@@ -408,8 +410,10 @@ export default function HomePage() {
               onClick={() => setListViewFilter("CANCELED")}
               aria-label="Filtrar desconfirmados"
             >
-              <X size={14} className="sm:hidden" />
-              <span className="hidden sm:inline">Desconfirmados</span>
+              <span className="inline-flex h-8 w-16 items-center justify-center sm:h-auto sm:w-auto">
+                <X size={14} className="sm:hidden" />
+                <span className="hidden sm:inline">Desconfirmados</span>
+              </span>
             </button>
           </div>
         </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bebas_Neue, Barlow_Condensed } from "next/font/google";
 import { formatDatePtBr } from "@/lib/date-format";
 import styles from "./player-card.module.css";
@@ -18,6 +18,7 @@ type Overview = {
 type Player = {
   id: string;
   name: string;
+  photoUrl: string | null;
 };
 
 type PlayerStats = {
@@ -99,6 +100,8 @@ export default function EstatisticasPage() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [selectedPlayerStats, setSelectedPlayerStats] = useState<PlayerStats | null>(null);
   const [message, setMessage] = useState("");
+  const [isDownloadingCard, setIsDownloadingCard] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     Promise.all([fetch("/api/stats/overview"), fetch("/api/players")])
@@ -119,14 +122,51 @@ export default function EstatisticasPage() {
       return;
     }
 
-    const response = await fetch(`/api/players/${playerId}/history`);
+    const response = await fetch(`/api/players/${playerId}/history`, { cache: "no-store" });
     if (!response.ok) {
       setMessage("Nao foi possivel carregar estatisticas do jogador.");
       return;
     }
 
     const payload = (await response.json()) as PlayerStats;
-    setSelectedPlayerStats(payload);
+    const fallbackPhotoUrl = players.find((player) => player.id === playerId)?.photoUrl ?? null;
+
+    setSelectedPlayerStats({
+      ...payload,
+      player: {
+        ...payload.player,
+        photoUrl: payload.player.photoUrl ?? fallbackPhotoUrl,
+      },
+    });
+  }
+
+  async function downloadPlayerCardPng() {
+    if (!selectedPlayerStats || !cardRef.current) return;
+
+    setIsDownloadingCard(true);
+
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(cardRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+      });
+
+      const safeName = selectedPlayerStats.player.name
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
+
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `card-${safeName || "jogador"}.png`;
+      link.click();
+    } catch {
+      setMessage("Nao foi possivel gerar o PNG do card.");
+    } finally {
+      setIsDownloadingCard(false);
+    }
   }
 
   return (
@@ -188,8 +228,8 @@ export default function EstatisticasPage() {
 
         {selectedPlayerStats ? (
           <div className="mt-4 grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
-            <div className="flex justify-center lg:justify-start">
-              <div className={`${styles.card} ${barlow.className}`}>
+            <div className="flex flex-col items-center gap-2 lg:items-start">
+              <div ref={cardRef} className={`${styles.card} ${barlow.className}`}>
               <div className={styles.cardBg} />
 
               <div className={styles.dot} style={{ width: 8, height: 8, background: "#fff", top: "15%", left: "8%" }} />
@@ -274,6 +314,21 @@ export default function EstatisticasPage() {
 
                   <div className={styles.statsRow}>
                     <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.wins}</div>
+                      <div className={styles.statLabel}>Vitorias</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.draws}</div>
+                      <div className={styles.statLabel}>Empates</div>
+                    </div>
+                    <div className={styles.stat}>
+                      <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.losses}</div>
+                      <div className={styles.statLabel}>Derrotas</div>
+                    </div>
+                  </div>
+
+                  <div className={styles.statsRow}>
+                    <div className={styles.stat}>
                       <div className={`${styles.statValue} ${bebas.className}`}>{selectedPlayerStats.totals.goals}</div>
                       <div className={styles.statLabel}>Gols</div>
                     </div>
@@ -306,6 +361,14 @@ export default function EstatisticasPage() {
 
                 <div className={styles.shimmer} />
               </div>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={downloadPlayerCardPng}
+                disabled={isDownloadingCard}
+              >
+                {isDownloadingCard ? "Gerando PNG..." : "Baixar card em PNG"}
+              </button>
             </div>
 
             <div className="lg:min-w-0">

@@ -22,6 +22,14 @@ type AttendanceRow = {
   attendancePercentage: number;
 };
 
+type EfficiencyRow = {
+  playerId: string;
+  playerName: string;
+  points: number;
+  matchesWithResult: number;
+  efficiency: number;
+};
+
 type Overview = {
   totalMatches: number;
   totalGoals: number;
@@ -29,6 +37,7 @@ type Overview = {
   topScorer: { name: string; goals: number };
   topAssist: { name: string; assists: number };
   topConcededGoalkeeper: { name: string; goalsConceded: number };
+  efficiency: EfficiencyRow[];
   attendance: AttendanceRow[];
   topScorers: RankingRow[];
   topAssists: RankingRow[];
@@ -136,6 +145,10 @@ export default function EstatisticasPage() {
         .slice(0, 10),
     [overview],
   );
+  const topEfficiency = useMemo(
+    () => (overview?.efficiency ?? []).filter((row) => row.matchesWithResult > 0 && row.points > 0),
+    [overview],
+  );
   const topScorers = useMemo(
     () => (overview?.topScorers ?? []).filter((row) => row.goals > 0),
     [overview],
@@ -213,7 +226,12 @@ export default function EstatisticasPage() {
             )}
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <RankingCard
+              title="Aproveitamento"
+              rows={topEfficiency}
+              metric={(row) => `${row.efficiency.toFixed(1)}% (${row.points})`}
+            />
             <RankingCard
               title="Presenca"
               rows={topPresence}

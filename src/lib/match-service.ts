@@ -743,6 +743,7 @@ export async function getGeneralStatsOverview() {
       topScorer: { name: "-", goals: 0 },
       topAssist: { name: "-", assists: 0 },
       topConcededGoalkeeper: { name: "-", goalsConceded: 0 },
+      efficiency: [],
       attendance: [],
       topScorers: [],
       topAssists: [],
@@ -766,8 +767,31 @@ export async function getGeneralStatsOverview() {
     },
   });
 
+  const resultParticipants = await db().matchParticipant.findMany({
+    where: {
+      matchId: { in: matchIds },
+      team: { not: null },
+    },
+    select: {
+      playerId: true,
+      team: true,
+      match: {
+        select: {
+          teamAScore: true,
+          teamBScore: true,
+        },
+      },
+    },
+  });
+
   const players = await db().player.findMany({
-    where: { id: { in: grouped.map((item) => item.playerId) } },
+    where: {
+      id: {
+        in: Array.from(
+          new Set([...grouped.map((item) => item.playerId), ...resultParticipants.map((item) => item.playerId)]),
+        ),
+      },
+    },
     select: { id: true, name: true, position: true },
   });
 
@@ -833,6 +857,48 @@ export async function getGeneralStatsOverview() {
     (a, b) => b.goalsConceded - a.goalsConceded || a.playerName.localeCompare(b.playerName),
   )[0];
 
+  const performanceMap = new Map<
+    string,
+    { playerId: string; playerName: string; points: number; matchesWithResult: number; efficiency: number }
+  >();
+
+  for (const participant of resultParticipants) {
+    if (!participant.team) continue;
+    if (participant.match.teamAScore === null || participant.match.teamBScore === null) continue;
+
+    const ownScore = participant.team === "A" ? participant.match.teamAScore : participant.match.teamBScore;
+    const opponentScore = participant.team === "A" ? participant.match.teamBScore : participant.match.teamAScore;
+    const points = ownScore > opponentScore ? 3 : ownScore === opponentScore ? 1 : 0;
+
+    const existing = performanceMap.get(participant.playerId) ?? {
+      playerId: participant.playerId,
+      playerName: playerById.get(participant.playerId)?.name ?? "Jogador",
+      points: 0,
+      matchesWithResult: 0,
+      efficiency: 0,
+    };
+
+    existing.points += points;
+    existing.matchesWithResult += 1;
+    performanceMap.set(participant.playerId, existing);
+  }
+
+  const efficiency = Array.from(performanceMap.values())
+    .map((item) => ({
+      ...item,
+      efficiency:
+        item.matchesWithResult > 0
+          ? Number(((item.points / (item.matchesWithResult * 3)) * 100).toFixed(1))
+          : 0,
+    }))
+    .sort(
+      (a, b) =>
+        b.efficiency - a.efficiency ||
+        b.points - a.points ||
+        b.matchesWithResult - a.matchesWithResult ||
+        a.playerName.localeCompare(b.playerName),
+    );
+
   return {
     totalMatches,
     totalGoals: totals._sum.goals ?? 0,
@@ -849,6 +915,7 @@ export async function getGeneralStatsOverview() {
       name: topConcededGoalkeeper?.playerName ?? "-",
       goalsConceded: topConcededGoalkeeper?.goalsConceded ?? 0,
     },
+    efficiency,
     attendance,
     topScorers: [...rankingRows].sort((a, b) => b.goals - a.goals || a.playerName.localeCompare(b.playerName)),
     topAssists: [...rankingRows].sort((a, b) => b.assists - a.assists || a.playerName.localeCompare(b.playerName)),

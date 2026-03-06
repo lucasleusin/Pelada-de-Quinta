@@ -146,7 +146,7 @@ export default function EstatisticasPage() {
     [overview],
   );
   const topEfficiency = useMemo(
-    () => (overview?.efficiency ?? []).filter((row) => row.matchesWithResult > 0 && row.points > 0),
+    () => (overview?.efficiency ?? []).filter((row) => row.matchesWithResult > 0),
     [overview],
   );
   const topScorers = useMemo(
@@ -226,7 +226,7 @@ export default function EstatisticasPage() {
             )}
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <RankingCard
               title="Aproveitamento"
               rows={topEfficiency}
@@ -237,10 +237,10 @@ export default function EstatisticasPage() {
               rows={topPresence}
               metric={(row) => `${row.attendancePercentage.toFixed(1)}%`}
             />
-            <RankingCard title="Artilharia" rows={topScorers} metric={(row) => String(row.goals)} />
-            <RankingCard title="Assistencias" rows={topAssists} metric={(row) => String(row.assists)} />
+            <RankingCard title="Gols Marcados" rows={topScorers} metric={(row) => String(row.goals)} />
             <RankingCard title="Gols Tomados" rows={topConceded} metric={(row) => String(row.goalsConceded)} />
-            <RankingCard title="Nota Media" rows={topMvp} metric={(row) => row.averageRating.toFixed(2)} />
+            <RankingCard title="Assistencia" rows={topAssists} metric={(row) => String(row.assists)} />
+            <RankingCard title="Nota" rows={topMvp} metric={(row) => row.averageRating.toFixed(2)} />
           </section>
         </>
       ) : selectedPlayerStats ? (

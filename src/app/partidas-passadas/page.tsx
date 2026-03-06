@@ -177,6 +177,11 @@ export default function PartidasPassadasPage() {
           (a, b) => getDateSortValue(b.matchDate) - getDateSortValue(a.matchDate),
         );
         setMatches(sorted);
+        setSelectedMatchId((current) =>
+          current && sorted.some((matchItem) => matchItem.id === current)
+            ? current
+            : (sorted[0]?.id ?? ""),
+        );
       })
       .catch(() => setMessage("Falha ao carregar partidas."));
   }, []);

@@ -8,17 +8,11 @@ type SettingsResponse = {
   id: string;
   enabled: boolean;
   provider: "TWILIO";
-  notifyOnConfirm: boolean;
-  notifyOnCancel: boolean;
-  confirmTemplate: string;
-  cancelTemplate: string;
   updatedAt: string;
   envStatus: {
     configured: boolean;
     missingEnvVars: string[];
   };
-  inboundMode: "OFF";
-  webhookPath: string;
 };
 
 type Recipient = {
@@ -32,12 +26,10 @@ type Recipient = {
 type Notification = {
   id: string;
   eventType: "CONFIRM" | "CANCEL" | "TEST";
-  direction: "OUTBOUND" | "INBOUND";
   status: "QUEUED" | "SENT" | "FAILED" | "SKIPPED";
   recipientPhone: string | null;
   body: string;
   errorMessage: string | null;
-  providerMessageId: string | null;
   createdAt: string;
   player?: {
     id: string;
@@ -75,7 +67,7 @@ function formatDateTime(value: string | null) {
 }
 
 function notificationLabel(eventType: Notification["eventType"]) {
-  if (eventType === "CANCEL") return "Desconfirmacao";
+  if (eventType === "CANCEL") return "Saida da lista";
   if (eventType === "TEST") return "Teste";
   return "Confirmacao";
 }
@@ -96,11 +88,6 @@ export default function AdminWhatsappPage() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
-  const [enabled, setEnabled] = useState(false);
-  const [notifyOnConfirm, setNotifyOnConfirm] = useState(true);
-  const [notifyOnCancel, setNotifyOnCancel] = useState(true);
-  const [confirmTemplate, setConfirmTemplate] = useState("");
-  const [cancelTemplate, setCancelTemplate] = useState("");
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [recipientDrafts, setRecipientDrafts] = useState<Record<string, RecipientDraft>>({});
   const [newLabel, setNewLabel] = useState("");
@@ -114,7 +101,7 @@ export default function AdminWhatsappPage() {
       const [settingsResponse, recipientsResponse, notificationsResponse] = await Promise.all([
         fetch("/api/admin/whatsapp/settings"),
         fetch("/api/admin/whatsapp/recipients"),
-        fetch("/api/admin/whatsapp/notifications?limit=40"),
+        fetch("/api/admin/whatsapp/notifications?limit=5"),
       ]);
 
       if (!settingsResponse.ok || !recipientsResponse.ok || !notificationsResponse.ok) {
@@ -126,11 +113,6 @@ export default function AdminWhatsappPage() {
       const notificationsPayload = (await notificationsResponse.json()) as Notification[];
 
       setSettings(settingsPayload);
-      setEnabled(settingsPayload.enabled);
-      setNotifyOnConfirm(settingsPayload.notifyOnConfirm);
-      setNotifyOnCancel(settingsPayload.notifyOnCancel);
-      setConfirmTemplate(settingsPayload.confirmTemplate);
-      setCancelTemplate(settingsPayload.cancelTemplate);
       setRecipients(recipientsPayload);
       setRecipientDrafts(
         Object.fromEntries(
@@ -161,32 +143,29 @@ export default function AdminWhatsappPage() {
     });
   }, []);
 
-  async function saveSettings(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function toggleIntegration() {
+    if (!settings) return;
 
     const response = await fetch("/api/admin/whatsapp/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        enabled,
-        notifyOnConfirm,
-        notifyOnCancel,
-        confirmTemplate,
-        cancelTemplate,
-      }),
+      body: JSON.stringify({ enabled: !settings.enabled }),
     });
 
     if (!response.ok) {
       setNotice({
         tone: "error",
-        text: await parseError(response, "Falha ao salvar configuracao."),
+        text: await parseError(response, "Falha ao atualizar integracao."),
       });
       return;
     }
 
     const payload = (await response.json()) as SettingsResponse;
     setSettings(payload);
-    setNotice({ tone: "success", text: "Configuracao de WhatsApp salva." });
+    setNotice({
+      tone: "success",
+      text: payload.enabled ? "Integracao WhatsApp habilitada." : "Integracao WhatsApp desabilitada.",
+    });
   }
 
   async function createRecipient(event: FormEvent<HTMLFormElement>) {
@@ -260,11 +239,11 @@ export default function AdminWhatsappPage() {
     await loadData();
   }
 
-  async function sendTest(recipientId: string, eventType: "CONFIRM" | "CANCEL") {
+  async function sendTest(recipientId: string) {
     const response = await fetch("/api/admin/whatsapp/test", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipientId, eventType }),
+      body: JSON.stringify({ recipientId }),
     });
 
     if (!response.ok) {
@@ -302,34 +281,24 @@ export default function AdminWhatsappPage() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Operacao interna</p>
         <h2 className="mt-1 text-3xl font-bold text-emerald-950">Whatsapp</h2>
         <p className="text-sm text-emerald-800">
-          Receba alertas administrativos 1:1 sempre que um jogador confirmar ou cancelar a presenca.
+          Cada numero ativo recebe a mesma lista atualizada de confirmados da pelada.
         </p>
       </HeroBlock>
 
       <SectionShell className="p-4">
-        <h3 className="text-xl font-semibold text-emerald-950">Status da integracao</h3>
-        {loading ? (
-          <p className="mt-3 text-sm text-emerald-900">Carregando configuracao...</p>
-        ) : settings ? (
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
-              <p className="field-label">Provedor</p>
-              <p className="font-semibold">{settings.provider}</p>
-            </div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
-              <p className="field-label">Ambiente</p>
-              <p className="font-semibold">{settings.envStatus.configured ? "Configurado" : "Incompleto"}</p>
-            </div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
-              <p className="field-label">Duas vias</p>
-              <p className="font-semibold">Preparado, desligado</p>
-            </div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
-              <p className="field-label">Webhook futuro</p>
-              <p className="font-semibold">{settings.webhookPath}</p>
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold text-emerald-950">Integracao WhatsApp</h3>
+            <p className="text-sm text-emerald-800">
+              Status atual: {settings?.enabled ? "habilitada" : "desabilitada"}.
+            </p>
           </div>
-        ) : null}
+          <button className="btn btn-primary" type="button" onClick={() => toggleIntegration()} disabled={!settings || loading}>
+            {settings?.enabled ? "Desabilitar integracao" : "Habilitar integracao"}
+          </button>
+        </div>
+
+        {loading && !settings ? <p className="mt-3 text-sm text-emerald-900">Carregando configuracao...</p> : null}
 
         {settings && settings.envStatus.missingEnvVars.length > 0 ? (
           <StatusNote className="mt-3" tone="warning">
@@ -427,7 +396,7 @@ export default function AdminWhatsappPage() {
                     <button className="btn btn-primary" type="button" onClick={() => saveRecipient(recipient.id)}>
                       Salvar
                     </button>
-                    <button className="btn btn-ghost" type="button" onClick={() => sendTest(recipient.id, "CONFIRM")}>
+                    <button className="btn btn-ghost" type="button" onClick={() => sendTest(recipient.id)}>
                       Testar
                     </button>
                     <button className="btn btn-ghost" type="button" onClick={() => deleteRecipient(recipient.id)}>
@@ -444,66 +413,8 @@ export default function AdminWhatsappPage() {
         </ul>
       </SectionShell>
 
-      <form onSubmit={saveSettings}>
-        <SectionShell className="p-4">
-          <h3 className="text-xl font-semibold text-emerald-950">Eventos e templates</h3>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            <div className="space-y-3 rounded-xl border border-emerald-100 p-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-emerald-900">
-                <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.currentTarget.checked)} />
-                Integracao habilitada
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-emerald-900">
-                <input
-                  type="checkbox"
-                  checked={notifyOnConfirm}
-                  onChange={(event) => setNotifyOnConfirm(event.currentTarget.checked)}
-                />
-                Notificar confirmacao
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-emerald-900">
-                <input
-                  type="checkbox"
-                  checked={notifyOnCancel}
-                  onChange={(event) => setNotifyOnCancel(event.currentTarget.checked)}
-                />
-                Notificar desconfirmacao
-              </label>
-              <p className="text-xs text-emerald-800">
-                Placeholders disponiveis: {"{{playerName}}"}, {"{{actionLabel}}"}, {"{{matchDate}}"}, {"{{startTime}}"}, {"{{location}}"}.
-              </p>
-            </div>
-
-            <div className="grid gap-3">
-              <label>
-                <span className="field-label">Template de confirmacao</span>
-                <textarea
-                  className="field-input min-h-28"
-                  value={confirmTemplate}
-                  onChange={(event) => setConfirmTemplate(event.currentTarget.value)}
-                />
-              </label>
-              <label>
-                <span className="field-label">Template de desconfirmacao</span>
-                <textarea
-                  className="field-input min-h-28"
-                  value={cancelTemplate}
-                  onChange={(event) => setCancelTemplate(event.currentTarget.value)}
-                />
-              </label>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn btn-primary" type="submit">Salvar configuracao</button>
-            <button className="btn btn-ghost" type="button" onClick={() => loadData()}>
-              Recarregar
-            </button>
-          </div>
-        </SectionShell>
-      </form>
-
       <SectionShell className="p-4">
-        <h3 className="text-xl font-semibold text-emerald-950">Historico</h3>
+        <h3 className="text-xl font-semibold text-emerald-950">Ultimas 5 mensagens</h3>
         <ul className="mt-4 space-y-3 text-sm">
           {notifications.length === 0 ? (
             <li className="rounded-xl border border-dashed border-emerald-200 p-4 text-emerald-900">
@@ -550,4 +461,3 @@ export default function AdminWhatsappPage() {
     </div>
   );
 }
-

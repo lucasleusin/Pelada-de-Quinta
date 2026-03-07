@@ -12,30 +12,6 @@ export default function AdminHomePage() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Central Operacional</p>
         <h2 className="mt-1 text-3xl font-bold text-emerald-950">Painel administrativo</h2>
         <p className="text-sm text-emerald-800">Gerencie jogadores, partidas, times, placares e alertas internos.</p>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Link href="/admin/jogadores" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
-            Abrir jogadores
-          </Link>
-          <Link
-            href="/admin/partidas"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full bg-white")}
-          >
-            Abrir partidas
-          </Link>
-          <Link
-            href="/admin/relatorios"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full bg-white")}
-          >
-            Abrir relatorios
-          </Link>
-          <Link
-            href="/admin/whatsapp"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full bg-white")}
-          >
-            Abrir Whatsapp
-          </Link>
-        </div>
       </HeroBlock>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -61,7 +37,7 @@ export default function AdminHomePage() {
 
         <SectionShell className="p-4">
           <h3 className="text-xl font-semibold text-emerald-950">Whatsapp</h3>
-          <p className="text-sm text-emerald-800">Destinatarios, templates e historico de alertas administrativos.</p>
+          <p className="text-sm text-emerald-800">Destinatarios e historico dos alertas administrativos.</p>
           <div className="mt-3">
             <Link href="/admin/whatsapp" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full bg-white")}>
               Ir para Whatsapp

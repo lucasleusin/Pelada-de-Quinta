@@ -1,4 +1,6 @@
 import {
+  MatchStatus,
+  Position,
   PresenceStatus,
   Prisma,
   WhatsAppMessageEventType,
@@ -9,15 +11,14 @@ import { getPrismaClient } from "@/lib/db";
 import {
   getWhatsAppEnvStatus,
   normalizePhoneToE164,
-  renderWhatsAppTemplate,
   sendTwilioWhatsAppMessage,
 } from "@/lib/whatsapp";
 
 const DEFAULT_SETTINGS_ID = "default";
-const DEFAULT_CONFIRM_TEMPLATE =
-  "{{playerName}} confirmou presenca para {{matchDate}} as {{startTime}} em {{location}}.";
-const DEFAULT_CANCEL_TEMPLATE =
-  "{{playerName}} cancelou presenca para {{matchDate}} as {{startTime}} em {{location}}.";
+const DEFAULT_LEGACY_TEMPLATE = "Mensagem padrao de snapshot da pelada.";
+const DEFAULT_APP_BASE_URL = "https://pelada-de-quinta.vercel.app";
+const MIN_VISIBLE_SLOTS = 16;
+const TEST_PREVIEW_START_TIME = "19:00";
 
 type DbClient = ReturnType<typeof getPrismaClient>;
 
@@ -45,6 +46,20 @@ type DispatchMessageInput = {
   recipientPhone?: string;
 };
 
+type RosterPlayer = {
+  name: string;
+  position: Position;
+};
+
+type RosterParticipant = {
+  confirmedAt: Date | null;
+  createdAt: Date;
+  player: {
+    name: string;
+    position: Position;
+  };
+};
+
 function db() {
   return getPrismaClient();
 }
@@ -58,32 +73,74 @@ function getMissingEnvError() {
   return status.configured ? null : `Configuracao ausente: ${status.missingEnvVars.join(", ")}`;
 }
 
-function resolveActionLabel(eventType: WhatsAppMessageEventType) {
-  if (eventType === WhatsAppMessageEventType.CANCEL) {
-    return "cancelou presenca";
-  }
+function normalizeAppBaseUrl(appBaseUrl?: string) {
+  const baseUrl =
+    appBaseUrl?.trim() || process.env.APP_BASE_URL?.trim() || DEFAULT_APP_BASE_URL;
 
-  if (eventType === WhatsAppMessageEventType.TEST) {
-    return "executou um teste de envio";
-  }
-
-  return "confirmou presenca";
+  return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
 }
 
-function buildTemplateContext(input: {
-  playerName: string;
-  actionLabel: string;
-  matchDate: Date;
+function getPositionCode(position: Position) {
+  if (position === Position.GOLEIRO) return "G";
+  if (position === Position.ZAGUEIRO) return "Z";
+  if (position === Position.MEIA) return "M";
+  if (position === Position.ATACANTE) return "A";
+  return "O";
+}
+
+function compareRosterParticipants(left: RosterParticipant, right: RosterParticipant) {
+  const leftConfirmedAt = left.confirmedAt?.getTime() ?? left.createdAt.getTime();
+  const rightConfirmedAt = right.confirmedAt?.getTime() ?? right.createdAt.getTime();
+
+  if (leftConfirmedAt !== rightConfirmedAt) {
+    return leftConfirmedAt - rightConfirmedAt;
+  }
+
+  const leftCreatedAt = left.createdAt.getTime();
+  const rightCreatedAt = right.createdAt.getTime();
+
+  if (leftCreatedAt !== rightCreatedAt) {
+    return leftCreatedAt - rightCreatedAt;
+  }
+
+  return left.player.name.localeCompare(right.player.name);
+}
+
+function resolvePresenceEventType(
+  previousStatus: PresenceStatus | null,
+  nextStatus: PresenceStatus,
+) {
+  if (nextStatus === PresenceStatus.CONFIRMED && previousStatus !== PresenceStatus.CONFIRMED) {
+    return WhatsAppMessageEventType.CONFIRM;
+  }
+
+  if (previousStatus === PresenceStatus.CONFIRMED && nextStatus !== PresenceStatus.CONFIRMED) {
+    return WhatsAppMessageEventType.CANCEL;
+  }
+
+  return null;
+}
+
+export function buildWhatsAppRosterMessage(input: {
+  matchDate: Date | string;
   startTime: string;
-  location: string | null;
+  confirmedPlayers: RosterPlayer[];
+  appBaseUrl?: string;
 }) {
-  return {
-    playerName: input.playerName,
-    actionLabel: input.actionLabel,
-    matchDate: formatDatePtBr(input.matchDate),
-    startTime: input.startTime,
-    location: input.location?.trim() || "Local nao informado",
-  };
+  const visibleSlots = Math.max(MIN_VISIBLE_SLOTS, input.confirmedPlayers.length);
+  const slotLines = Array.from({ length: visibleSlots }, (_, index) => {
+    const player = input.confirmedPlayers[index];
+    return player ? `${index + 1} - ${player.name} (${getPositionCode(player.position)})` : `${index + 1} -`;
+  });
+
+  return [
+    "PELADA DE QUINTA",
+    `${formatDatePtBr(input.matchDate)} - ${input.startTime}`,
+    "",
+    ...slotLines,
+    "",
+    `Confirme sua vaga aqui: ${normalizeAppBaseUrl(input.appBaseUrl)}`,
+  ].join("\n");
 }
 
 async function ensureSettings(prisma: DbClient = db()) {
@@ -92,13 +149,20 @@ async function ensureSettings(prisma: DbClient = db()) {
     update: {},
     create: {
       id: DEFAULT_SETTINGS_ID,
-      confirmTemplate: DEFAULT_CONFIRM_TEMPLATE,
-      cancelTemplate: DEFAULT_CANCEL_TEMPLATE,
+      confirmTemplate: DEFAULT_LEGACY_TEMPLATE,
+      cancelTemplate: DEFAULT_LEGACY_TEMPLATE,
     },
   });
 }
 
-async function createMessageLog(input: DispatchMessageInput & { status?: WhatsAppMessageStatus; errorMessage?: string; rawPayload?: Prisma.InputJsonValue | null }, prisma: DbClient = db()) {
+async function createMessageLog(
+  input: DispatchMessageInput & {
+    status?: WhatsAppMessageStatus;
+    errorMessage?: string;
+    rawPayload?: Prisma.InputJsonValue | null;
+  },
+  prisma: DbClient = db(),
+) {
   return prisma.whatsAppMessageLog.create({
     data: {
       direction: "OUTBOUND",
@@ -168,12 +232,107 @@ async function dispatchMessage(input: DispatchMessageInput, prisma: DbClient = d
   }
 }
 
+async function getMatchRosterSnapshot(matchId: string, prisma: DbClient = db()) {
+  return prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      id: true,
+      matchDate: true,
+      startTime: true,
+      participants: {
+        where: {
+          presenceStatus: PresenceStatus.CONFIRMED,
+        },
+        select: {
+          confirmedAt: true,
+          createdAt: true,
+          player: {
+            select: {
+              name: true,
+              position: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+async function buildRosterBodyForMatch(matchId: string, prisma: DbClient = db()) {
+  const match = await getMatchRosterSnapshot(matchId, prisma);
+
+  if (!match) {
+    throw new Error("Partida nao encontrada para gerar a mensagem de WhatsApp.");
+  }
+
+  const confirmedPlayers = [...match.participants]
+    .sort(compareRosterParticipants)
+    .map((participant) => ({
+      name: participant.player.name,
+      position: participant.player.position,
+    }));
+
+  return buildWhatsAppRosterMessage({
+    matchDate: match.matchDate,
+    startTime: match.startTime,
+    confirmedPlayers,
+  });
+}
+
+async function buildTestRosterBody(prisma: DbClient = db()) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const nextMatch = await prisma.match.findFirst({
+    where: {
+      status: { not: MatchStatus.ARCHIVED },
+      matchDate: { gte: today },
+    },
+    orderBy: { matchDate: "asc" },
+    select: { id: true },
+  });
+
+  if (nextMatch) {
+    return buildRosterBodyForMatch(nextMatch.id, prisma);
+  }
+
+  return buildWhatsAppRosterMessage({
+    matchDate: new Date(),
+    startTime: TEST_PREVIEW_START_TIME,
+    confirmedPlayers: [],
+  });
+}
+
+async function createSkippedNotification(
+  eventType: WhatsAppMessageEventType,
+  body: string,
+  reason: string,
+  playerId: string,
+  matchId: string,
+  prisma: DbClient,
+) {
+  await createMessageLog(
+    {
+      eventType,
+      body,
+      playerId,
+      matchId,
+      status: WhatsAppMessageStatus.SKIPPED,
+      errorMessage: reason,
+    },
+    prisma,
+  );
+}
+
 export async function getWhatsAppSettings(prisma: DbClient = db()) {
   const settings = await ensureSettings(prisma);
   const envStatus = getWhatsAppEnvStatus();
 
   return {
-    ...settings,
+    id: settings.id,
+    enabled: settings.enabled,
+    provider: settings.provider,
+    updatedAt: settings.updatedAt,
     envStatus,
   };
 }
@@ -181,19 +340,15 @@ export async function getWhatsAppSettings(prisma: DbClient = db()) {
 export async function updateWhatsAppSettings(
   input: {
     enabled: boolean;
-    notifyOnConfirm: boolean;
-    notifyOnCancel: boolean;
-    confirmTemplate: string;
-    cancelTemplate: string;
   },
   prisma: DbClient = db(),
 ) {
-  return prisma.whatsAppSettings.upsert({
+  await ensureSettings(prisma);
+
+  return prisma.whatsAppSettings.update({
     where: { id: DEFAULT_SETTINGS_ID },
-    update: input,
-    create: {
-      id: DEFAULT_SETTINGS_ID,
-      ...input,
+    data: {
+      enabled: input.enabled,
     },
   });
 }
@@ -326,26 +481,14 @@ export async function retryWhatsAppMessageLog(logId: string, prisma: DbClient = 
   );
 }
 
-export async function sendWhatsAppTest(recipientId: string, eventType: WhatsAppMessageEventType, prisma: DbClient = db()) {
-  const settings = await ensureSettings(prisma);
+export async function sendWhatsAppTest(recipientId: string, prisma: DbClient = db()) {
   const recipient = await prisma.whatsAppRecipient.findUnique({ where: { id: recipientId } });
 
   if (!recipient) {
     throw new Error("Destinatario nao encontrado.");
   }
 
-  const template = eventType === WhatsAppMessageEventType.CANCEL ? settings.cancelTemplate : settings.confirmTemplate;
-  const body = renderWhatsAppTemplate(
-    template,
-    buildTemplateContext({
-      playerName: "Teste do admin",
-      actionLabel: resolveActionLabel(eventType),
-      matchDate: new Date(),
-      startTime: "19:00",
-      location: "Arena dos Coqueiros",
-    }),
-  );
-
+  const body = await buildTestRosterBody(prisma);
   const result = await dispatchMessage(
     {
       eventType: WhatsAppMessageEventType.TEST,
@@ -364,79 +507,25 @@ export async function sendWhatsAppTest(recipientId: string, eventType: WhatsAppM
   return result;
 }
 
-async function createSkippedNotification(
-  eventType: WhatsAppMessageEventType,
-  body: string,
-  reason: string,
-  playerId: string,
-  matchId: string,
-  prisma: DbClient,
-) {
-  await createMessageLog(
-    {
-      eventType,
-      body,
-      playerId,
-      matchId,
-      status: WhatsAppMessageStatus.SKIPPED,
-      errorMessage: reason,
-    },
-    prisma,
-  );
-}
-
 export async function notifyPresenceChange(input: PresenceNotificationInput, prisma: DbClient = db()) {
   if (input.previousStatus === input.nextStatus) {
     return;
   }
 
-  const eventType =
-    input.nextStatus === PresenceStatus.CONFIRMED
-      ? WhatsAppMessageEventType.CONFIRM
-      : input.nextStatus === PresenceStatus.CANCELED
-        ? WhatsAppMessageEventType.CANCEL
-        : null;
+  const eventType = resolvePresenceEventType(input.previousStatus, input.nextStatus);
 
   if (!eventType) {
     return;
   }
 
   const settings = await ensureSettings(prisma);
+  const body = await buildRosterBodyForMatch(input.match.id, prisma);
 
   if (!settings.enabled) {
-    const template = eventType === WhatsAppMessageEventType.CANCEL ? settings.cancelTemplate : settings.confirmTemplate;
-    const body = renderWhatsAppTemplate(
-      template,
-      buildTemplateContext({
-        playerName: input.player.name,
-        actionLabel: resolveActionLabel(eventType),
-        matchDate: input.match.matchDate,
-        startTime: input.match.startTime,
-        location: input.match.location,
-      }),
-    );
-
-    await createSkippedNotification(eventType, body, "Integracao WhatsApp desabilitada.", input.player.id, input.match.id, prisma);
-    return;
-  }
-
-  if (eventType === WhatsAppMessageEventType.CONFIRM && !settings.notifyOnConfirm) {
     await createSkippedNotification(
       eventType,
-      settings.confirmTemplate,
-      "Notificacao de confirmacao desabilitada.",
-      input.player.id,
-      input.match.id,
-      prisma,
-    );
-    return;
-  }
-
-  if (eventType === WhatsAppMessageEventType.CANCEL && !settings.notifyOnCancel) {
-    await createSkippedNotification(
-      eventType,
-      settings.cancelTemplate,
-      "Notificacao de desconfirmacao desabilitada.",
+      body,
+      "Integracao WhatsApp desabilitada.",
       input.player.id,
       input.match.id,
       prisma,
@@ -452,20 +541,15 @@ export async function notifyPresenceChange(input: PresenceNotificationInput, pri
     orderBy: { label: "asc" },
   });
 
-  const template = eventType === WhatsAppMessageEventType.CANCEL ? settings.cancelTemplate : settings.confirmTemplate;
-  const body = renderWhatsAppTemplate(
-    template,
-    buildTemplateContext({
-      playerName: input.player.name,
-      actionLabel: resolveActionLabel(eventType),
-      matchDate: input.match.matchDate,
-      startTime: input.match.startTime,
-      location: input.match.location,
-    }),
-  );
-
   if (recipients.length === 0) {
-    await createSkippedNotification(eventType, body, "Nenhum destinatario ativo configurado.", input.player.id, input.match.id, prisma);
+    await createSkippedNotification(
+      eventType,
+      body,
+      "Nenhum destinatario ativo configurado.",
+      input.player.id,
+      input.match.id,
+      prisma,
+    );
     return;
   }
 
@@ -485,4 +569,3 @@ export async function notifyPresenceChange(input: PresenceNotificationInput, pri
     ),
   );
 }
-

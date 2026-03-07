@@ -4,11 +4,7 @@ import { getWhatsAppSettings, updateWhatsAppSettings } from "@/lib/whatsapp-serv
 import { whatsAppSettingsUpdateSchema } from "@/lib/validators";
 
 function serializeSettings(settings: Awaited<ReturnType<typeof getWhatsAppSettings>>) {
-  return {
-    ...settings,
-    inboundMode: "OFF",
-    webhookPath: "/api/integrations/whatsapp/webhook",
-  };
+  return settings;
 }
 
 export async function GET() {

@@ -121,7 +121,7 @@ async function applyPresenceStatusChange(
   const [existing, player] = await Promise.all([
     db().matchParticipant.findUnique({
       where: { matchId_playerId: { matchId: match.id, playerId } },
-      select: { presenceStatus: true },
+      select: { presenceStatus: true, confirmedAt: true },
     }),
     db().player.findUnique({
       where: { id: playerId },
@@ -129,10 +129,18 @@ async function applyPresenceStatusChange(
     }),
   ]);
 
+  const now = new Date();
+  const confirmedAt =
+    presenceStatus === PresenceStatus.CONFIRMED
+      ? existing?.presenceStatus === PresenceStatus.CONFIRMED
+        ? existing.confirmedAt ?? now
+        : now
+      : null;
+
   const participant = await db().matchParticipant.upsert({
     where: { matchId_playerId: { matchId: match.id, playerId } },
-    update: { presenceStatus },
-    create: { matchId: match.id, playerId, presenceStatus },
+    update: { presenceStatus, confirmedAt },
+    create: { matchId: match.id, playerId, presenceStatus, confirmedAt },
   });
 
   if (player && existing?.presenceStatus !== presenceStatus) {
@@ -1107,4 +1115,6 @@ export async function requireAdminOr401() {
 export async function parseConfirmBody(body: unknown) {
   return confirmPresenceSchema.safeParse(body);
 }
+
+
 

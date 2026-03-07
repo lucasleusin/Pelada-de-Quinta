@@ -104,6 +104,7 @@ model MatchParticipant {
   matchId                String
   playerId               String
   presenceStatus         PresenceStatus @default(CANCELED)
+  confirmedAt            DateTime?
   team                   Team?
   playedAsGoalkeeper     Boolean        @default(false)
   goals                  Int            @default(0)
@@ -120,6 +121,7 @@ model MatchParticipant {
 
   @@unique([matchId, playerId])
   @@index([matchId, presenceStatus])
+  @@index([matchId, confirmedAt])
   @@index([playerId])
   @@map("match_participants")
 }
@@ -207,3 +209,4 @@ model WhatsAppMessageLog {
   @@index([playerId, matchId])
   @@map("whatsapp_message_logs")
 }
+

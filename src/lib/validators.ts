@@ -32,12 +32,6 @@ const optionalPhoneSchema = z.preprocess(
     .optional(),
 );
 
-const whatsAppTemplateSchema = z
-  .string()
-  .trim()
-  .min(10, "Mensagem muito curta.")
-  .max(1000, "Mensagem muito longa.");
-
 const whatsAppPhoneSchema = z
   .string()
   .trim()
@@ -145,10 +139,6 @@ export const ratingsBatchSchema = z.object({
 
 export const whatsAppSettingsUpdateSchema = z.object({
   enabled: z.boolean(),
-  notifyOnConfirm: z.boolean(),
-  notifyOnCancel: z.boolean(),
-  confirmTemplate: whatsAppTemplateSchema,
-  cancelTemplate: whatsAppTemplateSchema,
 });
 
 export const whatsAppRecipientCreateSchema = z.object({
@@ -165,5 +155,6 @@ export const whatsAppRecipientUpdateSchema = whatsAppRecipientCreateSchema
 
 export const whatsAppTestSchema = z.object({
   recipientId: z.string().uuid(),
-  eventType: z.enum(["CONFIRM", "CANCEL"]).optional(),
 });
+
+

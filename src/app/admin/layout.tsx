@@ -28,20 +28,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <PageShell>
       <ActionBar className="flex flex-wrap items-center justify-between gap-2 p-3">
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin" className={navClass("/admin")}>
-            Dashboard
-          </Link>
-          <Link href="/admin/jogadores" className={navClass("/admin/jogadores")}>
-            Jogadores
-          </Link>
-          <Link href="/admin/partidas" className={navClass("/admin/partidas")}>
-            Partidas
+          <Link href="/admin/whatsapp" className={navClass("/admin/whatsapp")}>
+            Whatsapp
           </Link>
           <Link href="/admin/relatorios" className={navClass("/admin/relatorios")}>
             Relatorios
           </Link>
-          <Link href="/admin/whatsapp" className={navClass("/admin/whatsapp")}>
-            Whatsapp
+          <Link href="/admin/partidas" className={navClass("/admin/partidas")}>
+            Partidas
+          </Link>
+          <Link href="/admin/jogadores" className={navClass("/admin/jogadores")}>
+            Jogadores
+          </Link>
+          <Link href="/admin" className={navClass("/admin")}>
+            Dashboard
           </Link>
         </div>
         <AdminLogoutButton />

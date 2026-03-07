@@ -57,7 +57,7 @@ describe("presence flow with whatsapp notifications", () => {
     mocks.requireAdminApi.mockResolvedValue({ ok: true, admin: { id: "admin-1" } });
   });
 
-  it("notifies admins when a player confirms", async () => {
+  it("notifies admins when a player confirms and stamps confirmedAt", async () => {
     mocks.prismaMock.matchParticipant.findUnique.mockResolvedValue(null);
     mocks.prismaMock.matchParticipant.count.mockResolvedValue(0);
     mocks.prismaMock.matchParticipant.upsert.mockResolvedValue({
@@ -70,6 +70,18 @@ describe("presence flow with whatsapp notifications", () => {
     const response = await confirmPresence("match-1", "player-1");
 
     expect(response.status).toBe(200);
+    expect(mocks.prismaMock.matchParticipant.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          presenceStatus: PresenceStatus.CONFIRMED,
+          confirmedAt: expect.any(Date),
+        }),
+        create: expect.objectContaining({
+          presenceStatus: PresenceStatus.CONFIRMED,
+          confirmedAt: expect.any(Date),
+        }),
+      }),
+    );
     expect(mocks.notifyPresenceChange).toHaveBeenCalledTimes(1);
     expect(mocks.notifyPresenceChange).toHaveBeenCalledWith({
       previousStatus: null,
@@ -83,6 +95,7 @@ describe("presence flow with whatsapp notifications", () => {
     mocks.prismaMock.matchParticipant.findUnique.mockResolvedValue({
       id: "participant-1",
       presenceStatus: PresenceStatus.CONFIRMED,
+      confirmedAt: new Date("2030-03-01T10:00:00.000Z"),
     });
 
     const response = await confirmPresence("match-1", "player-1");
@@ -92,10 +105,45 @@ describe("presence flow with whatsapp notifications", () => {
     expect(mocks.notifyPresenceChange).not.toHaveBeenCalled();
   });
 
+  it("notifies admins when a confirmed player moves to waitlist", async () => {
+    mocks.prismaMock.matchParticipant.findUnique.mockResolvedValue({
+      id: "participant-1",
+      presenceStatus: PresenceStatus.CONFIRMED,
+      confirmedAt: new Date("2030-03-01T10:00:00.000Z"),
+    });
+    mocks.prismaMock.matchParticipant.upsert.mockResolvedValue({
+      id: "participant-1",
+      playerId: "player-1",
+      matchId: "match-1",
+      presenceStatus: PresenceStatus.WAITLIST,
+    });
+
+    const response = await updateParticipantPresence("match-1", "player-1", {
+      presenceStatus: PresenceStatus.WAITLIST,
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.prismaMock.matchParticipant.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          presenceStatus: PresenceStatus.WAITLIST,
+          confirmedAt: null,
+        }),
+      }),
+    );
+    expect(mocks.notifyPresenceChange).toHaveBeenCalledWith({
+      previousStatus: PresenceStatus.CONFIRMED,
+      nextStatus: PresenceStatus.WAITLIST,
+      player: { id: "player-1", name: "Marcio" },
+      match: expect.objectContaining({ id: "match-1" }),
+    });
+  });
+
   it("does not notify when manual update stays canceled", async () => {
     mocks.prismaMock.matchParticipant.findUnique.mockResolvedValue({
       id: "participant-1",
       presenceStatus: PresenceStatus.CANCELED,
+      confirmedAt: null,
     });
     mocks.prismaMock.matchParticipant.upsert.mockResolvedValue({
       id: "participant-1",
@@ -116,6 +164,7 @@ describe("presence flow with whatsapp notifications", () => {
     mocks.prismaMock.matchParticipant.findUnique.mockResolvedValue({
       id: "participant-1",
       presenceStatus: PresenceStatus.CONFIRMED,
+      confirmedAt: new Date("2030-03-01T10:00:00.000Z"),
     });
     mocks.prismaMock.matchParticipant.upsert.mockResolvedValue({
       id: "participant-1",

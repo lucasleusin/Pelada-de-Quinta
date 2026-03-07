@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   updateWhatsAppSettings: vi.fn(),
   listWhatsAppRecipients: vi.fn(),
   createWhatsAppRecipient: vi.fn(),
+  sendWhatsAppTest: vi.fn(),
 }));
 
 vi.mock("@/lib/admin", () => ({
@@ -17,21 +18,18 @@ vi.mock("@/lib/whatsapp-service", () => ({
   updateWhatsAppSettings: mocks.updateWhatsAppSettings,
   listWhatsAppRecipients: mocks.listWhatsAppRecipients,
   createWhatsAppRecipient: mocks.createWhatsAppRecipient,
+  sendWhatsAppTest: mocks.sendWhatsAppTest,
 }));
 
 import { GET as getSettings, PUT as putSettings } from "@/app/api/admin/whatsapp/settings/route";
 import { GET as getRecipients, POST as postRecipients } from "@/app/api/admin/whatsapp/recipients/route";
+import { POST as postTest } from "@/app/api/admin/whatsapp/test/route";
 
 function makeSettings() {
   return {
     id: "default",
     enabled: true,
     provider: "TWILIO",
-    notifyOnConfirm: true,
-    notifyOnCancel: false,
-    confirmTemplate: "confirm",
-    cancelTemplate: "cancel",
-    createdAt: new Date(),
     updatedAt: new Date(),
     envStatus: {
       configured: true,
@@ -47,6 +45,7 @@ describe("admin whatsapp api", () => {
     mocks.updateWhatsAppSettings.mockReset();
     mocks.listWhatsAppRecipients.mockReset();
     mocks.createWhatsAppRecipient.mockReset();
+    mocks.sendWhatsAppTest.mockReset();
     mocks.requireAdminApi.mockResolvedValue({ ok: true, admin: { id: "admin-1" } });
   });
 
@@ -54,32 +53,26 @@ describe("admin whatsapp api", () => {
     mocks.getWhatsAppSettings.mockResolvedValue(makeSettings());
 
     const response = await getSettings();
-    const payload = (await response.json()) as { webhookPath: string; inboundMode: string };
+    const payload = (await response.json()) as { enabled: boolean; envStatus: { configured: boolean } };
 
     expect(response.status).toBe(200);
-    expect(payload.webhookPath).toBe("/api/integrations/whatsapp/webhook");
-    expect(payload.inboundMode).toBe("OFF");
+    expect(payload.enabled).toBe(true);
+    expect(payload.envStatus.configured).toBe(true);
   });
 
-  it("updates whatsapp settings", async () => {
+  it("updates whatsapp settings with only the enabled flag", async () => {
     mocks.getWhatsAppSettings.mockResolvedValue(makeSettings());
 
     const response = await putSettings(
       new Request("http://localhost/api/admin/whatsapp/settings", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          enabled: true,
-          notifyOnConfirm: true,
-          notifyOnCancel: true,
-          confirmTemplate: "{{playerName}} confirmou",
-          cancelTemplate: "{{playerName}} cancelou",
-        }),
+        body: JSON.stringify({ enabled: false }),
       }),
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.updateWhatsAppSettings).toHaveBeenCalledTimes(1);
+    expect(mocks.updateWhatsAppSettings).toHaveBeenCalledWith({ enabled: false });
   });
 
   it("lists recipients", async () => {
@@ -117,5 +110,20 @@ describe("admin whatsapp api", () => {
       phone: "+5551999999999",
       isActive: true,
     });
+  });
+
+  it("sends a manual test without event type", async () => {
+    mocks.sendWhatsAppTest.mockResolvedValue({ id: "log-1" });
+
+    const response = await postTest(
+      new Request("http://localhost/api/admin/whatsapp/test", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ recipientId: "7f21ab95-ef41-4fc4-b073-9de6488020a8" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.sendWhatsAppTest).toHaveBeenCalledWith("7f21ab95-ef41-4fc4-b073-9de6488020a8");
   });
 });

@@ -1,4 +1,3 @@
-import { WhatsAppMessageEventType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin";
 import { sendWhatsAppTest } from "@/lib/whatsapp-service";
@@ -16,10 +15,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const notification = await sendWhatsAppTest(
-      parsed.data.recipientId,
-      parsed.data.eventType === "CANCEL" ? WhatsAppMessageEventType.CANCEL : WhatsAppMessageEventType.CONFIRM,
-    );
+    const notification = await sendWhatsAppTest(parsed.data.recipientId);
 
     return NextResponse.json(notification);
   } catch (error) {

@@ -13,7 +13,6 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 import { ActionBar, PageShell, StatusNote } from "@/components/layout/primitives";
@@ -183,6 +182,10 @@ export default function HomePage() {
   const [message, setMessage] = useState<string>("");
   const [actionMessage, setActionMessage] = useState<string>("");
   const [nextMatchWeather, setNextMatchWeather] = useState<NextMatchWeather | null>(null);
+  const [quickPlayerId, setQuickPlayerId] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("pelada:selectedPlayerId") ?? "";
+  });
 
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
@@ -269,6 +272,18 @@ export default function HomePage() {
     setAllPlayers(players);
     setMatches(sortedMatches);
 
+    setQuickPlayerId((current) => {
+      const stored = window.localStorage.getItem("pelada:selectedPlayerId") ?? "";
+      const candidate = current || stored;
+      if (candidate && players.some((player) => player.id === candidate)) {
+        return candidate;
+      }
+      if (candidate) {
+        window.localStorage.removeItem("pelada:selectedPlayerId");
+      }
+      return "";
+    });
+
     setSelectedMatchId((currentSelection) => {
       if (sortedMatches.length === 0) return null;
       if (currentSelection && sortedMatches.some((match) => match.id === currentSelection)) {
@@ -295,6 +310,7 @@ export default function HomePage() {
 
     return () => window.clearTimeout(timer);
   }, [actionMessage]);
+
 
   useEffect(() => {
     if (!primaryMatch) return;
@@ -332,6 +348,15 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [primaryMatch]);
+
+  function handleQuickPlayerSelect(playerId: string) {
+    setQuickPlayerId(playerId);
+    if (playerId) {
+      window.localStorage.setItem("pelada:selectedPlayerId", playerId);
+      return;
+    }
+    window.localStorage.removeItem("pelada:selectedPlayerId");
+  }
 
   async function setPresence(playerId: string, presenceStatus: PresenceStatus) {
     if (!selectedMatch) return;
@@ -473,17 +498,58 @@ export default function HomePage() {
           </>
         )}
       </section>
-
-      <ActionBar className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
+      <ActionBar className="space-y-3 p-3 sm:p-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Atleta</p>
-          <p className="text-sm text-emerald-900">Quer confirmar em poucos toques?</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmação rápida</p>
+          <p className="text-sm text-emerald-900">Escolha o jogador e confirme com um toque.</p>
         </div>
-        <Link href="/confirmacao-rapida" className="btn btn-accent inline-flex items-center justify-center">
-          Confirmacao rapida
-        </Link>
-      </ActionBar>
 
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="min-w-[240px] sm:max-w-md sm:flex-1">
+            <span className="field-label">Jogador</span>
+            <select
+              className="field-input"
+              value={quickPlayerId}
+              onChange={(event) => handleQuickPlayerSelect(event.currentTarget.value)}
+              aria-label="Selecionar jogador para confirmação rápida"
+            >
+              <option value="">Selecione...</option>
+              {allPlayers.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {quickPlayerId ? (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                className="h-10 rounded-full bg-emerald-600 px-4 text-white hover:bg-emerald-700"
+                disabled={!selectedMatch}
+                onClick={() => setPresence(quickPlayerId, "CONFIRMED")}
+                aria-label="Confirmar presença do jogador selecionado"
+              >
+                Confirmar
+              </Button>
+              <Button
+                type="button"
+                className="h-10 rounded-full bg-red-600 px-4 text-white hover:bg-red-700"
+                disabled={!selectedMatch}
+                onClick={() => setPresence(quickPlayerId, "CANCELED")}
+                aria-label="Marcar jogador selecionado como não vou"
+              >
+                Não vou
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        {!selectedMatch ? (
+          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presença.</p>
+        ) : null}
+      </ActionBar>
 
       {selectedMatch ? (
         <section className="section-shell p-4 sm:p-5">
@@ -688,6 +754,9 @@ export default function HomePage() {
     </PageShell>
   );
 }
+
+
+
 
 
 

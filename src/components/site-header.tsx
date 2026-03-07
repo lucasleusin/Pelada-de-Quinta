@@ -18,16 +18,23 @@ export function SiteHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-emerald-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-col items-start gap-2 px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <Link href="/" className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-          <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 md:hidden">CH-RS - Pelada de Quinta</p>
-          <div className="hidden md:block">
-            <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Cachoeira do Sul</p>
-            <h1 className="font-heading text-2xl font-bold text-emerald-950">Pelada da Quinta</h1>
-          </div>
-        </Link>
-        <nav className="flex w-full flex-wrap items-center justify-start gap-2 text-sm md:w-auto">
+    <header className="sticky top-0 z-30 border-b border-emerald-200/70 bg-white/85 backdrop-blur-lg">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:px-5 lg:px-8">
+        <div className="flex items-center justify-between gap-2">
+          <Link href="/" className="rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700 sm:hidden">CH-RS - Pelada</p>
+            <div className="hidden sm:block">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700">Cachoeira do Sul</p>
+              <h1 className="font-heading text-2xl font-bold text-emerald-950">Pelada da Quinta</h1>
+            </div>
+          </Link>
+
+          <p className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700 md:block">
+            Gestao Semanal
+          </p>
+        </div>
+
+        <nav className="action-bar flex w-full flex-wrap items-center gap-2 p-2">
           {links.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
@@ -37,6 +44,7 @@ export function SiteHeader() {
                 className={cn(
                   buttonVariants({ variant: active ? "default" : "outline", size: "sm" }),
                   "rounded-full",
+                  active ? "shadow-sm" : "bg-white",
                 )}
               >
                 {link.label}

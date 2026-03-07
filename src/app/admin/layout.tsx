@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AdminLogoutButton } from "@/components/admin-logout-button";
+import { ActionBar, PageShell } from "@/components/layout/primitives";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -19,12 +20,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return cn(
       buttonVariants({ variant: active ? "default" : "outline", size: "sm" }),
       "rounded-full",
+      active ? "shadow-sm" : "bg-white",
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="card flex flex-wrap items-center justify-between gap-2 p-3">
+    <PageShell>
+      <ActionBar className="flex flex-wrap items-center justify-between gap-2 p-3">
         <div className="flex flex-wrap gap-2">
           <Link href="/admin" className={navClass("/admin")}>
             Dashboard
@@ -35,10 +37,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/partidas" className={navClass("/admin/partidas")}>
             Partidas
           </Link>
+          <Link href="/admin/relatorios" className={navClass("/admin/relatorios")}>
+            Relatorios
+          </Link>
         </div>
         <AdminLogoutButton />
-      </div>
+      </ActionBar>
       {children}
-    </div>
+    </PageShell>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
+import { ActionBar, PageShell, StatusNote } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { IconKey } from "@/lib/weather-icons";
@@ -359,8 +360,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-3 sm:space-y-5">
-      <section className="card p-3 sm:p-5">
+    <PageShell>
+      <section className="hero-block p-4 sm:p-6">
         {matches.length === 0 || !primaryMatch ? (
           <>
             <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
@@ -473,7 +474,7 @@ export default function HomePage() {
       </section>
 
       {selectedMatch ? (
-        <section className="card p-3 sm:p-4">
+        <section className="section-shell p-4 sm:p-5">
           <label>
             <span className="field-label">Buscar jogador</span>
             <div className="mt-1 flex items-center gap-2">
@@ -493,7 +494,7 @@ export default function HomePage() {
       ) : null}
 
       {selectedMatch ? (
-        <section className="sticky top-20 z-10 rounded-xl border border-emerald-200 bg-white/95 p-1.5 sm:p-2 backdrop-blur">
+        <ActionBar className="sticky top-24 z-10 p-1.5 sm:p-2">
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -549,11 +550,11 @@ export default function HomePage() {
               <span className="hidden sm:inline">Desconfirmados</span>
             </Button>
           </div>
-        </section>
+        </ActionBar>
       ) : null}
 
       {selectedMatch && actionMessage ? (
-        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">{actionMessage}</p>
+        <StatusNote tone="success">{actionMessage}</StatusNote>
       ) : null}
 
       {selectedMatch ? (
@@ -671,7 +672,11 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {message ? <p className="text-sm font-medium text-red-700">{message}</p> : null}
-    </div>
+      {message ? <StatusNote tone="error">{message}</StatusNote> : null}
+    </PageShell>
   );
 }
+
+
+
+

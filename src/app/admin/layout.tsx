@@ -40,6 +40,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/relatorios" className={navClass("/admin/relatorios")}>
             Relatorios
           </Link>
+          <Link href="/admin/whatsapp" className={navClass("/admin/whatsapp")}>
+            Whatsapp
+          </Link>
         </div>
         <AdminLogoutButton />
       </ActionBar>

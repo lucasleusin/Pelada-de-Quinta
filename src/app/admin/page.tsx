@@ -11,7 +11,7 @@ export default function AdminHomePage() {
       <HeroBlock className="p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Central Operacional</p>
         <h2 className="mt-1 text-3xl font-bold text-emerald-950">Painel administrativo</h2>
-        <p className="text-sm text-emerald-800">Gerencie jogadores, partidas, times e placares.</p>
+        <p className="text-sm text-emerald-800">Gerencie jogadores, partidas, times, placares e alertas internos.</p>
 
         <div className="mt-5 flex flex-wrap gap-2">
           <Link href="/admin/jogadores" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
@@ -29,6 +29,12 @@ export default function AdminHomePage() {
           >
             Abrir relatorios
           </Link>
+          <Link
+            href="/admin/whatsapp"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full bg-white")}
+          >
+            Abrir Whatsapp
+          </Link>
         </div>
       </HeroBlock>
 
@@ -43,12 +49,22 @@ export default function AdminHomePage() {
           <p className="text-sm text-emerald-800">Datas, times, presencas e placar.</p>
         </Link>
 
-        <SectionShell className="p-4 md:col-span-2">
+        <SectionShell className="p-4">
           <h3 className="text-xl font-semibold text-emerald-950">Relatorios</h3>
           <p className="text-sm text-emerald-800">Rankings, presenca e exportacao CSV consolidados.</p>
           <div className="mt-3">
             <Link href="/admin/relatorios" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full bg-white")}>
               Ir para relatorios
+            </Link>
+          </div>
+        </SectionShell>
+
+        <SectionShell className="p-4">
+          <h3 className="text-xl font-semibold text-emerald-950">Whatsapp</h3>
+          <p className="text-sm text-emerald-800">Destinatarios, templates e historico de alertas administrativos.</p>
+          <div className="mt-3">
+            <Link href="/admin/whatsapp" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full bg-white")}>
+              Ir para Whatsapp
             </Link>
           </div>
         </SectionShell>

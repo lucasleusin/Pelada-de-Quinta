@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -35,6 +35,28 @@ enum Team {
   B
 }
 
+enum WhatsAppProvider {
+  TWILIO
+}
+
+enum WhatsAppMessageDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum WhatsAppMessageEventType {
+  CONFIRM
+  CANCEL
+  TEST
+}
+
+enum WhatsAppMessageStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
 model Player {
   id                    String             @id @default(uuid())
   name                  String             @unique
@@ -51,25 +73,27 @@ model Player {
   ratingsGiven          MatchRating[]      @relation("RatingsGiven")
   ratingsReceived       MatchRating[]      @relation("RatingsReceived")
   statsUpdatedEntries   MatchParticipant[] @relation("StatsUpdatedBy")
+  whatsAppMessages      WhatsAppMessageLog[]
 
   @@index([name])
   @@map("players")
 }
 
 model Match {
-  id           String             @id @default(uuid())
-  matchDate    DateTime           @db.Date
-  location     String?
-  startTime    String             @default("19:00")
-  status       MatchStatus        @default(DRAFT)
-  teamAName    String             @default("Time A")
-  teamBName    String             @default("Time B")
-  teamAScore   Int?
-  teamBScore   Int?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  participants MatchParticipant[]
-  ratings      MatchRating[]
+  id               String               @id @default(uuid())
+  matchDate        DateTime             @db.Date
+  location         String?
+  startTime        String               @default("19:00")
+  status           MatchStatus          @default(DRAFT)
+  teamAName        String               @default("Time A")
+  teamBName        String               @default("Time B")
+  teamAScore       Int?
+  teamBScore       Int?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  participants     MatchParticipant[]
+  ratings          MatchRating[]
+  whatsAppMessages WhatsAppMessageLog[]
 
   @@index([matchDate, status])
   @@map("matches")
@@ -124,4 +148,62 @@ model AdminUser {
   createdAt    DateTime @default(now())
 
   @@map("admin_users")
+}
+
+model WhatsAppSettings {
+  id              String             @id @default("default")
+  enabled         Boolean            @default(false)
+  provider        WhatsAppProvider   @default(TWILIO)
+  notifyOnConfirm Boolean            @default(true)
+  notifyOnCancel  Boolean            @default(true)
+  confirmTemplate String
+  cancelTemplate  String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  recipients      WhatsAppRecipient[]
+
+  @@map("whatsapp_settings")
+}
+
+model WhatsAppRecipient {
+  id         String              @id @default(uuid())
+  settingsId String
+  label      String
+  phoneE164  String
+  isActive   Boolean             @default(true)
+  lastTestAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  settings   WhatsAppSettings    @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  messages   WhatsAppMessageLog[]
+
+  @@unique([settingsId, phoneE164])
+  @@index([settingsId, isActive])
+  @@map("whatsapp_recipients")
+}
+
+model WhatsAppMessageLog {
+  id                String                   @id @default(uuid())
+  direction         WhatsAppMessageDirection @default(OUTBOUND)
+  eventType         WhatsAppMessageEventType
+  provider          WhatsAppProvider         @default(TWILIO)
+  providerMessageId String?
+  recipientPhone    String?
+  body              String
+  status            WhatsAppMessageStatus    @default(QUEUED)
+  errorMessage      String?
+  rawPayload        Json?
+  playerId          String?
+  matchId           String?
+  recipientId       String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  player    Player?            @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  match     Match?             @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  recipient WhatsAppRecipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([playerId, matchId])
+  @@map("whatsapp_message_logs")
 }

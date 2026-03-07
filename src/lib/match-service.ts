@@ -18,6 +18,7 @@ import {
   teamsSchema,
 } from "@/lib/validators";
 import { requireAdminApi } from "@/lib/admin";
+import { notifyPresenceChange } from "@/lib/whatsapp-service";
 
 const db = () => getPrismaClient();
 
@@ -105,6 +106,50 @@ function validateScoreAgainstTeamGoals(
   return null;
 }
 
+type PresenceTransitionMatch = {
+  id: string;
+  matchDate: Date;
+  startTime: string;
+  location: string | null;
+};
+
+async function applyPresenceStatusChange(
+  match: PresenceTransitionMatch,
+  playerId: string,
+  presenceStatus: PresenceStatus,
+) {
+  const [existing, player] = await Promise.all([
+    db().matchParticipant.findUnique({
+      where: { matchId_playerId: { matchId: match.id, playerId } },
+      select: { presenceStatus: true },
+    }),
+    db().player.findUnique({
+      where: { id: playerId },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  const participant = await db().matchParticipant.upsert({
+    where: { matchId_playerId: { matchId: match.id, playerId } },
+    update: { presenceStatus },
+    create: { matchId: match.id, playerId, presenceStatus },
+  });
+
+  if (player && existing?.presenceStatus !== presenceStatus) {
+    try {
+      await notifyPresenceChange({
+        previousStatus: existing?.presenceStatus ?? null,
+        nextStatus: presenceStatus,
+        player,
+        match,
+      });
+    } catch (error) {
+      console.error("Falha ao notificar WhatsApp.", error);
+    }
+  }
+  return participant;
+}
+
 export async function listMatches(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = parseDateFilter(searchParams.get("from"));
@@ -186,6 +231,12 @@ export async function confirmPresence(matchId: string, playerId: string) {
       id: matchId,
       status: { not: MatchStatus.ARCHIVED },
     },
+    select: {
+      id: true,
+      matchDate: true,
+      startTime: true,
+      location: true,
+    },
   });
 
   if (!match) {
@@ -211,17 +262,8 @@ export async function confirmPresence(matchId: string, playerId: string) {
     where: { matchId, presenceStatus: PresenceStatus.CONFIRMED },
   });
 
-  const presenceStatus = pickPresenceStatusForConfirmation(confirmedCount);
-
-  const participant = await db().matchParticipant.upsert({
-    where: { matchId_playerId: { matchId, playerId } },
-    update: { presenceStatus },
-    create: {
-      matchId,
-      playerId,
-      presenceStatus,
-    },
-  });
+  const nextStatus = pickPresenceStatusForConfirmation(confirmedCount);
+  const participant = await applyPresenceStatusChange(match, playerId, nextStatus);
 
   return NextResponse.json(participant);
 }
@@ -231,6 +273,12 @@ export async function cancelPresence(matchId: string, playerId: string) {
     where: {
       id: matchId,
       status: { not: MatchStatus.ARCHIVED },
+    },
+    select: {
+      id: true,
+      matchDate: true,
+      startTime: true,
+      location: true,
     },
   });
 
@@ -245,11 +293,7 @@ export async function cancelPresence(matchId: string, playerId: string) {
     );
   }
 
-  const participant = await db().matchParticipant.upsert({
-    where: { matchId_playerId: { matchId, playerId } },
-    update: { presenceStatus: PresenceStatus.CANCELED },
-    create: { matchId, playerId, presenceStatus: PresenceStatus.CANCELED },
-  });
+  const participant = await applyPresenceStatusChange(match, playerId, PresenceStatus.CANCELED);
 
   return NextResponse.json(participant);
 }
@@ -264,6 +308,12 @@ export async function setPresenceStatus(
       id: matchId,
       status: { not: MatchStatus.ARCHIVED },
     },
+    select: {
+      id: true,
+      matchDate: true,
+      startTime: true,
+      location: true,
+    },
   });
 
   if (!match) {
@@ -277,11 +327,7 @@ export async function setPresenceStatus(
     );
   }
 
-  const participant = await db().matchParticipant.upsert({
-    where: { matchId_playerId: { matchId, playerId } },
-    update: { presenceStatus },
-    create: { matchId, playerId, presenceStatus },
-  });
+  const participant = await applyPresenceStatusChange(match, playerId, presenceStatus);
 
   return NextResponse.json(participant);
 }
@@ -609,22 +655,19 @@ export async function updateParticipantPresence(matchId: string, playerId: strin
       id: matchId,
       status: { not: MatchStatus.ARCHIVED },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      matchDate: true,
+      startTime: true,
+      location: true,
+    },
   });
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
-  const participant = await db().matchParticipant.upsert({
-    where: { matchId_playerId: { matchId, playerId } },
-    update: { presenceStatus: parsed.data.presenceStatus },
-    create: {
-      matchId,
-      playerId,
-      presenceStatus: parsed.data.presenceStatus,
-    },
-  });
+  const participant = await applyPresenceStatusChange(match, playerId, parsed.data.presenceStatus);
 
   return NextResponse.json(participant);
 }

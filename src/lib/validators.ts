@@ -1,4 +1,4 @@
-﻿import { MatchStatus, Position, PresenceStatus, Team } from "@prisma/client";
+import { MatchStatus, Position, PresenceStatus, Team } from "@prisma/client";
 import { z } from "zod";
 
 export const loginSchema = z.object({
@@ -31,6 +31,19 @@ const optionalPhoneSchema = z.preprocess(
     .nullable()
     .optional(),
 );
+
+const whatsAppTemplateSchema = z
+  .string()
+  .trim()
+  .min(10, "Mensagem muito curta.")
+  .max(1000, "Mensagem muito longa.");
+
+const whatsAppPhoneSchema = z
+  .string()
+  .trim()
+  .min(8, "Telefone invalido.")
+  .max(25, "Telefone invalido.")
+  .regex(/^[0-9()+\-\s]+$/u, "Telefone invalido.");
 
 export const playerCreateSchema = z.object({
   name: z.string().trim().min(2, "Nome obrigatorio."),
@@ -128,4 +141,29 @@ export const ratingsBatchSchema = z.object({
       }),
     )
     .min(1),
+});
+
+export const whatsAppSettingsUpdateSchema = z.object({
+  enabled: z.boolean(),
+  notifyOnConfirm: z.boolean(),
+  notifyOnCancel: z.boolean(),
+  confirmTemplate: whatsAppTemplateSchema,
+  cancelTemplate: whatsAppTemplateSchema,
+});
+
+export const whatsAppRecipientCreateSchema = z.object({
+  label: z.string().trim().min(1, "Nome obrigatorio.").max(80, "Nome muito longo."),
+  phone: whatsAppPhoneSchema,
+  isActive: z.boolean().optional(),
+});
+
+export const whatsAppRecipientUpdateSchema = whatsAppRecipientCreateSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo para atualizar.",
+  });
+
+export const whatsAppTestSchema = z.object({
+  recipientId: z.string().uuid(),
+  eventType: z.enum(["CONFIRM", "CANCEL"]).optional(),
 });

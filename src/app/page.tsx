@@ -372,8 +372,8 @@ export default function HomePage() {
     });
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presenca." }));
-      setMessage(payload.error ?? "Falha ao atualizar presenca.");
+      const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presença." }));
+      setMessage(payload.error ?? "Falha ao atualizar presença.");
       return;
     }
 
@@ -394,7 +394,7 @@ export default function HomePage() {
       <section className="hero-block p-4 sm:p-6">
         {matches.length === 0 || !primaryMatch ? (
           <>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Próximas Partidas</p>
             <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
           </>
         ) : (
@@ -402,16 +402,16 @@ export default function HomePage() {
             <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-2 md:hidden">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Próxima Partida</p>
                   {nextMatchWeather ? (
                     <span
                       className="inline-flex items-center gap-1"
-                      aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C`}
+                      aria-label={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
+                      title={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C
+                        {nextMatchWeather.temperatureC}°C
                       </span>
                     </span>
                   ) : null}
@@ -446,16 +446,16 @@ export default function HomePage() {
             <div className="hidden gap-4 md:grid xl:grid-cols-[minmax(280px,0.5fr)_minmax(0,1fr)]">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Próxima Partida</p>
                   {nextMatchWeather ? (
                     <span
                       className="inline-flex items-center gap-1"
-                      aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C`}
+                      aria-label={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
+                      title={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C
+                        {nextMatchWeather.temperatureC}°C
                       </span>
                     </span>
                   ) : null}
@@ -504,8 +504,8 @@ export default function HomePage() {
       </section>
       <ActionBar className="space-y-3 p-3 sm:p-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
-          <p className="text-sm text-emerald-900">{quickSelectedPresenceStatus === "CONFIRMED" ? "Voce ja esta confirmado." : quickSelectedPresenceStatus === "CANCELED" ? "Voce esta desconfirmado." : "Escolha o jogador e confirme com um toque."}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmação rápida</p>
+          <p className="text-sm text-emerald-900">{quickSelectedPresenceStatus === "CONFIRMED" ? "Você já está confirmado." : quickSelectedPresenceStatus === "CANCELED" ? "Você está desconfirmado." : "Escolha o jogador e confirme com um toque."}</p>
         </div>
 
         <div className="flex items-end gap-2">
@@ -515,7 +515,7 @@ export default function HomePage() {
               className="field-input"
               value={quickPlayerId}
               onChange={(event) => handleQuickPlayerSelect(event.currentTarget.value)}
-              aria-label="Selecionar jogador para confirmacao rapida"
+              aria-label="Selecionar jogador para confirmação rápida"
             >
               <option value="">Selecione...</option>
               {allPlayers.map((player) => (
@@ -545,7 +545,7 @@ export default function HomePage() {
                   className="h-10 w-10 shrink-0 rounded-full bg-emerald-600 p-0 text-white hover:bg-emerald-700 sm:w-auto sm:px-4"
                   disabled={!selectedMatch}
                   onClick={() => setPresence(quickPlayerId, "CONFIRMED")}
-                  aria-label="Confirmar presenca do jogador selecionado"
+                  aria-label="Confirmar presença do jogador selecionado"
                 >
                   <Check size={16} className="sm:hidden" />
                   <span className="hidden sm:inline">Confirmar</span>
@@ -556,10 +556,10 @@ export default function HomePage() {
                     className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
                     disabled={!selectedMatch}
                     onClick={() => setPresence(quickPlayerId, "CANCELED")}
-                    aria-label="Marcar jogador selecionado como nao vou"
+                    aria-label="Marcar jogador selecionado como não vou"
                   >
                     <X size={16} className="sm:hidden" />
-                    <span className="hidden sm:inline">Nao vou</span>
+                    <span className="hidden sm:inline">Não vou</span>
                   </Button>
                 ) : null}
               </div>
@@ -568,7 +568,7 @@ export default function HomePage() {
         </div>
 
         {!selectedMatch ? (
-          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenca.</p>
+          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presença.</p>
         ) : null}
       </ActionBar>
 

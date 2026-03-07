@@ -46,7 +46,7 @@ type NextMatchPayload = {
 function statusLabel(status: UiStatus) {
   if (status === "CONFIRMED") return "Confirmado";
   if (status === "WAITLIST") return "Lista de espera";
-  if (status === "CANCELED") return "Nao vou";
+  if (status === "CANCELED") return "Não vou";
   return "Pendente";
 }
 
@@ -96,7 +96,7 @@ export default function ConfirmacaoRapidaPage() {
       }
 
       if (!nextMatchRes.ok) {
-        throw new Error("Falha ao carregar a proxima partida.");
+        throw new Error("Falha ao carregar a próxima partida.");
       }
 
       const playersPayload = ((await playersRes.json()) as ActivePlayer[]).sort((a, b) =>
@@ -121,7 +121,7 @@ export default function ConfirmacaoRapidaPage() {
         setShowPlayerSelector(true);
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Erro ao carregar confirmacao rapida.");
+      setErrorMessage(error instanceof Error ? error.message : "Erro ao carregar confirmação rápida.");
     } finally {
       setLoading(false);
     }
@@ -139,7 +139,7 @@ export default function ConfirmacaoRapidaPage() {
   }
 
   useEffect(() => {
-    loadPlayersAndNextMatch().catch(() => setErrorMessage("Erro ao carregar confirmacao rapida."));
+    loadPlayersAndNextMatch().catch(() => setErrorMessage("Erro ao carregar confirmação rápida."));
   }, []);
 
   useEffect(() => {
@@ -172,12 +172,12 @@ export default function ConfirmacaoRapidaPage() {
 
   async function handlePresenceAction(action: "confirm" | "cancel") {
     if (!nextMatch) {
-      setErrorMessage("Nao ha partida em aberto para confirmar.");
+      setErrorMessage("Não há partida em aberto para confirmar.");
       return;
     }
 
     if (!selectedPlayerId) {
-      setErrorMessage("Selecione um atleta para confirmar presencia.");
+      setErrorMessage("Selecione um atleta para confirmar presença.");
       setShowPlayerSelector(true);
       return;
     }
@@ -196,25 +196,25 @@ export default function ConfirmacaoRapidaPage() {
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presenca." }));
-        throw new Error(payload.error ?? "Falha ao atualizar presenca.");
+        const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presença." }));
+        throw new Error(payload.error ?? "Falha ao atualizar presença.");
       }
 
       const payload = (await response.json()) as { presenceStatus?: PresenceStatus };
 
       if (action === "confirm") {
         if (payload.presenceStatus === "WAITLIST") {
-          setActionMessage("Voce entrou na lista de espera desta partida.");
+          setActionMessage("Você entrou na lista de espera desta partida.");
         } else {
-          setActionMessage("Presenca confirmada com sucesso.");
+          setActionMessage("Presença confirmada com sucesso.");
         }
       } else {
-        setActionMessage("Voce foi marcado como nao vou.");
+        setActionMessage("Você foi marcado como não vou.");
       }
 
       await reloadNextMatchOnly();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Falha ao atualizar presenca.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao atualizar presença.");
     } finally {
       setActionLoading(null);
     }
@@ -224,8 +224,8 @@ export default function ConfirmacaoRapidaPage() {
     <PageShell>
       <HeroBlock className="p-5 sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Atleta</p>
-        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Confirmacao rapida</h2>
-        <p className="text-sm text-emerald-800">Confirme sua presenca para a proxima partida em poucos toques.</p>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Confirmação rápida</h2>
+        <p className="text-sm text-emerald-800">Confirme sua presença para a próxima partida em poucos toques.</p>
 
         {selectedPlayer ? (
           <ActionBar className="mt-4 flex items-center justify-between gap-2 p-3">
@@ -246,7 +246,7 @@ export default function ConfirmacaoRapidaPage() {
       </HeroBlock>
 
       <SectionShell className="space-y-4 p-4 sm:p-5">
-        {loading ? <p className="text-sm text-emerald-900">Carregando confirmacao rapida...</p> : null}
+        {loading ? <p className="text-sm text-emerald-900">Carregando confirmação rápida...</p> : null}
 
         {!loading && showPlayerSelector ? (
           <div>
@@ -277,7 +277,7 @@ export default function ConfirmacaoRapidaPage() {
           <div className="card space-y-4 p-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                Proxima partida
+                Próxima partida
               </p>
               <p className="mt-1 text-xl font-semibold text-emerald-950">
                 {formatDatePtBr(nextMatch.matchDate)} - {nextMatch.startTime}
@@ -307,9 +307,9 @@ export default function ConfirmacaoRapidaPage() {
                     className="h-11 rounded-full"
                     onClick={() => handlePresenceAction("confirm")}
                     disabled={actionLoading !== null}
-                    aria-label="Confirmar presenca na proxima partida"
+                    aria-label="Confirmar presença na próxima partida"
                   >
-                    {actionLoading === "confirm" ? "Confirmando..." : "Confirmar presenca"}
+                    {actionLoading === "confirm" ? "Confirmando..." : "Confirmar presença"}
                   </Button>
 
                   <Button
@@ -318,14 +318,14 @@ export default function ConfirmacaoRapidaPage() {
                     className="h-11 rounded-full border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
                     onClick={() => handlePresenceAction("cancel")}
                     disabled={actionLoading !== null}
-                    aria-label="Informar que nao vai na proxima partida"
+                    aria-label="Informar que não vai na próxima partida"
                   >
-                    {actionLoading === "cancel" ? "Atualizando..." : "Nao vou"}
+                    {actionLoading === "cancel" ? "Atualizando..." : "Não vou"}
                   </Button>
                 </div>
               </>
             ) : (
-              <StatusNote tone="warning">Selecione um atleta para confirmar presenca.</StatusNote>
+              <StatusNote tone="warning">Selecione um atleta para confirmar presença.</StatusNote>
             )}
           </div>
         ) : null}

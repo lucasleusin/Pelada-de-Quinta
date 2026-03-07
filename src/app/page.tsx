@@ -550,16 +550,18 @@ export default function HomePage() {
                   <Check size={16} className="sm:hidden" />
                   <span className="hidden sm:inline">Confirmar</span>
                 </Button>
-                <Button
-                  type="button"
-                  className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
-                  disabled={!selectedMatch}
-                  onClick={() => setPresence(quickPlayerId, "CANCELED")}
-                  aria-label="Marcar jogador selecionado como nao vou"
-                >
-                  <X size={16} className="sm:hidden" />
-                  <span className="hidden sm:inline">Nao vou</span>
-                </Button>
+                {quickSelectedPresenceStatus !== "CANCELED" ? (
+                  <Button
+                    type="button"
+                    className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
+                    disabled={!selectedMatch}
+                    onClick={() => setPresence(quickPlayerId, "CANCELED")}
+                    aria-label="Marcar jogador selecionado como nao vou"
+                  >
+                    <X size={16} className="sm:hidden" />
+                    <span className="hidden sm:inline">Nao vou</span>
+                  </Button>
+                ) : null}
               </div>
             )
           ) : null}

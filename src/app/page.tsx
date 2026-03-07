@@ -192,6 +192,10 @@ export default function HomePage() {
     [matches, selectedMatchId],
   );
   const primaryMatch = useMemo(() => matches[0] ?? null, [matches]);
+  const quickSelectedPresenceStatus = useMemo(
+    () => selectedMatch?.participants.find((participant) => participant.playerId === quickPlayerId)?.presenceStatus ?? null,
+    [quickPlayerId, selectedMatch],
+  );
 
   const otherMatches = useMemo(
     () => matches.slice(1),
@@ -403,11 +407,11 @@ export default function HomePage() {
                     <span
                       className="inline-flex items-center gap-1"
                       aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ã‚Â°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}°C
+                        {nextMatchWeather.temperatureC}Ã‚Â°C
                       </span>
                     </span>
                   ) : null}
@@ -447,11 +451,11 @@ export default function HomePage() {
                     <span
                       className="inline-flex items-center gap-1"
                       aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ã‚Â°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}°C
+                        {nextMatchWeather.temperatureC}Ã‚Â°C
                       </span>
                     </span>
                   ) : null}
@@ -500,18 +504,18 @@ export default function HomePage() {
       </section>
       <ActionBar className="space-y-3 p-3 sm:p-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmação rápida</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
           <p className="text-sm text-emerald-900">Escolha o jogador e confirme com um toque.</p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="min-w-[240px] sm:max-w-md sm:flex-1">
+          <label className="w-[60%] min-w-[144px] sm:min-w-[240px] sm:max-w-md sm:flex-1">
             <span className="field-label">Jogador</span>
             <select
               className="field-input"
               value={quickPlayerId}
               onChange={(event) => handleQuickPlayerSelect(event.currentTarget.value)}
-              aria-label="Selecionar jogador para confirmação rápida"
+              aria-label="Selecionar jogador para confirmacao rapida"
             >
               <option value="">Selecione...</option>
               {allPlayers.map((player) => (
@@ -523,31 +527,46 @@ export default function HomePage() {
           </label>
 
           {quickPlayerId ? (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                className="h-10 rounded-full bg-emerald-600 px-4 text-white hover:bg-emerald-700"
-                disabled={!selectedMatch}
-                onClick={() => setPresence(quickPlayerId, "CONFIRMED")}
-                aria-label="Confirmar presença do jogador selecionado"
-              >
-                Confirmar
-              </Button>
+            quickSelectedPresenceStatus === "CONFIRMED" ? (
               <Button
                 type="button"
                 className="h-10 rounded-full bg-red-600 px-4 text-white hover:bg-red-700"
                 disabled={!selectedMatch}
                 onClick={() => setPresence(quickPlayerId, "CANCELED")}
-                aria-label="Marcar jogador selecionado como não vou"
+                aria-label="Desconfirmar jogador selecionado"
               >
-                Não vou
+                <X size={16} className="sm:hidden" />
+                <span className="hidden sm:inline">Desconfirmar</span>
               </Button>
-            </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  className="h-10 rounded-full bg-emerald-600 px-4 text-white hover:bg-emerald-700"
+                  disabled={!selectedMatch}
+                  onClick={() => setPresence(quickPlayerId, "CONFIRMED")}
+                  aria-label="Confirmar presenca do jogador selecionado"
+                >
+                  <Check size={16} className="sm:hidden" />
+                  <span className="hidden sm:inline">Confirmar</span>
+                </Button>
+                <Button
+                  type="button"
+                  className="h-10 rounded-full bg-red-600 px-4 text-white hover:bg-red-700"
+                  disabled={!selectedMatch}
+                  onClick={() => setPresence(quickPlayerId, "CANCELED")}
+                  aria-label="Marcar jogador selecionado como nao vou"
+                >
+                  <X size={16} className="sm:hidden" />
+                  <span className="hidden sm:inline">Nao vou</span>
+                </Button>
+              </div>
+            )
           ) : null}
         </div>
 
         {!selectedMatch ? (
-          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presença.</p>
+          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenca.</p>
         ) : null}
       </ActionBar>
 

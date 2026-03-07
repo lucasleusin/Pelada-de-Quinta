@@ -407,11 +407,11 @@ export default function HomePage() {
                     <span
                       className="inline-flex items-center gap-1"
                       aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ã‚Â°C`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}Ã‚Â°C
+                        {nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C
                       </span>
                     </span>
                   ) : null}
@@ -451,11 +451,11 @@ export default function HomePage() {
                     <span
                       className="inline-flex items-center gap-1"
                       aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ã‚Â°C`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}Ã‚Â°C
+                        {nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C
                       </span>
                     </span>
                   ) : null}
@@ -508,7 +508,7 @@ export default function HomePage() {
           <p className="text-sm text-emerald-900">Escolha o jogador e confirme com um toque.</p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="flex items-end gap-2">
           <label className="w-[60%] min-w-[144px] sm:min-w-[240px] sm:max-w-md sm:flex-1">
             <span className="field-label">Jogador</span>
             <select
@@ -530,7 +530,7 @@ export default function HomePage() {
             quickSelectedPresenceStatus === "CONFIRMED" ? (
               <Button
                 type="button"
-                className="h-10 rounded-full bg-red-600 px-4 text-white hover:bg-red-700"
+                className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
                 disabled={!selectedMatch}
                 onClick={() => setPresence(quickPlayerId, "CANCELED")}
                 aria-label="Desconfirmar jogador selecionado"
@@ -539,10 +539,10 @@ export default function HomePage() {
                 <span className="hidden sm:inline">Desconfirmar</span>
               </Button>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex shrink-0 gap-2">
                 <Button
                   type="button"
-                  className="h-10 rounded-full bg-emerald-600 px-4 text-white hover:bg-emerald-700"
+                  className="h-10 w-10 shrink-0 rounded-full bg-emerald-600 p-0 text-white hover:bg-emerald-700 sm:w-auto sm:px-4"
                   disabled={!selectedMatch}
                   onClick={() => setPresence(quickPlayerId, "CONFIRMED")}
                   aria-label="Confirmar presenca do jogador selecionado"
@@ -552,7 +552,7 @@ export default function HomePage() {
                 </Button>
                 <Button
                   type="button"
-                  className="h-10 rounded-full bg-red-600 px-4 text-white hover:bg-red-700"
+                  className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
                   disabled={!selectedMatch}
                   onClick={() => setPresence(quickPlayerId, "CANCELED")}
                   aria-label="Marcar jogador selecionado como nao vou"

@@ -28,9 +28,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${heading.variable} ${body.variable} bg-canvas text-ink antialiased`}>
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dff6e8,_#f7faf8_60%)]">
+        <div className="app-bg min-h-screen">
           <SiteHeader />
-          <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
+          <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-5 lg:px-8">{children}</main>
         </div>
       </body>
     </html>

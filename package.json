@@ -22,9 +22,11 @@
     "votes:reset": "prisma db execute --schema prisma/schema.prisma --file scripts/reset-votes.sql"
   },
   "dependencies": {
+    "@base-ui/react": "^1.2.0",
     "@prisma/client": "^6.17.1",
     "@supabase/supabase-js": "^2.98.0",
     "bcryptjs": "^3.0.3",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "html-to-image": "^1.11.13",
@@ -34,6 +36,9 @@
     "prisma": "^6.17.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "shadcn": "^4.0.0",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

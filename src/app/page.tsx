@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { IconKey } from "@/lib/weather-icons";
 
 type Player = {
@@ -89,17 +91,22 @@ function ActionButton({
   onClick: () => void;
   children: ReactNode;
 }) {
-  const className =
+  const toneClass =
     tone === "green"
-      ? "inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+      ? "bg-emerald-600 text-white hover:bg-emerald-700"
       : tone === "red"
-        ? "inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
-        : "inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 text-white hover:bg-amber-500";
+        ? "bg-red-600 text-white hover:bg-red-700"
+        : "bg-amber-400 text-white hover:bg-amber-500";
 
   return (
-    <button type="button" className={className} onClick={onClick} aria-label={label}>
+    <Button
+      type="button"
+      className={cn("h-10 w-10 rounded-full p-0", toneClass)}
+      onClick={onClick}
+      aria-label={label}
+    >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -478,7 +485,7 @@ export default function HomePage() {
                 onChange={(event) => setSearchTerm(event.currentTarget.value)}
               />
               {searchTerm ? (
-                <button type="button" className="btn btn-ghost" onClick={() => setSearchTerm("")}>Limpar</button>
+                <Button type="button" variant="outline" className="rounded-full" onClick={() => setSearchTerm("")}>Limpar</Button>
               ) : null}
             </div>
           </label>
@@ -488,52 +495,59 @@ export default function HomePage() {
       {selectedMatch ? (
         <section className="sticky top-20 z-10 rounded-xl border border-emerald-200 bg-white/95 p-1.5 sm:p-2 backdrop-blur">
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
               type="button"
-              className={`btn inline-flex items-center justify-center px-2 py-1 text-center text-xs leading-none sm:px-4 sm:py-2 sm:text-sm ${listViewFilter === "ALL" ? "btn-primary" : "btn-ghost"}`}
+              variant={listViewFilter === "ALL" ? "default" : "outline"}
+              className="h-8 rounded-full px-2 text-xs sm:h-9 sm:px-4 sm:text-sm"
               onClick={() => setListViewFilter("ALL")}
             >
               Todos
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={`btn inline-flex h-8 w-16 items-center justify-center p-0 text-center text-xs leading-none sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              variant={listViewFilter === "PENDING" ? "default" : "outline"}
+              className={cn(
+                "h-8 w-16 rounded-full p-0 text-xs sm:h-9 sm:w-auto sm:px-4 sm:text-sm",
                 listViewFilter === "PENDING"
                   ? "bg-amber-500 text-white hover:bg-amber-600 sm:bg-emerald-700 sm:hover:bg-emerald-800"
-                  : "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
-              }`}
+                  : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]",
+              )}
               onClick={() => setListViewFilter("PENDING")}
               aria-label="Filtrar pendentes"
             >
               <RotateCcw size={14} className="sm:hidden" />
               <span className="hidden sm:inline">Pendentes</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={`btn inline-flex h-8 w-16 items-center justify-center p-0 text-center text-xs leading-none sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              variant={listViewFilter === "CONFIRMED" ? "default" : "outline"}
+              className={cn(
+                "h-8 w-16 rounded-full p-0 text-xs sm:h-9 sm:w-auto sm:px-4 sm:text-sm",
                 listViewFilter === "CONFIRMED"
                   ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
-              }`}
+                  : "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]",
+              )}
               onClick={() => setListViewFilter("CONFIRMED")}
               aria-label="Filtrar confirmados"
             >
               <Check size={14} className="sm:hidden" />
               <span className="hidden sm:inline">Confirmados</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={`btn inline-flex h-8 w-16 items-center justify-center p-0 text-center text-xs leading-none sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${
+              variant={listViewFilter === "CANCELED" ? "default" : "outline"}
+              className={cn(
+                "h-8 w-16 rounded-full p-0 text-xs sm:h-9 sm:w-auto sm:px-4 sm:text-sm",
                 listViewFilter === "CANCELED"
                   ? "bg-red-600 text-white hover:bg-red-700"
-                  : "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]"
-              }`}
+                  : "border-red-300 bg-red-50 text-red-700 hover:bg-red-100 sm:border-[#9ecdb4] sm:bg-white sm:text-[#15452f]",
+              )}
               onClick={() => setListViewFilter("CANCELED")}
               aria-label="Filtrar desconfirmados"
             >
               <X size={14} className="sm:hidden" />
               <span className="hidden sm:inline">Desconfirmados</span>
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}

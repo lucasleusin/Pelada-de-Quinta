@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("marcio");
@@ -34,7 +35,7 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <section className="mx-auto max-w-md card p-6">
+    <section className="card mx-auto max-w-md p-6">
       <h2 className="text-3xl font-bold text-emerald-950">Login admin</h2>
       <p className="text-sm text-emerald-800">Acesso ao painel protegido.</p>
 
@@ -61,9 +62,9 @@ export default function AdminLoginPage() {
           />
         </label>
 
-        <button className="btn btn-primary w-full" type="submit" disabled={loading}>
+        <Button className="w-full" type="submit" disabled={loading}>
           {loading ? "Entrando..." : "Entrar"}
-        </button>
+        </Button>
       </form>
 
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}

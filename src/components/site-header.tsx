@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { clsx } from "clsx";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Home" },
@@ -33,11 +34,9 @@ export function SiteHeader() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={clsx(
-                  "rounded-full border px-3 py-1.5 transition",
-                  active
-                    ? "border-emerald-700 bg-emerald-700 text-white"
-                    : "border-emerald-200 bg-white text-emerald-900 hover:border-emerald-400",
+                className={cn(
+                  buttonVariants({ variant: active ? "default" : "outline", size: "sm" }),
+                  "rounded-full",
                 )}
               >
                 {link.label}

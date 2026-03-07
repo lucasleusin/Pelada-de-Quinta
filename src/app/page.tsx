@@ -13,6 +13,7 @@ import {
   Sun,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 import { ActionBar, PageShell, StatusNote } from "@/components/layout/primitives";
@@ -473,6 +474,17 @@ export default function HomePage() {
         )}
       </section>
 
+      <ActionBar className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Atleta</p>
+          <p className="text-sm text-emerald-900">Quer confirmar em poucos toques?</p>
+        </div>
+        <Link href="/confirmacao-rapida" className="btn btn-accent inline-flex items-center justify-center">
+          Confirmacao rapida
+        </Link>
+      </ActionBar>
+
+
       {selectedMatch ? (
         <section className="section-shell p-4 sm:p-5">
           <label>
@@ -676,6 +688,7 @@ export default function HomePage() {
     </PageShell>
   );
 }
+
 
 
 

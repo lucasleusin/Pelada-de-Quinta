@@ -500,7 +500,7 @@ export default function HomePage() {
       </section>
       <ActionBar className="space-y-3 p-3 sm:p-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">ConfirmaÁ„o r·pida</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirma√ß√£o r√°pida</p>
           <p className="text-sm text-emerald-900">Escolha o jogador e confirme com um toque.</p>
         </div>
 
@@ -511,7 +511,7 @@ export default function HomePage() {
               className="field-input"
               value={quickPlayerId}
               onChange={(event) => handleQuickPlayerSelect(event.currentTarget.value)}
-              aria-label="Selecionar jogador para confirmaÁ„o r·pida"
+              aria-label="Selecionar jogador para confirma√ß√£o r√°pida"
             >
               <option value="">Selecione...</option>
               {allPlayers.map((player) => (
@@ -529,7 +529,7 @@ export default function HomePage() {
                 className="h-10 rounded-full bg-emerald-600 px-4 text-white hover:bg-emerald-700"
                 disabled={!selectedMatch}
                 onClick={() => setPresence(quickPlayerId, "CONFIRMED")}
-                aria-label="Confirmar presenÁa do jogador selecionado"
+                aria-label="Confirmar presen√ßa do jogador selecionado"
               >
                 Confirmar
               </Button>
@@ -538,16 +538,16 @@ export default function HomePage() {
                 className="h-10 rounded-full bg-red-600 px-4 text-white hover:bg-red-700"
                 disabled={!selectedMatch}
                 onClick={() => setPresence(quickPlayerId, "CANCELED")}
-                aria-label="Marcar jogador selecionado como n„o vou"
+                aria-label="Marcar jogador selecionado como n√£o vou"
               >
-                N„o vou
+                N√£o vou
               </Button>
             </div>
           ) : null}
         </div>
 
         {!selectedMatch ? (
-          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenÁa.</p>
+          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presen√ßa.</p>
         ) : null}
       </ActionBar>
 

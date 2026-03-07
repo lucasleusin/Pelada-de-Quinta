@@ -407,11 +407,11 @@ export default function HomePage() {
                     <span
                       className="inline-flex items-center gap-1"
                       aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C
+                        {nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C
                       </span>
                     </span>
                   ) : null}
@@ -451,11 +451,11 @@ export default function HomePage() {
                     <span
                       className="inline-flex items-center gap-1"
                       aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}Ãƒâ€šÃ‚Â°C
+                        {nextMatchWeather.temperatureC}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C
                       </span>
                     </span>
                   ) : null}
@@ -505,7 +505,7 @@ export default function HomePage() {
       <ActionBar className="space-y-3 p-3 sm:p-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
-          <p className="text-sm text-emerald-900">Escolha o jogador e confirme com um toque.</p>
+          <p className="text-sm text-emerald-900">{quickSelectedPresenceStatus === "CONFIRMED" ? "Voce ja esta confirmado." : quickSelectedPresenceStatus === "CANCELED" ? "Voce esta desconfirmado." : "Escolha o jogador e confirme com um toque."}</p>
         </div>
 
         <div className="flex items-end gap-2">

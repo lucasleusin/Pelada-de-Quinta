@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDatePtBr } from "@/lib/date-format";
 import { PlayerFifaCard, type PlayerCardPosition } from "@/components/player-fifa-card";
+import {
+  HeroBlock,
+  PageShell,
+  SectionShell,
+  StatCard,
+  StatusNote,
+} from "@/components/layout/primitives";
+import { Button } from "@/components/ui/button";
 
 type RankingRow = {
   playerId: string;
@@ -170,63 +178,67 @@ export default function EstatisticasPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Estatisticas</h2>
+    <PageShell>
+      <HeroBlock className="p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Indicadores</p>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Estatisticas</h2>
 
-        <div className="mt-4 flex flex-wrap items-end gap-2">
-          <button
-            type="button"
-            className={`btn ${viewMode === "GERAL" ? "btn-primary" : "btn-ghost"}`}
-            onClick={showGeneralView}
-          >
-            Geral
-          </button>
-
-          <label className="min-w-[220px] flex-1">
-            <span className="field-label">Por Jogador</span>
-            <select
-              id="player-select"
-              className="field-input"
-              value={selectedPlayerId}
-              onChange={(event) => handleSelectPlayer(event.currentTarget.value)}
+        <div className="mt-4 action-bar p-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <Button
+              type="button"
+              className="rounded-full"
+              variant={viewMode === "GERAL" ? "default" : "outline"}
+              onClick={showGeneralView}
             >
-              <option value="">Selecione...</option>
-              {players.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              Geral
+            </Button>
+
+            <label className="min-w-[220px] flex-1">
+              <span className="field-label">Por Jogador</span>
+              <select
+                id="player-select"
+                className="field-input"
+                value={selectedPlayerId}
+                onChange={(event) => handleSelectPlayer(event.currentTarget.value)}
+              >
+                <option value="">Selecione...</option>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
-      </section>
+      </HeroBlock>
 
       {viewMode === "GERAL" ? (
         <>
-          <section className="card p-5">
+          <SectionShell className="p-5">
             <h3 className="text-2xl font-bold text-emerald-950">Resumo Geral</h3>
             {overview ? (
               <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl bg-emerald-50 p-3 text-sm">
-                  <p className="font-semibold text-emerald-900">Numero de Partidas</p>
-                  <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalMatches}</p>
-                </div>
-                <div className="rounded-xl bg-emerald-50 p-3 text-sm">
-                  <p className="font-semibold text-emerald-900">Total de Gols</p>
-                  <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalGoals}</p>
-                </div>
-                <div className="rounded-xl bg-emerald-50 p-3 text-sm">
-                  <p className="font-semibold text-emerald-900">Total de Assistencias</p>
-                  <p className="mt-1 text-xl font-bold text-emerald-950">{overview.totalAssists}</p>
-                </div>
+                <StatCard>
+                  <p className="text-sm font-semibold text-emerald-900">Numero de Partidas</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-950">{overview.totalMatches}</p>
+                </StatCard>
+                <StatCard>
+                  <p className="text-sm font-semibold text-emerald-900">Total de Gols</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-950">{overview.totalGoals}</p>
+                </StatCard>
+                <StatCard>
+                  <p className="text-sm font-semibold text-emerald-900">Total de Assistencias</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-950">{overview.totalAssists}</p>
+                </StatCard>
               </div>
             ) : (
               <p className="mt-3 text-sm text-emerald-900">Carregando resumo geral...</p>
             )}
-          </section>
+          </SectionShell>
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <RankingCard
               title="Aproveitamento"
               rows={topEfficiency}
@@ -241,10 +253,10 @@ export default function EstatisticasPage() {
             <RankingCard title="Gols Tomados" rows={topConceded} metric={(row) => String(row.goalsConceded)} />
             <RankingCard title="Assistencia" rows={topAssists} metric={(row) => String(row.assists)} />
             <RankingCard title="Nota" rows={topMvp} metric={(row) => row.averageRating.toFixed(2)} />
-          </section>
+          </div>
         </>
       ) : selectedPlayerStats ? (
-        <section className="card p-5">
+        <SectionShell className="p-5">
           <h3 className="text-2xl font-bold text-emerald-950">Estatistica por jogador</h3>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
@@ -267,7 +279,7 @@ export default function EstatisticasPage() {
               </h3>
               <ul className="mt-3 space-y-3 text-sm">
                 {selectedPlayerStats.history.map((item) => (
-                  <li key={item.match.id} className="rounded-xl bg-zinc-50 p-3">
+                  <li key={item.match.id} className="rounded-xl border border-emerald-100 bg-zinc-50 p-3">
                     <p className="font-semibold text-emerald-900">
                       {formatDatePtBr(item.match.matchDate)} - {item.match.teamAScore ?? "-"} x{" "}
                       {item.match.teamBScore ?? "-"}
@@ -281,17 +293,17 @@ export default function EstatisticasPage() {
               </ul>
             </div>
           </div>
-        </section>
+        </SectionShell>
       ) : (
-        <section className="card p-5">
-          <p className="text-sm text-emerald-900">
+        <SectionShell className="p-5">
+          <p className="empty-state text-sm">
             Selecione um jogador para visualizar as estatisticas individuais.
           </p>
-        </section>
+        </SectionShell>
       )}
 
-      {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
-    </div>
+      {message ? <StatusNote tone="error">{message}</StatusNote> : null}
+    </PageShell>
   );
 }
 
@@ -305,11 +317,11 @@ function RankingCard<T extends { playerId: string; playerName: string }>({
   metric: (row: T) => string;
 }) {
   return (
-    <section className="card p-4">
+    <SectionShell className="p-4">
       <h4 className="text-xl font-semibold text-emerald-950">{title}</h4>
       <ul className="mt-3 space-y-2 text-sm">
         {rows.length === 0 ? (
-          <li className="rounded-lg bg-zinc-50 px-3 py-2 text-emerald-800">Sem dados.</li>
+          <li className="empty-state text-sm">Sem dados.</li>
         ) : (
           rows.map((row) => (
             <li key={row.playerId} className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2">
@@ -319,6 +331,6 @@ function RankingCard<T extends { playerId: string; playerName: string }>({
           ))
         )}
       </ul>
-    </section>
+    </SectionShell>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { formatDatePtBr } from "@/lib/date-format";
 
 type Player = {
@@ -274,7 +275,7 @@ export default function AdminJogadoresPage() {
 
   return (
     <div className="space-y-4">
-      <section className="card p-5">
+      <HeroBlock className="p-5 sm:p-6">
         <h2 className="text-3xl font-bold text-emerald-950">Jogadores</h2>
         <form className="mt-4 grid gap-3 md:grid-cols-6" onSubmit={createPlayer}>
           <label>
@@ -333,9 +334,9 @@ export default function AdminJogadoresPage() {
             </button>
           </div>
         </form>
-      </section>
+      </HeroBlock>
 
-      <section className="card p-4">
+      <SectionShell className="p-4">
         <ul className="space-y-3 text-sm">
           {players.map((player) => {
             const isExpanded = expandedPlayerId === player.id;
@@ -555,9 +556,10 @@ export default function AdminJogadoresPage() {
             );
           })}
         </ul>
-      </section>
+      </SectionShell>
 
-      {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
+      {message ? <StatusNote tone="neutral">{message}</StatusNote> : null}
     </div>
   );
 }
+

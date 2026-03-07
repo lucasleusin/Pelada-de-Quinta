@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActionBar,
+  HeroBlock,
+  PageShell,
+  SectionShell,
+  StatusNote,
+} from "@/components/layout/primitives";
 import { StarRating } from "@/components/star-rating";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 
@@ -230,7 +237,7 @@ export default function VotacaoPage() {
       "grid-cols-[minmax(0,1fr)_30px_30px_30px_132px] sm:grid-cols-[minmax(0,1fr)_52px_52px_52px_140px]";
 
     return (
-      <div className="card p-4">
+      <SectionShell className="p-4">
         <h3 className="text-2xl font-bold text-emerald-950">{title}</h3>
         {participants.length === 0 ? (
           <p className="mt-2 text-sm text-emerald-800">Sem jogadores neste time.</p>
@@ -270,73 +277,74 @@ export default function VotacaoPage() {
             </ul>
           </div>
         )}
-      </div>
+      </SectionShell>
     );
   }
 
   return (
-    <div className="space-y-5">
-      <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Votacao</h2>
+    <PageShell>
+      <HeroBlock className="p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Avaliacao</p>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Votacao</h2>
         <p className="text-sm text-emerald-800">
           Escolha seu nome, selecione a partida e vote em um ou mais jogadores. O salvamento e automatico.
         </p>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <label>
-            <span className="field-label">Quem esta votando?</span>
-            <select
-              className="field-input"
-              value={selectedRaterId}
-              onChange={(event) => {
-                const nextRaterId = event.currentTarget.value;
-                setSelectedRaterId(nextRaterId);
-                setMatches([]);
-                setSelectedMatchId("");
-                resetSelectedMatchState();
-                setSaveStatus("idle");
-                setMessage("");
-              }}
-            >
-              <option value="">Selecione...</option>
-              {players.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <ActionBar className="mt-4 p-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <label>
+              <span className="field-label">Quem esta votando?</span>
+              <select
+                className="field-input"
+                value={selectedRaterId}
+                onChange={(event) => {
+                  const nextRaterId = event.currentTarget.value;
+                  setSelectedRaterId(nextRaterId);
+                  setMatches([]);
+                  setSelectedMatchId("");
+                  resetSelectedMatchState();
+                  setSaveStatus("idle");
+                  setMessage("");
+                }}
+              >
+                <option value="">Selecione...</option>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label>
-            <span className="field-label">Partida</span>
-            <select
-              className="field-input"
-              value={selectedMatchId}
-              onChange={(event) => handleSelectMatch(event.currentTarget.value)}
-              disabled={!selectedRaterId}
-            >
-              <option value="">Selecione...</option>
-              {matches.map((matchItem) => (
-                <option key={matchItem.id} value={matchItem.id}>
-                  {formatDatePtBr(matchItem.matchDate)} - {matchItem.startTime}
-                  {matchItem.location ? ` - ${matchItem.location}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+            <label>
+              <span className="field-label">Partida</span>
+              <select
+                className="field-input"
+                value={selectedMatchId}
+                onChange={(event) => handleSelectMatch(event.currentTarget.value)}
+                disabled={!selectedRaterId}
+              >
+                <option value="">Selecione...</option>
+                {matches.map((matchItem) => (
+                  <option key={matchItem.id} value={matchItem.id}>
+                    {formatDatePtBr(matchItem.matchDate)} - {matchItem.startTime}
+                    {matchItem.location ? ` - ${matchItem.location}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </ActionBar>
 
-        {saveStatus === "saving" ? <p className="mt-3 text-sm text-amber-700">Salvando...</p> : null}
-        {saveStatus === "saved" ? <p className="mt-3 text-sm text-emerald-800">{message}</p> : null}
-        {saveStatus === "error" ? <p className="mt-3 text-sm text-red-700">{message}</p> : null}
-      </section>
+        {saveStatus === "saving" ? <StatusNote className="mt-3" tone="warning">Salvando...</StatusNote> : null}
+        {saveStatus === "saved" ? <StatusNote className="mt-3" tone="success">{message}</StatusNote> : null}
+        {saveStatus === "error" ? <StatusNote className="mt-3" tone="error">{message}</StatusNote> : null}
+      </HeroBlock>
 
       {selectedRaterId && !selectedMatchId && matches.length === 0 ? (
-        <section className="card p-4">
-          <p className="text-sm font-medium text-emerald-900">
-            Esse jogador nao tem partidas disponiveis para votacao.
-          </p>
-        </section>
+        <SectionShell className="p-4">
+          <p className="empty-state text-sm">Esse jogador nao tem partidas disponiveis para votacao.</p>
+        </SectionShell>
       ) : null}
 
       {selectedRaterId && match ? (
@@ -346,14 +354,13 @@ export default function VotacaoPage() {
             {renderTeamGrid(match.teamBName || "Time B", teamB)}
           </section>
           {teamA.length === 0 && teamB.length === 0 ? (
-            <section className="card p-4">
-              <p className="text-sm font-medium text-emerald-900">
-                Todos os jogadores dessa partida ja receberam sua nota.
-              </p>
-            </section>
+            <SectionShell className="p-4">
+              <p className="empty-state text-sm">Todos os jogadores dessa partida ja receberam sua nota.</p>
+            </SectionShell>
           ) : null}
         </>
       ) : null}
-    </div>
+    </PageShell>
   );
 }
+

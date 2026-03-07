@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  HeroBlock,
+  PageShell,
+  SectionShell,
+  StatusNote,
+} from "@/components/layout/primitives";
 import { StarRating } from "@/components/star-rating";
+import { Button } from "@/components/ui/button";
 
 type Participant = {
   playerId: string;
@@ -125,13 +132,14 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="space-y-4">
-      <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Pos-jogo</h2>
+    <PageShell>
+      <HeroBlock className="p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Fechamento</p>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Pos-jogo</h2>
         <p className="text-sm text-emerald-800">Registre gols, assistencias, gols sofridos e notas.</p>
-      </section>
+      </HeroBlock>
 
-      <section className="card overflow-x-auto p-4">
+      <SectionShell className="overflow-x-auto p-4">
         <table className="min-w-full text-sm">
           <thead>
             <tr className="text-left text-emerald-900">
@@ -185,12 +193,12 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
           </tbody>
         </table>
 
-        <button className="btn btn-primary mt-4" onClick={saveStats}>
+        <Button className="mt-4 rounded-full" onClick={saveStats}>
           Salvar estatisticas
-        </button>
-      </section>
+        </Button>
+      </SectionShell>
 
-      <section className="card p-5">
+      <SectionShell className="p-5">
         <h3 className="text-2xl font-bold text-emerald-950">Avaliacoes (1..5)</h3>
         <div className="mt-4 space-y-3">
           {participants
@@ -214,12 +222,12 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
             ))}
         </div>
 
-        <button className="btn btn-accent mt-4" onClick={saveRatings}>
+        <Button className="mt-4 rounded-full" variant="outline" onClick={saveRatings}>
           Salvar avaliacoes
-        </button>
-      </section>
+        </Button>
+      </SectionShell>
 
-      {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
-    </div>
+      {message ? <StatusNote tone="neutral">{message}</StatusNote> : null}
+    </PageShell>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
+import { StatusNote } from "@/components/layout/primitives";
 
 type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 
@@ -502,14 +503,14 @@ export default function PartidasPassadasPage() {
           ))}
         </select>
 
-        {saveStatus === "saving" ? <p className="mt-3 text-sm text-amber-700">Salvando...</p> : null}
-        {saveStatus === "saved" ? <p className="mt-3 text-sm text-emerald-800">{message}</p> : null}
-        {saveStatus === "error" ? <p className="mt-3 text-sm text-red-700">{message}</p> : null}
+        {saveStatus === "saving" ? <StatusNote className="mt-3" tone="warning">Salvando...</StatusNote> : null}
+        {saveStatus === "saved" ? <StatusNote className="mt-3" tone="success">{message}</StatusNote> : null}
+        {saveStatus === "error" ? <StatusNote className="mt-3" tone="error">{message}</StatusNote> : null}
       </section>
 
       {match ? (
         <>
-          <section className="card p-4">
+          <div className="card p-4">
             <h3 className="text-2xl font-bold text-emerald-950">Placar</h3>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <label>
@@ -547,7 +548,7 @@ export default function PartidasPassadasPage() {
                 ) : null}
               </label>
             </div>
-          </section>
+          </div>
 
           <section className="grid gap-4 xl:grid-cols-2">
             {renderTeamGrid(match.teamAName || "Time A", teamA)}
@@ -558,3 +559,7 @@ export default function PartidasPassadasPage() {
     </div>
   );
 }
+
+
+
+

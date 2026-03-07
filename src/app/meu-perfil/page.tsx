@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  HeroBlock,
+  PageShell,
+  SectionShell,
+  StatusNote,
+} from "@/components/layout/primitives";
 import { PlayerFifaCard, type PlayerCardPosition } from "@/components/player-fifa-card";
+import { Button } from "@/components/ui/button";
 
 type ActivePlayer = {
   id: string;
@@ -259,9 +266,10 @@ export default function MeuPerfilPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Meu Perfil</h2>
+    <PageShell>
+      <HeroBlock className="p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Cadastro</p>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Meu Perfil</h2>
         <p className="mt-1 text-sm text-emerald-800">
           Selecione o jogador e atualize os dados. O salvamento e automatico.
         </p>
@@ -282,11 +290,11 @@ export default function MeuPerfilPage() {
             </option>
           ))}
         </select>
-      </section>
+      </HeroBlock>
 
       {canRenderProfile && profileData ? (
         <section className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
-          <div className="order-1 card p-4 lg:order-2">
+          <SectionShell className="order-1 p-4 lg:order-2">
             <h3 className="text-xl font-semibold text-emerald-950">Edicao de dados</h3>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -360,22 +368,23 @@ export default function MeuPerfilPage() {
                     onChange={(event) => handlePhotoUpload(event.currentTarget.files?.[0] ?? null)}
                   />
                 </label>
-                <button
-                  className="btn btn-ghost"
+                <Button
+                  className="rounded-full"
+                  variant="outline"
                   type="button"
                   onClick={removePhoto}
                   disabled={!profileData.player.photoUrl}
                 >
                   Remover foto
-                </button>
+                </Button>
               </div>
               {photoStatus ? <p className="mt-2 text-sm text-emerald-900">{photoStatus}</p> : null}
             </div>
 
-            {saveStatus === "saving" ? <p className="mt-3 text-sm text-amber-700">Salvando...</p> : null}
-            {saveStatus === "saved" ? <p className="mt-3 text-sm text-emerald-800">{saveMessage}</p> : null}
-            {saveStatus === "error" ? <p className="mt-3 text-sm text-red-700">{saveMessage}</p> : null}
-          </div>
+            {saveStatus === "saving" ? <StatusNote className="mt-3" tone="warning">Salvando...</StatusNote> : null}
+            {saveStatus === "saved" ? <StatusNote className="mt-3" tone="success">{saveMessage}</StatusNote> : null}
+            {saveStatus === "error" ? <StatusNote className="mt-3" tone="error">{saveMessage}</StatusNote> : null}
+          </SectionShell>
 
           <div className="order-2 lg:order-1">
             <PlayerFifaCard
@@ -391,12 +400,12 @@ export default function MeuPerfilPage() {
           </div>
         </section>
       ) : (
-        <section className="card p-4">
-          <p className="text-sm text-emerald-900">Selecione um jogador para editar o perfil.</p>
-        </section>
+        <SectionShell className="p-4">
+          <p className="empty-state text-sm">Selecione um jogador para editar o perfil.</p>
+        </SectionShell>
       )}
 
-      {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
-    </div>
+      {message ? <StatusNote tone="error">{message}</StatusNote> : null}
+    </PageShell>
   );
 }

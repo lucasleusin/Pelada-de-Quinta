@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { DragEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { formatDatePtBr } from "@/lib/date-format";
 
 type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
@@ -370,7 +371,7 @@ export default function AdminPartidasPage() {
 
   return (
     <div className="space-y-4">
-      <section className="card p-5">
+      <HeroBlock className="p-5 sm:p-6">
         <h2 className="text-3xl font-bold text-emerald-950">Partidas</h2>
         <form className="mt-4 grid gap-3 md:grid-cols-3" onSubmit={createMatch}>
           <label>
@@ -387,9 +388,9 @@ export default function AdminPartidasPage() {
             </button>
           </div>
         </form>
-      </section>
+      </HeroBlock>
 
-      <section className="card p-4">
+      <SectionShell className="p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_140px_140px] lg:items-end">
           <label>
             <span className="field-label">Selecione uma partida</span>
@@ -450,10 +451,10 @@ export default function AdminPartidasPage() {
         {scoreSaveStatus === "saving" ? <p className="mt-2 text-sm text-amber-700">Salvando placar...</p> : null}
         {scoreSaveStatus === "saved" ? <p className="mt-2 text-sm text-emerald-800">{scoreMessage}</p> : null}
         {scoreSaveStatus === "error" ? <p className="mt-2 text-sm text-red-700">{scoreMessage}</p> : null}
-      </section>
+      </SectionShell>
 
       {selectedMatch ? (
-        <section className="card p-4">
+        <SectionShell className="p-4">
           <h3 className="text-xl font-semibold text-emerald-950">Definicao dos times (drag and drop)</h3>
           <p className="mt-1 text-sm text-emerald-800">
             Arraste jogadores confirmados entre as colunas para montar os times. No celular, use os botoes de mover em cada jogador.
@@ -525,10 +526,12 @@ export default function AdminPartidasPage() {
               </section>
             </div>
           </div>
-        </section>
+        </SectionShell>
       ) : null}
 
-      {message ? <p className="text-sm font-medium text-emerald-900">{message}</p> : null}
+      {message ? <StatusNote tone="neutral">{message}</StatusNote> : null}
     </div>
   );
 }
+
+

@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  HeroBlock,
+  PageShell,
+  SectionShell,
+  StatusNote,
+} from "@/components/layout/primitives";
 
 type LeaderboardRow = {
   playerId: string;
@@ -30,6 +36,7 @@ type AttendanceRow = {
 export default function AdminRelatoriosPage() {
   const [leaderboards, setLeaderboards] = useState<Leaderboards | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     Promise.all([fetch("/api/admin/reports/leaderboards"), fetch("/api/admin/reports/attendance")])
@@ -41,17 +48,19 @@ export default function AdminRelatoriosPage() {
       })
       .catch(() => {
         setLeaderboards(null);
+        setMessage("Falha ao carregar relatorios.");
       });
   }, []);
 
   return (
-    <div className="space-y-4">
-      <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Relatorios</h2>
-        <a href="/api/admin/reports/export.csv" className="btn btn-accent mt-3 inline-flex">
-          Exportar CSV
-        </a>
-      </section>
+    <PageShell>
+      <HeroBlock className="p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Admin</p>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Relatorios</h2>
+        <div className="mt-4">
+          <a href="/api/admin/reports/export.csv" className="btn btn-accent inline-flex rounded-full">Exportar CSV</a>
+        </div>
+      </HeroBlock>
 
       {leaderboards ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -61,10 +70,12 @@ export default function AdminRelatoriosPage() {
           <ReportCard title="MVP" rows={leaderboards.mvp.slice(0, 10)} metric="averageRating" />
         </div>
       ) : (
-        <p className="card p-4 text-sm text-emerald-900">Carregando liderancas...</p>
+        <SectionShell className="p-4">
+          <p className="text-sm text-emerald-900">Carregando liderancas...</p>
+        </SectionShell>
       )}
 
-      <section className="card p-5">
+      <SectionShell className="p-5">
         <h3 className="text-2xl font-bold text-emerald-950">Presenca</h3>
         <ul className="mt-3 space-y-2 text-sm">
           {attendance.map((item) => (
@@ -74,8 +85,10 @@ export default function AdminRelatoriosPage() {
             </li>
           ))}
         </ul>
-      </section>
-    </div>
+      </SectionShell>
+
+      {message ? <StatusNote tone="error">{message}</StatusNote> : null}
+    </PageShell>
   );
 }
 
@@ -89,7 +102,7 @@ function ReportCard({
   metric: "goals" | "assists" | "goalsConceded" | "averageRating";
 }) {
   return (
-    <section className="card p-4">
+    <SectionShell className="p-4">
       <h4 className="text-xl font-semibold text-emerald-950">{title}</h4>
       <ul className="mt-3 space-y-2 text-sm">
         {rows.map((row) => (
@@ -101,6 +114,7 @@ function ReportCard({
           </li>
         ))}
       </ul>
-    </section>
+    </SectionShell>
   );
 }
+

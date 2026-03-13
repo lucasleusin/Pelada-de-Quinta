@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatDatePtBr } from "@/lib/date-format";
 import {
   HeroBlock,
   PageShell,
@@ -51,6 +52,21 @@ type PlayerHistoryPayload = {
     avgAssistsPerMatch: number;
     avgConcededPerMatch: number;
   };
+  history: Array<{
+    matchId: string;
+    match: {
+      id: string;
+      matchDate: string;
+      teamAScore: number | null;
+      teamBScore: number | null;
+    };
+    goals: number;
+    assists: number;
+    goalsConceded: number;
+    result: "WIN" | "DRAW" | "LOSS" | null;
+    averageRating: number | null;
+    ratingsCount: number;
+  }>;
 };
 
 function toEditablePosition(position: PlayerCardPosition): EditablePosition {
@@ -59,6 +75,13 @@ function toEditablePosition(position: PlayerCardPosition): EditablePosition {
   }
 
   return "MEIA";
+}
+
+function getResultLabel(result: "WIN" | "DRAW" | "LOSS" | null) {
+  if (result === "WIN") return "Vitoria";
+  if (result === "DRAW") return "Empate";
+  if (result === "LOSS") return "Derrota";
+  return "Sem resultado";
 }
 
 export default function MeuPerfilPage() {
@@ -269,136 +292,187 @@ export default function MeuPerfilPage() {
     <PageShell>
       <HeroBlock className="p-5 sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Cadastro</p>
-        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Meu Perfil</h2>
-        <p className="mt-1 text-sm text-emerald-800">
-          Selecione o jogador e atualize os dados. O salvamento e automatico.
-        </p>
+        <div className="mt-1 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-emerald-950">Perfil do Atleta</h2>
+            <p className="mt-1 text-sm text-emerald-800">
+              Selecione o jogador e atualize os dados. O salvamento e automatico.
+            </p>
+          </div>
 
-        <label className="field-label mt-4" htmlFor="profile-player-select">
-          Jogador
-        </label>
-        <select
-          id="profile-player-select"
-          className="field-input max-w-md"
-          value={selectedPlayerId}
-          onChange={(event) => handleSelectPlayer(event.currentTarget.value)}
-        >
-          <option value="">Selecione...</option>
-          {players.map((player) => (
-            <option key={player.id} value={player.id}>
-              {player.name}
-            </option>
-          ))}
-        </select>
+          <label className="w-full max-w-md" htmlFor="profile-player-select">
+            <span className="field-label">Jogador</span>
+            <select
+              id="profile-player-select"
+              className="field-input"
+              value={selectedPlayerId}
+              onChange={(event) => handleSelectPlayer(event.currentTarget.value)}
+            >
+              <option value="">Selecione...</option>
+              {players.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </HeroBlock>
 
       {canRenderProfile && profileData ? (
-        <section className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
-          <SectionShell className="order-1 p-4 lg:order-2">
-            <h3 className="text-xl font-semibold text-emerald-950">Edicao de dados</h3>
+        <>
+          <section className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
+            <SectionShell className="order-1 p-4 lg:order-2">
+              <h3 className="text-xl font-semibold text-emerald-950">Edicao de dados</h3>
 
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <label>
-                <span className="field-label">Nome</span>
-                <input
-                  className="field-input"
-                  value={formState.name}
-                  onChange={(event) => updateForm("name", event.currentTarget.value)}
-                />
-              </label>
-
-              <label>
-                <span className="field-label">Numero</span>
-                <input
-                  className="field-input"
-                  type="number"
-                  min={0}
-                  max={99}
-                  value={formState.shirtNumberPreference}
-                  onChange={(event) => updateForm("shirtNumberPreference", event.currentTarget.value)}
-                />
-              </label>
-
-              <label>
-                <span className="field-label">Posicao</span>
-                <select
-                  className="field-input"
-                  value={formState.position}
-                  onChange={(event) => updateForm("position", event.currentTarget.value as EditablePosition)}
-                >
-                  <option value="GOLEIRO">Goleiro</option>
-                  <option value="ZAGUEIRO">Zagueiro</option>
-                  <option value="MEIA">Meio Campo</option>
-                  <option value="ATACANTE">Atacante</option>
-                </select>
-              </label>
-
-              <label>
-                <span className="field-label">Email</span>
-                <input
-                  className="field-input"
-                  type="email"
-                  placeholder="email@exemplo.com"
-                  value={formState.email}
-                  onChange={(event) => updateForm("email", event.currentTarget.value)}
-                />
-              </label>
-
-              <label className="md:col-span-2">
-                <span className="field-label">Telefone</span>
-                <input
-                  className="field-input"
-                  type="tel"
-                  placeholder="(51) 99999-9999"
-                  value={formState.phone}
-                  onChange={(event) => updateForm("phone", event.currentTarget.value)}
-                />
-              </label>
-            </div>
-
-            <div className="mt-4 rounded-lg bg-emerald-50 p-3">
-              <p className="text-sm font-medium text-emerald-900">Foto do jogador</p>
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                <label className="min-w-[240px] flex-1">
-                  <span className="field-label">Arquivo</span>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label>
+                  <span className="field-label">Nome</span>
                   <input
                     className="field-input"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => handlePhotoUpload(event.currentTarget.files?.[0] ?? null)}
+                    value={formState.name}
+                    onChange={(event) => updateForm("name", event.currentTarget.value)}
                   />
                 </label>
-                <Button
-                  className="rounded-full"
-                  variant="outline"
-                  type="button"
-                  onClick={removePhoto}
-                  disabled={!profileData.player.photoUrl}
-                >
-                  Remover foto
-                </Button>
+
+                <label>
+                  <span className="field-label">Numero</span>
+                  <input
+                    className="field-input"
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={formState.shirtNumberPreference}
+                    onChange={(event) => updateForm("shirtNumberPreference", event.currentTarget.value)}
+                  />
+                </label>
+
+                <label>
+                  <span className="field-label">Posicao</span>
+                  <select
+                    className="field-input"
+                    value={formState.position}
+                    onChange={(event) => updateForm("position", event.currentTarget.value as EditablePosition)}
+                  >
+                    <option value="GOLEIRO">Goleiro</option>
+                    <option value="ZAGUEIRO">Zagueiro</option>
+                    <option value="MEIA">Meio Campo</option>
+                    <option value="ATACANTE">Atacante</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span className="field-label">Email</span>
+                  <input
+                    className="field-input"
+                    type="email"
+                    placeholder="email@exemplo.com"
+                    value={formState.email}
+                    onChange={(event) => updateForm("email", event.currentTarget.value)}
+                  />
+                </label>
+
+                <label className="md:col-span-2">
+                  <span className="field-label">Telefone</span>
+                  <input
+                    className="field-input"
+                    type="tel"
+                    placeholder="(51) 99999-9999"
+                    value={formState.phone}
+                    onChange={(event) => updateForm("phone", event.currentTarget.value)}
+                  />
+                </label>
               </div>
-              {photoStatus ? <p className="mt-2 text-sm text-emerald-900">{photoStatus}</p> : null}
+
+              <div className="mt-4 rounded-lg bg-emerald-50 p-3">
+                <p className="text-sm font-medium text-emerald-900">Foto do jogador</p>
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <label className="min-w-[240px] flex-1">
+                    <span className="field-label">Arquivo</span>
+                    <input
+                      className="field-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) => handlePhotoUpload(event.currentTarget.files?.[0] ?? null)}
+                    />
+                  </label>
+                  <Button
+                    className="rounded-full"
+                    variant="outline"
+                    type="button"
+                    onClick={removePhoto}
+                    disabled={!profileData.player.photoUrl}
+                  >
+                    Remover foto
+                  </Button>
+                </div>
+                {photoStatus ? <p className="mt-2 text-sm text-emerald-900">{photoStatus}</p> : null}
+              </div>
+
+              {saveStatus === "saving" ? <StatusNote className="mt-3" tone="warning">Salvando...</StatusNote> : null}
+              {saveStatus === "saved" ? <StatusNote className="mt-3" tone="success">{saveMessage}</StatusNote> : null}
+              {saveStatus === "error" ? <StatusNote className="mt-3" tone="error">{saveMessage}</StatusNote> : null}
+            </SectionShell>
+
+            <div className="order-2 lg:order-1">
+              <PlayerFifaCard
+                player={{
+                  name: profileData.player.name,
+                  position: profileData.player.position,
+                  shirtNumberPreference: profileData.player.shirtNumberPreference,
+                  photoUrl: profileData.player.photoUrl,
+                }}
+                totals={profileData.totals}
+                showDownloadButton
+              />
+            </div>
+          </section>
+
+          <SectionShell className="p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-emerald-950">Partidas jogadas</h3>
+                <p className="text-sm text-emerald-800">
+                  Historico detalhado do atleta com desempenho por partida.
+                </p>
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-emerald-700">
+                {profileData.history.length} partida{profileData.history.length === 1 ? "" : "s"}
+              </p>
             </div>
 
-            {saveStatus === "saving" ? <StatusNote className="mt-3" tone="warning">Salvando...</StatusNote> : null}
-            {saveStatus === "saved" ? <StatusNote className="mt-3" tone="success">{saveMessage}</StatusNote> : null}
-            {saveStatus === "error" ? <StatusNote className="mt-3" tone="error">{saveMessage}</StatusNote> : null}
-          </SectionShell>
+            {profileData.history.length > 0 ? (
+              <ul className="mt-4 space-y-3">
+                {profileData.history.map((item) => (
+                  <li key={item.matchId} className="rounded-xl border border-emerald-100 bg-zinc-50 p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-emerald-950">
+                          {formatDatePtBr(item.match.matchDate)} - {item.match.teamAScore ?? "-"} x {item.match.teamBScore ?? "-"} (
+                          {getResultLabel(item.result)})
+                        </p>
+                        <p className="mt-1 text-sm text-emerald-800">
+                          Gols: {item.goals} | Assistencias: {item.assists} | Gols sofridos: {item.goalsConceded}
+                        </p>
+                      </div>
 
-          <div className="order-2 lg:order-1">
-            <PlayerFifaCard
-              player={{
-                name: profileData.player.name,
-                position: profileData.player.position,
-                shirtNumberPreference: profileData.player.shirtNumberPreference,
-                photoUrl: profileData.player.photoUrl,
-              }}
-              totals={profileData.totals}
-              showDownloadButton
-            />
-          </div>
-        </section>
+                      <div className="shrink-0 text-left sm:text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                          Nota media
+                        </p>
+                        <p className="text-sm font-semibold text-emerald-950">
+                          {item.averageRating === null ? "Sem Nota" : item.averageRating.toFixed(1)}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 text-sm text-emerald-800">Nenhuma partida jogada registrada para este atleta.</p>
+            )}
+          </SectionShell>
+        </>
       ) : (
         <SectionShell className="p-4">
           <p className="empty-state text-sm">Selecione um jogador para editar o perfil.</p>

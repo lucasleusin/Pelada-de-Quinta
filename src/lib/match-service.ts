@@ -1261,20 +1261,43 @@ export async function getPlayerReport(playerId: string) {
   });
 
   const historyMatchIds = history.map((item) => item.matchId);
-  const ratings =
+  const [ratings, ratingsByMatch] =
     historyMatchIds.length > 0
-      ? await db().matchRating.aggregate({
-          where: {
-            ratedPlayerId: playerId,
-            matchId: { in: historyMatchIds },
+      ? await Promise.all([
+          db().matchRating.aggregate({
+            where: {
+              ratedPlayerId: playerId,
+              matchId: { in: historyMatchIds },
+            },
+            _avg: { rating: true },
+            _count: { _all: true },
+          }),
+          db().matchRating.groupBy({
+            by: ["matchId"],
+            where: {
+              ratedPlayerId: playerId,
+              matchId: { in: historyMatchIds },
+            },
+            _avg: { rating: true },
+            _count: { _all: true },
+          }),
+        ])
+      : [
+          {
+            _avg: { rating: null },
+            _count: { _all: 0 },
           },
-          _avg: { rating: true },
-          _count: { _all: true },
-        })
-      : {
-          _avg: { rating: null },
-          _count: { _all: 0 },
-        };
+          [],
+        ];
+  const ratingSummaryByMatchId = new Map(
+    ratingsByMatch.map((rating) => [
+      rating.matchId,
+      {
+        averageRating: rating._avg.rating === null ? null : Number(rating._avg.rating.toFixed(2)),
+        ratingsCount: rating._count._all,
+      },
+    ]),
+  );
 
   let wins = 0;
   let losses = 0;
@@ -1307,6 +1330,17 @@ export async function getPlayerReport(playerId: string) {
   const avgConcededPerMatch = matches > 0 ? Number((goalsConceded / matches).toFixed(2)) : 0;
   const efficiency =
     resultMatches > 0 ? Number((((wins * 3 + draws) / (resultMatches * 3)) * 100).toFixed(1)) : 0;
+  const historyWithSummary = history.map((item) => {
+    const performance = getPerformanceForTeam(getPrimaryTeam(item.primaryTeam, item.teams), item.match);
+    const ratingSummary = ratingSummaryByMatchId.get(item.matchId);
+
+    return {
+      ...item,
+      result: performance?.result ?? null,
+      averageRating: ratingSummary?.averageRating ?? null,
+      ratingsCount: ratingSummary?.ratingsCount ?? 0,
+    };
+  });
 
   return {
     player,
@@ -1326,7 +1360,7 @@ export async function getPlayerReport(playerId: string) {
       avgConcededPerMatch,
       efficiency,
     },
-    history,
+    history: historyWithSummary,
   };
 }
 

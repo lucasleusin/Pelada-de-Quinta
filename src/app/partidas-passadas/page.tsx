@@ -489,7 +489,7 @@ export default function PartidasPassadasPage() {
   return (
     <div className="space-y-5">
       <section className="card p-5">
-        <h2 className="text-3xl font-bold text-emerald-950">Partidas Passadas</h2>
+        <h2 className="text-3xl font-bold text-emerald-950">Partidas Anteriores</h2>
         <p className="text-sm text-emerald-800">
           Selecione a partida de hoje ou anteriores, ajuste stats e placar. A media dos votos aparece por jogador.
         </p>

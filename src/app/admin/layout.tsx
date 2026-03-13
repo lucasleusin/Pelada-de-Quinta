@@ -7,6 +7,15 @@ import { ActionBar, PageShell } from "@/components/layout/primitives";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const adminLinks = [
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/partidas", label: "Partidas" },
+  { href: "/admin/jogadores", label: "Jogadores" },
+  { href: "/admin/site-setup", label: "Site Setup" },
+  { href: "/admin/whatsapp", label: "Whatsapp" },
+  { href: "/admin/relatorios", label: "Relatorios" },
+] as const;
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -15,37 +24,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   function navClass(href: string) {
-    const active = pathname === href || pathname.startsWith(`${href}/`);
+    const active = href === "/admin" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
     return cn(
       buttonVariants({ variant: active ? "default" : "outline", size: "sm" }),
       "rounded-full",
-      active ? "shadow-sm" : "bg-white",
+      active
+        ? "shadow-sm"
+        : "border-emerald-300 bg-emerald-50 text-emerald-950 hover:bg-emerald-100 hover:text-emerald-950",
     );
   }
 
   return (
     <PageShell>
-      <ActionBar className="flex flex-wrap items-center justify-between gap-2 p-3">
+      <ActionBar className="flex flex-wrap items-center justify-between gap-2 border-emerald-300/80 bg-emerald-200/70 p-3">
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/site-setup" className={navClass("/admin/site-setup")}>
-            Site Setup
-          </Link>
-          <Link href="/admin/whatsapp" className={navClass("/admin/whatsapp")}>
-            Whatsapp
-          </Link>
-          <Link href="/admin/relatorios" className={navClass("/admin/relatorios")}>
-            Relatorios
-          </Link>
-          <Link href="/admin/partidas" className={navClass("/admin/partidas")}>
-            Partidas
-          </Link>
-          <Link href="/admin/jogadores" className={navClass("/admin/jogadores")}>
-            Jogadores
-          </Link>
-          <Link href="/admin" className={navClass("/admin")}>
-            Dashboard
-          </Link>
+          {adminLinks.map((link) => (
+            <Link key={link.href} href={link.href} className={navClass(link.href)}>
+              {link.label}
+            </Link>
+          ))}
         </div>
         <AdminLogoutButton />
       </ActionBar>

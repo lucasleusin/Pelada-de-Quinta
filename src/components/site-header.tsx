@@ -18,6 +18,8 @@ const links = [
 export function SiteHeader() {
   const pathname = usePathname();
   const siteSettings = useSiteSettings();
+  const logoUrl = siteSettings.logoUrl ?? undefined;
+  const hasLogo = Boolean(logoUrl);
 
   return (
     <header className="sticky top-0 z-30 border-b border-emerald-200/70 bg-white/85 backdrop-blur-lg">
@@ -25,27 +27,17 @@ export function SiteHeader() {
         <div className="flex items-center justify-between gap-2">
           <Link href="/" className="rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
             <div className="flex items-center gap-3">
-              {siteSettings.logoUrl ? (
+              {hasLogo ? (
                 <img
-                  src={siteSettings.logoUrl}
-                  alt=""
-                  className="h-11 w-11 rounded-xl border border-emerald-200 bg-white object-contain p-1"
+                  src={logoUrl}
+                  alt={siteSettings.siteName}
+                  className="h-11 w-auto object-contain sm:h-14"
                 />
-              ) : null}
-
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700 sm:hidden">
-                  {siteSettings.siteShortName}
-                </p>
-                <div className="hidden sm:block">
-                  {siteSettings.locationLabel ? (
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700">
-                      {siteSettings.locationLabel}
-                    </p>
-                  ) : null}
-                  <h1 className="font-heading text-2xl font-bold text-emerald-950">{siteSettings.siteName}</h1>
-                </div>
-              </div>
+              ) : (
+                <h1 className="font-heading text-2xl font-bold text-emerald-950 sm:text-3xl">
+                  {siteSettings.siteName}
+                </h1>
+              )}
             </div>
           </Link>
 

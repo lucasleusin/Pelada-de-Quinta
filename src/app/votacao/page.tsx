@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActionBar,
   HeroBlock,
   PageShell,
   SectionShell,
@@ -11,11 +10,6 @@ import {
 import { StarRating } from "@/components/star-rating";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 import { getPrimaryTeam, type TeamCode } from "@/lib/team-utils";
-
-type Player = {
-  id: string;
-  name: string;
-};
 
 type MatchSummary = {
   id: string;
@@ -94,7 +88,6 @@ function getParticipantTeamStats(participant: Participant, team: TeamCode) {
 }
 
 export default function VotacaoPage() {
-  const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<MatchSummary[]>([]);
   const [selectedRaterId, setSelectedRaterId] = useState("");
   const [selectedMatchId, setSelectedMatchId] = useState("");
@@ -113,33 +106,20 @@ export default function VotacaoPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/players?active=true")
-      .then(async (playersRes) => {
-        const playersPayload = ((await playersRes.json()) as Player[]).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
-        setPlayers(playersPayload);
-      })
-      .catch(() => setMessage("Falha ao carregar jogadores da votacao."));
-  }, []);
+    fetch(`/api/matches?to=${getTodayIsoDate()}`)
+      .then(async (matchesRes) => {
+        const matchesPayload = (await matchesRes.json()) as MatchSummary[];
+        const latestMatches = matchesPayload
+          .sort((a, b) => getDateSortValue(b.matchDate) - getDateSortValue(a.matchDate))
+          .slice(0, 3);
 
-  useEffect(() => {
-    if (!selectedRaterId) return;
-
-    fetch(`/api/matches?to=${getTodayIsoDate()}&playerId=${selectedRaterId}`)
-      .then((res) => res.json())
-      .then((payload: MatchSummary[]) => {
-        const sortedMatches = payload.sort(
-          (a, b) => getDateSortValue(b.matchDate) - getDateSortValue(a.matchDate),
-        );
-
-        setMatches(sortedMatches);
+        setMatches(latestMatches);
       })
       .catch(() => {
         setMatches([]);
-        setMessage("Falha ao carregar partidas desse jogador.");
+        setMessage("Falha ao carregar partidas da votacao.");
       });
-  }, [selectedRaterId]);
+  }, []);
 
   useEffect(() => {
     if (!selectedMatchId) return;
@@ -148,8 +128,9 @@ export default function VotacaoPage() {
       .then((res) => res.json())
       .then((payload: MatchDetails) => {
         setMatch(payload);
-        setVotes(selectedRaterId ? getVotesFromRatings(payload.ratings, selectedRaterId) : {});
+        setVotes({});
         setDirtyVoteIds([]);
+        setSelectedRaterId("");
         setSaveStatus("idle");
         setMessage("");
       })
@@ -157,15 +138,35 @@ export default function VotacaoPage() {
         setMessage("Falha ao carregar detalhes da partida.");
         setSaveStatus("error");
       });
-  }, [selectedMatchId, selectedRaterId]);
+  }, [selectedMatchId]);
 
   function handleSelectMatch(nextMatchId: string) {
     setSelectedMatchId(nextMatchId);
-
-    if (!nextMatchId) {
-      resetSelectedMatchState();
-    }
+    setSelectedRaterId("");
+    resetSelectedMatchState();
   }
+
+  useEffect(() => {
+    if (!match || !selectedRaterId) {
+      setVotes({});
+      setDirtyVoteIds([]);
+      return;
+    }
+
+    const raterIsEligible = match.participants.some((participant) => participant.playerId === selectedRaterId);
+
+    if (!raterIsEligible) {
+      setSelectedRaterId("");
+      setVotes({});
+      setDirtyVoteIds([]);
+      return;
+    }
+
+    setVotes(getVotesFromRatings(match.ratings, selectedRaterId));
+    setDirtyVoteIds([]);
+    setSaveStatus("idle");
+    setMessage("");
+  }, [match, selectedRaterId]);
 
   useEffect(() => {
     if (!selectedRaterId || !selectedMatchId) return;
@@ -246,6 +247,16 @@ export default function VotacaoPage() {
       ),
     [alreadyRatedIds, match, selectedRaterId],
   );
+  const eligibleRaters = useMemo(
+    () =>
+      [...(match?.participants ?? [])]
+        .map((participant) => ({
+          id: participant.player.id,
+          name: participant.player.name,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [match],
+  );
 
   function updateVote(ratedPlayerId: string, rating: number) {
     setVotes((prev) => ({
@@ -315,63 +326,88 @@ export default function VotacaoPage() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Avaliacao</p>
         <h2 className="mt-1 text-3xl font-bold text-emerald-950">Votacao</h2>
         <p className="text-sm text-emerald-800">
-          Escolha seu nome, selecione a partida e vote em um ou mais jogadores. O salvamento e automatico.
+          Escolha uma das tres ultimas partidas, depois informe quem esta votando. O salvamento e automatico.
         </p>
 
-        <ActionBar className="mt-4 p-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            <label>
-              <span className="field-label">Quem esta votando?</span>
-              <select
-                className="field-input"
-                value={selectedRaterId}
-                onChange={(event) => {
-                  const nextRaterId = event.currentTarget.value;
-                  setSelectedRaterId(nextRaterId);
-                  setMatches([]);
-                  setSelectedMatchId("");
-                  resetSelectedMatchState();
-                  setSaveStatus("idle");
-                  setMessage("");
-                }}
-              >
-                <option value="">Selecione...</option>
-                {players.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <div className="mt-4 space-y-4">
+          <div>
+            <span className="field-label">Partida</span>
+            <div className="mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:overflow-visible md:pb-0">
+              {matches.map((matchItem) => {
+                const isActive = selectedMatchId === matchItem.id;
 
-            <label>
-              <span className="field-label">Partida</span>
-              <select
-                className="field-input"
-                value={selectedMatchId}
-                onChange={(event) => handleSelectMatch(event.currentTarget.value)}
-                disabled={!selectedRaterId}
-              >
-                <option value="">Selecione...</option>
-                {matches.map((matchItem) => (
-                  <option key={matchItem.id} value={matchItem.id}>
-                    {formatDatePtBr(matchItem.matchDate)} - {matchItem.startTime}
-                    {matchItem.location ? ` - ${matchItem.location}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+                return (
+                  <button
+                    key={matchItem.id}
+                    type="button"
+                    onClick={() => handleSelectMatch(matchItem.id)}
+                    className={`min-w-[248px] snap-start rounded-2xl border px-4 py-4 text-left transition md:min-w-0 ${
+                      isActive
+                        ? "border-emerald-500 bg-emerald-950 text-white shadow-lg shadow-emerald-950/20"
+                        : "border-emerald-200 bg-white text-emerald-950 hover:border-emerald-300 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${isActive ? "text-emerald-200" : "text-emerald-700"}`}>
+                      {formatDatePtBr(matchItem.matchDate)}
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {matchItem.startTime}
+                      {matchItem.location ? ` - ${matchItem.location}` : ""}
+                    </p>
+                    <p className={`mt-3 text-sm ${isActive ? "text-emerald-100" : "text-emerald-800"}`}>
+                      {matchItem.teamAName || "Time A"} x {matchItem.teamBName || "Time B"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </ActionBar>
+
+          <label className="block max-w-xl">
+            <span className="field-label">Quem esta votando?</span>
+            <select
+              className="field-input mt-2"
+              value={selectedRaterId}
+              onChange={(event) => {
+                setSelectedRaterId(event.currentTarget.value);
+                setSaveStatus("idle");
+                setMessage("");
+              }}
+              disabled={!match}
+            >
+              <option value="">{match ? "Selecione..." : "Escolha primeiro a partida"}</option>
+              {eligibleRaters.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name}
+                </option>
+              ))}
+            </select>
+            {match ? (
+              <p className="mt-2 text-sm text-emerald-800">A lista mostra somente quem jogou esta partida.</p>
+            ) : null}
+          </label>
+        </div>
 
         {saveStatus === "saving" ? <StatusNote className="mt-3" tone="warning">Salvando...</StatusNote> : null}
         {saveStatus === "saved" ? <StatusNote className="mt-3" tone="success">{message}</StatusNote> : null}
         {saveStatus === "error" ? <StatusNote className="mt-3" tone="error">{message}</StatusNote> : null}
       </HeroBlock>
 
-      {selectedRaterId && !selectedMatchId && matches.length === 0 ? (
+      {!selectedMatchId && matches.length > 0 ? (
         <SectionShell className="p-4">
-          <p className="empty-state text-sm">Esse jogador nao tem partidas disponiveis para votacao.</p>
+          <p className="empty-state text-sm">Escolha uma das ultimas partidas para liberar a votacao.</p>
+        </SectionShell>
+      ) : null}
+
+      {matches.length === 0 ? (
+        <SectionShell className="p-4">
+          <p className="empty-state text-sm">Nao existem partidas disponiveis para votacao.</p>
+        </SectionShell>
+      ) : null}
+
+      {selectedMatchId && match && !selectedRaterId ? (
+        <SectionShell className="p-4">
+          <p className="empty-state text-sm">Escolha quem esta votando para exibir os atletas da partida.</p>
         </SectionShell>
       ) : null}
 

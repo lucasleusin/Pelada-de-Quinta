@@ -18,19 +18,18 @@ export function buildSiteMetadata(
   appBaseUrl = process.env.APP_BASE_URL?.trim(),
 ): Metadata {
   const shareImages = settings.shareImageUrl ? [settings.shareImageUrl] : undefined;
+  const faviconHref = `/favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`;
 
   return {
     metadataBase: getMetadataBase(appBaseUrl),
     title: settings.siteName,
     description: settings.siteDescription || undefined,
     applicationName: settings.siteName,
-    icons: settings.faviconUrl
-      ? {
-          icon: settings.faviconUrl,
-          shortcut: settings.faviconUrl,
-          apple: settings.faviconUrl,
-        }
-      : undefined,
+    icons: {
+      icon: faviconHref,
+      shortcut: faviconHref,
+      apple: faviconHref,
+    },
     openGraph: {
       type: "website",
       title: settings.siteName,

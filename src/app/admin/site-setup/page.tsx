@@ -129,7 +129,10 @@ export default function AdminSiteSetupPage() {
     const response = await fetch("/api/admin/site-setup/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(formState),
+      body: JSON.stringify({
+        ...formState,
+        siteShortName: formState.siteName,
+      }),
     });
 
     setSaving(false);
@@ -245,19 +248,6 @@ export default function AdminSiteSetupPage() {
             />
           </label>
 
-          <label>
-            <span className="field-label">Nome curto</span>
-            <input
-              className="field-input"
-              value={formState.siteShortName}
-              onChange={(event) => {
-                const { value } = event.currentTarget;
-                setFormState((current) => ({ ...current, siteShortName: value }));
-              }}
-              required
-            />
-          </label>
-
           <label className="md:col-span-2">
             <span className="field-label">Descricao</span>
             <textarea
@@ -267,19 +257,6 @@ export default function AdminSiteSetupPage() {
                 const { value } = event.currentTarget;
                 setFormState((current) => ({ ...current, siteDescription: value }));
               }}
-            />
-          </label>
-
-          <label>
-            <span className="field-label">Texto secundario do cabecalho</span>
-            <input
-              className="field-input"
-              value={formState.locationLabel}
-              onChange={(event) => {
-                const { value } = event.currentTarget;
-                setFormState((current) => ({ ...current, locationLabel: value }));
-              }}
-              placeholder="Cachoeira do Sul"
             />
           </label>
 

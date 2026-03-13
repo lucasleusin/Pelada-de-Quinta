@@ -1,4 +1,3 @@
-import { cache } from "react";
 import type { SiteSettings } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db";
 import { deletePhoto, storePhoto } from "@/lib/photo-storage";
@@ -151,11 +150,11 @@ export async function deleteSiteAsset(kind: SiteAssetKind, prisma: DbClient = db
   return serializeSiteSettings(updated);
 }
 
-export const getCachedSiteSettings = cache(async () => {
+export async function getCachedSiteSettings() {
   try {
     return await getSiteSettings();
   } catch (error) {
     console.error("Falha ao carregar configuracao publica do site.", error);
     return DEFAULT_SITE_SETTINGS;
   }
-});
+}

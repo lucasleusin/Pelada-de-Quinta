@@ -697,7 +697,7 @@ export async function updateTeams(matchId: string, body: unknown) {
   const existingParticipantByPlayerId = new Map(existingParticipants.map((participant) => [participant.playerId, participant]));
   const now = new Date();
 
-  await db().$transaction(
+  const updatedParticipants = await db().$transaction(
     parsed.data.assignments.map((assignment) => {
       const existingParticipant = existingParticipantByPlayerId.get(assignment.playerId);
       const nextTeams = normalizeTeams(assignment.teams);
@@ -741,7 +741,7 @@ export async function updateTeams(matchId: string, body: unknown) {
     }),
   );
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, updatedParticipants });
 }
 
 export async function updateParticipantPresence(matchId: string, playerId: string, body: unknown) {

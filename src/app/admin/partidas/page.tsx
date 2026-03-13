@@ -69,6 +69,7 @@ export default function AdminPartidasPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
+  const [showNonConfirmedPlayers, setShowNonConfirmedPlayers] = useState(false);
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("Arena dos Coqueiros");
   const [score, setScore] = useState<ScoreState>({ teamAScore: "", teamBScore: "" });
@@ -86,14 +87,26 @@ export default function AdminPartidasPage() {
     [selectedMatch],
   );
 
-  const confirmedPlayers = useMemo(
+  const confirmedPlayersWithTeams = useMemo(
     () =>
-      [...(selectedMatch?.participants ?? []).filter((participant) => participant.presenceStatus === "CONFIRMED")]
+      [...(selectedMatch?.participants ?? []).filter(
+        (participant) => participant.presenceStatus === "CONFIRMED" && participant.teams.length > 0,
+      )]
         .sort(
           (left, right) =>
             getTeamMembershipRank(left.teams) - getTeamMembershipRank(right.teams) ||
             left.player.name.localeCompare(right.player.name),
         ),
+    [selectedMatch],
+  );
+
+  const confirmedPlayersWithoutTeams = useMemo(
+    () =>
+      sortByName(
+        (selectedMatch?.participants ?? []).filter(
+          (participant) => participant.presenceStatus === "CONFIRMED" && participant.teams.length === 0,
+        ),
+      ),
     [selectedMatch],
   );
 
@@ -122,7 +135,7 @@ export default function AdminPartidasPage() {
       const participant = participantByPlayerId.get(player.id);
       if (participant) return participant;
 
-            return {
+      return {
         playerId: player.id,
         presenceStatus: "WAITLIST" as const,
         teams: [],
@@ -148,15 +161,17 @@ export default function AdminPartidasPage() {
     setMatches(matchesPayload);
     setPlayers(playersPayload);
 
-    if (matchesPayload.length === 0) {
-      setSelectedMatchId("");
-      return;
-    }
+    setSelectedMatchId((currentSelection) => {
+      if (matchesPayload.length === 0) {
+        return "";
+      }
 
-    const selectionStillExists = matchesPayload.some((match) => match.id === selectedMatchId);
-    if (!selectedMatchId || !selectionStillExists) {
-      setSelectedMatchId(matchesPayload[0].id);
-    }
+      if (currentSelection && matchesPayload.some((match) => match.id === currentSelection)) {
+        return currentSelection;
+      }
+
+      return matchesPayload[0].id;
+    });
   }
 
   useEffect(() => {
@@ -179,6 +194,10 @@ export default function AdminPartidasPage() {
     setScoreDirty(false);
     setScoreSaveStatus("idle");
   }, [selectedMatch]);
+
+  useEffect(() => {
+    setShowNonConfirmedPlayers(false);
+  }, [selectedMatchId]);
 
   useEffect(() => {
     if (!selectedMatch || !scoreDirty) return;
@@ -245,8 +264,9 @@ export default function AdminPartidasPage() {
 
   async function setPlayerTeams(playerId: string, teams: TeamCode[]) {
     if (!selectedMatch) return;
+    const matchId = selectedMatch.id;
 
-    const response = await fetch(`/api/admin/matches/${selectedMatch.id}/teams`, {
+    const response = await fetch(`/api/admin/matches/${matchId}/teams`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ assignments: [{ playerId, teams: normalizeTeams(teams) }] }),
@@ -257,7 +277,83 @@ export default function AdminPartidasPage() {
       return;
     }
 
-    await loadData();
+    const payload = (await response.json()) as {
+      updatedParticipants: Array<
+        Pick<Participant, "playerId" | "presenceStatus" | "teams" | "goals" | "assists" | "goalsConceded">
+      >;
+    };
+
+    const updatedParticipant = payload.updatedParticipants.find((participant) => participant.playerId === playerId);
+    if (!updatedParticipant) return;
+
+    setMatches((prev) =>
+      prev.map((match) => {
+        if (match.id !== matchId) return match;
+
+        const existingParticipant = match.participants.find((participant) => participant.playerId === playerId);
+        const player = existingParticipant?.player ?? players.find((item) => item.id === playerId);
+        if (!player) return match;
+
+        const nextParticipant: Participant = {
+          ...updatedParticipant,
+          player,
+        };
+
+        const remainingParticipants = match.participants.filter((participant) => participant.playerId !== playerId);
+
+        return {
+          ...match,
+          participants: [...remainingParticipants, nextParticipant],
+        };
+      }),
+    );
+
+    setMessage("Times atualizados somente para a partida selecionada.");
+  }
+
+  async function setPlayerPresenceStatus(playerId: string, presenceStatus: Participant["presenceStatus"]) {
+    if (!selectedMatch) return;
+    const matchId = selectedMatch.id;
+
+    const response = await fetch(`/api/admin/matches/${matchId}/participants/${playerId}/presence`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ presenceStatus }),
+    });
+
+    if (!response.ok) {
+      setMessage("Falha ao atualizar a confirmacao do jogador.");
+      return;
+    }
+
+    const updatedParticipant = (await response.json()) as Pick<
+      Participant,
+      "playerId" | "presenceStatus" | "teams" | "goals" | "assists" | "goalsConceded"
+    >;
+
+    setMatches((prev) =>
+      prev.map((match) => {
+        if (match.id !== matchId) return match;
+
+        const existingParticipant = match.participants.find((participant) => participant.playerId === playerId);
+        const player = existingParticipant?.player ?? players.find((item) => item.id === playerId);
+        if (!player) return match;
+
+        const nextParticipant: Participant = {
+          ...updatedParticipant,
+          player,
+        };
+
+        const remainingParticipants = match.participants.filter((participant) => participant.playerId !== playerId);
+
+        return {
+          ...match,
+          participants: [...remainingParticipants, nextParticipant],
+        };
+      }),
+    );
+
+    setMessage("Jogador desconfirmado somente para a partida selecionada.");
   }
 
   async function archiveSelectedMatch() {
@@ -296,12 +392,26 @@ export default function AdminPartidasPage() {
     setPlayerTeams(participant.playerId, nextTeams).catch(() => setMessage("Falha ao atualizar os times."));
   }
 
-  function renderAssignmentButtons(participant: Participant) {
+  function renderAssignmentButtons(participant: Participant, allowUnconfirm = false) {
     const buttonClass =
       "rounded-full border px-3 py-1 text-xs font-semibold transition sm:text-sm";
 
     return (
       <div className="flex flex-wrap gap-2">
+        {allowUnconfirm ? (
+          <button
+            type="button"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-xs font-bold text-red-700 transition hover:bg-red-100 sm:h-8 sm:w-8"
+            aria-label={`Desconfirmar ${participant.player.name} da partida selecionada`}
+            onClick={() =>
+              setPlayerPresenceStatus(participant.playerId, "CANCELED").catch(() =>
+                setMessage("Falha ao desconfirmar o jogador."),
+              )
+            }
+          >
+            X
+          </button>
+        ) : null}
         <button
           type="button"
           className={`${buttonClass} ${
@@ -328,7 +438,12 @@ export default function AdminPartidasPage() {
     );
   }
 
-  function renderAssignmentRow(participant: Participant, showStatusLabel = false) {
+  function renderAssignmentRow(
+    participant: Participant,
+    options?: { showStatusLabel?: boolean; allowUnconfirm?: boolean },
+  ) {
+    const showStatusLabel = options?.showStatusLabel ?? false;
+    const allowUnconfirm = options?.allowUnconfirm ?? false;
     const statusLabel = participant.presenceStatus === "CANCELED" ? "Desconfirmado" : "Pendente";
 
     return (
@@ -346,7 +461,7 @@ export default function AdminPartidasPage() {
               <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-emerald-700">{statusLabel}</p>
             ) : null}
           </div>
-          {renderAssignmentButtons(participant)}
+          {renderAssignmentButtons(participant, allowUnconfirm)}
         </div>
       </div>
     );
@@ -446,33 +561,64 @@ export default function AdminPartidasPage() {
           <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
               <h4 className="font-semibold text-emerald-950">
-                Confirmados ({confirmedPlayers.length})
+                Com time definido ({confirmedPlayersWithTeams.length})
               </h4>
               <p className="mt-1 text-xs text-emerald-800">
-                Sem time ficam no topo. Depois a lista organiza por Time A, Time B e A/B.
+                Lista ordenada por Time A, Time B e A/B.
               </p>
               <div className="mt-3 space-y-2">
-                {confirmedPlayers.length === 0 ? (
-                  <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador confirmado.</p>
+                {confirmedPlayersWithTeams.length === 0 ? (
+                  <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador com time definido.</p>
                 ) : (
-                  confirmedPlayers.map((participant) => renderAssignmentRow(participant))
+                  confirmedPlayersWithTeams.map((participant) =>
+                    renderAssignmentRow(participant, { allowUnconfirm: true }),
+                  )
                 )}
               </div>
 
               <div className="mt-4 border-t border-emerald-200 pt-3">
                 <h5 className="font-semibold text-emerald-950">
-                  Nao confirmados ({nonConfirmedPlayers.length})
+                  Confirmados sem time ({confirmedPlayersWithoutTeams.length})
                 </h5>
                 <p className="mt-1 text-xs text-emerald-800">
-                  Clique em Time A ou Time B para confirmar automaticamente o jogador e inclui-lo no time.
+                  Jogadores confirmados para esta partida, mas ainda sem Time A ou Time B.
                 </p>
                 <div className="mt-2 space-y-2">
-                  {nonConfirmedPlayers.length === 0 ? (
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nao confirmado.</p>
+                  {confirmedPlayersWithoutTeams.length === 0 ? (
+                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum confirmado sem time.</p>
                   ) : (
-                    nonConfirmedPlayers.map((participant) => renderAssignmentRow(participant, true))
+                    confirmedPlayersWithoutTeams.map((participant) =>
+                      renderAssignmentRow(participant, { allowUnconfirm: true }),
+                    )
                   )}
                 </div>
+              </div>
+
+              <div className="mt-4 border-t border-emerald-200 pt-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100"
+                  onClick={() => setShowNonConfirmedPlayers((current) => !current)}
+                >
+                  <span>Nao confirmados ({nonConfirmedPlayers.length})</span>
+                  <span className="text-xs uppercase tracking-[0.08em] text-emerald-700">
+                    {showNonConfirmedPlayers ? "Ocultar" : "Mostrar"}
+                  </span>
+                </button>
+                <p className="mt-2 text-xs text-emerald-800">
+                  Se voce marcar Time A ou Time B aqui, a alteracao vale apenas para esta partida selecionada.
+                </p>
+                {showNonConfirmedPlayers ? (
+                  <div className="mt-2 space-y-2">
+                    {nonConfirmedPlayers.length === 0 ? (
+                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nao confirmado.</p>
+                    ) : (
+                      nonConfirmedPlayers.map((participant) =>
+                        renderAssignmentRow(participant, { showStatusLabel: true }),
+                      )
+                    )}
+                  </div>
+                ) : null}
               </div>
             </section>
 

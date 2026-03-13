@@ -33,6 +33,22 @@ describe("business rules", () => {
     expect(isMatchOnOrBeforeToday(new Date(2026, 2, 5, 0, 0, 0), now)).toBe(false);
   });
 
+  it("treats a date-only match as open on the same civil day in app timezone", () => {
+    const previousTimeZone = process.env.APP_TIMEZONE;
+    process.env.APP_TIMEZONE = "America/Sao_Paulo";
+
+    try {
+      const matchDate = new Date("2026-03-13T00:00:00.000Z");
+      const now = new Date("2026-03-13T12:00:00.000Z");
+
+      expect(isMatchOpenForPresence(matchDate, now)).toBe(true);
+      expect(isMatchInPast(matchDate, now)).toBe(false);
+      expect(isMatchOnOrBeforeToday(matchDate, now)).toBe(true);
+    } finally {
+      process.env.APP_TIMEZONE = previousTimeZone;
+    }
+  });
+
   it("sends overflow players to waitlist after 18 confirmations", () => {
     expect(pickPresenceStatusForConfirmation(MAX_CONFIRMED_PLAYERS - 1)).toBe(PresenceStatus.CONFIRMED);
     expect(pickPresenceStatusForConfirmation(MAX_CONFIRMED_PLAYERS)).toBe(PresenceStatus.WAITLIST);

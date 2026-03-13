@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/db";
-import { getSupabaseAdminClient, PLAYER_PHOTOS_BUCKET } from "@/lib/supabase-admin";
+import { deletePhoto, storePhoto } from "@/lib/photo-storage";
+import { buildPlayerPhotoPath, validatePlayerPhotoFile } from "@/lib/player-photo";
 
 export const runtime = "nodejs";
-
-const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_SIZE_BYTES = 5 * 1024 * 1024;
-
-function extFromMimeType(mimeType: string) {
-  if (mimeType === "image/jpeg") return "jpg";
-  if (mimeType === "image/png") return "png";
-  if (mimeType === "image/webp") return "webp";
-  return null;
-}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -33,48 +24,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const formData = await request.formData().catch(() => null);
     const fileLike = formData?.get("file");
+    const validationError = validatePlayerPhotoFile(fileLike);
 
-    if (!(fileLike instanceof File)) {
-      return NextResponse.json({ error: "Arquivo invalido." }, { status: 400 });
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    if (!ALLOWED_MIME_TYPES.has(fileLike.type)) {
-      return NextResponse.json({ error: "Formato invalido. Envie JPG, PNG ou WEBP." }, { status: 400 });
-    }
-
-    if (fileLike.size > MAX_SIZE_BYTES) {
-      return NextResponse.json({ error: "Arquivo muito grande. Limite de 5MB." }, { status: 400 });
-    }
-
-    const extension = extFromMimeType(fileLike.type);
-    if (!extension) {
-      return NextResponse.json({ error: "Formato invalido." }, { status: 400 });
-    }
-
-    const path = `players/${player.id}/${Date.now()}.${extension}`;
-    const data = Buffer.from(await fileLike.arrayBuffer());
-    const supabase = getSupabaseAdminClient();
-
-    const upload = await supabase.storage.from(PLAYER_PHOTOS_BUCKET).upload(path, data, {
-      contentType: fileLike.type,
-      upsert: true,
+    const file = fileLike as File;
+    const path = buildPlayerPhotoPath(player.id, file.type);
+    const data = Buffer.from(await file.arrayBuffer());
+    const storedPhoto = await storePhoto({
+      photoPath: path,
+      data,
+      contentType: file.type,
     });
 
-    if (upload.error) {
-      return NextResponse.json({ error: `Falha ao enviar foto: ${upload.error.message}` }, { status: 500 });
-    }
-
     if (player.photoPath && player.photoPath !== path) {
-      await supabase.storage.from(PLAYER_PHOTOS_BUCKET).remove([player.photoPath]);
+      await deletePhoto(player.photoPath);
     }
-
-    const { data: urlData } = supabase.storage.from(PLAYER_PHOTOS_BUCKET).getPublicUrl(path);
 
     const updated = await prisma.player.update({
       where: { id: player.id },
       data: {
-        photoPath: path,
-        photoUrl: urlData.publicUrl,
+        photoPath: storedPhoto.photoPath,
+        photoUrl: storedPhoto.photoUrl,
       },
       select: { id: true, photoPath: true, photoUrl: true },
     });
@@ -104,11 +77,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     }
 
     if (player.photoPath) {
-      const supabase = getSupabaseAdminClient();
-      const remove = await supabase.storage.from(PLAYER_PHOTOS_BUCKET).remove([player.photoPath]);
-      if (remove.error) {
-        return NextResponse.json({ error: `Falha ao remover foto: ${remove.error.message}` }, { status: 500 });
-      }
+      await deletePhoto(player.photoPath);
     }
 
     await prisma.player.update({

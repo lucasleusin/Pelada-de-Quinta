@@ -39,6 +39,15 @@ const whatsAppPhoneSchema = z
   .max(25, "Telefone invalido.")
   .regex(/^[0-9()+\-\s]+$/u, "Telefone invalido.");
 
+const siteOptionalTextSchema = (max: number, message: string) =>
+  z.preprocess(
+    (value) => {
+      if (typeof value !== "string") return value;
+      return value.trim();
+    },
+    z.string().max(max, message),
+  );
+
 export const playerCreateSchema = z.object({
   name: z.string().trim().min(2, "Nome obrigatorio."),
   position: z.nativeEnum(Position),
@@ -164,6 +173,14 @@ export const whatsAppRecipientUpdateSchema = whatsAppRecipientCreateSchema
 
 export const whatsAppTestSchema = z.object({
   recipientId: z.string().uuid(),
+});
+
+export const siteSettingsUpdateSchema = z.object({
+  siteName: z.string().trim().min(1, "Nome do site obrigatorio.").max(80, "Nome do site muito longo."),
+  siteShortName: z.string().trim().min(1, "Nome curto obrigatorio.").max(40, "Nome curto muito longo."),
+  siteDescription: siteOptionalTextSchema(180, "Descricao muito longa."),
+  locationLabel: siteOptionalTextSchema(80, "Localidade muito longa."),
+  headerBadge: siteOptionalTextSchema(40, "Badge muito longo."),
 });
 
 

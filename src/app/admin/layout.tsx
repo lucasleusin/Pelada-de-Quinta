@@ -28,6 +28,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <PageShell>
       <ActionBar className="flex flex-wrap items-center justify-between gap-2 p-3">
         <div className="flex flex-wrap gap-2">
+          <Link href="/admin/site-setup" className={navClass("/admin/site-setup")}>
+            Site Setup
+          </Link>
           <Link href="/admin/whatsapp" className={navClass("/admin/whatsapp")}>
             Whatsapp
           </Link>

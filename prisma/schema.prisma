@@ -160,6 +160,25 @@ model AdminUser {
   @@map("admin_users")
 }
 
+model SiteSettings {
+  id              String   @id @default("default")
+  siteName        String
+  siteShortName   String
+  siteDescription String
+  locationLabel   String
+  headerBadge     String
+  logoUrl         String?
+  logoPath        String?
+  faviconUrl      String?
+  faviconPath     String?
+  shareImageUrl   String?
+  shareImagePath  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
 model WhatsAppSettings {
   id              String             @id @default("default")
   enabled         Boolean            @default(false)

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Bebas_Neue, Barlow_Condensed } from "next/font/google";
+import { useSiteSettings } from "@/components/site-settings-provider";
 import styles from "@/components/player-fifa-card.module.css";
 
 export type PlayerCardPosition = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
@@ -76,6 +77,7 @@ export function PlayerFifaCard({
   totals,
   showDownloadButton = false,
 }: PlayerFifaCardProps) {
+  const siteSettings = useSiteSettings();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -127,7 +129,7 @@ export function PlayerFifaCard({
         </div>
 
         <div className={styles.topBar}>
-          <div className={`${styles.editionBadge} ${bebas.className}`}>PELADA DE QUINTA</div>
+          <div className={`${styles.editionBadge} ${bebas.className}`}>{siteSettings.siteName.toUpperCase()}</div>
           <div className={`${styles.shirtNumberBadge} ${bebas.className}`}>
             #{player.shirtNumberPreference ?? "--"}
           </div>

@@ -27,6 +27,19 @@ const players = [
 ] as const;
 
 async function main() {
+  await prisma.siteSettings.upsert({
+    where: { id: "default" },
+    update: {},
+    create: {
+      id: "default",
+      siteName: "Pelada da Quinta",
+      siteShortName: "CH-RS - Pelada",
+      siteDescription: "Gestao da pelada semanal de Cachoeira do Sul",
+      locationLabel: "Cachoeira do Sul",
+      headerBadge: "Gestao Semanal",
+    },
+  });
+
   const email = process.env.ADMIN_SEED_EMAIL ?? "marcio";
   const password = process.env.ADMIN_SEED_PASSWORD ?? "sop";
   const passwordHash = await hash(password, 10);

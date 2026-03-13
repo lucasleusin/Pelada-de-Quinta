@@ -1272,14 +1272,15 @@ export async function getPlayerReport(playerId: string) {
             _avg: { rating: true },
             _count: { _all: true },
           }),
-          db().matchRating.groupBy({
-            by: ["matchId"],
+          db().matchRating.findMany({
+            select: {
+              matchId: true,
+              rating: true,
+            },
             where: {
               ratedPlayerId: playerId,
               matchId: { in: historyMatchIds },
             },
-            _avg: { rating: true },
-            _count: { _all: true },
           }),
         ])
       : [
@@ -1290,11 +1291,22 @@ export async function getPlayerReport(playerId: string) {
           [],
         ];
   const ratingSummaryByMatchId = new Map(
-    ratingsByMatch.map((rating) => [
-      rating.matchId,
+    Array.from(
+      ratingsByMatch.reduce(
+        (summary, rating) => {
+          const current = summary.get(rating.matchId) ?? { total: 0, count: 0 };
+          current.total += rating.rating;
+          current.count += 1;
+          summary.set(rating.matchId, current);
+          return summary;
+        },
+        new Map<string, { total: number; count: number }>(),
+      ),
+    ).map(([matchId, summary]) => [
+      matchId,
       {
-        averageRating: rating._avg.rating === null ? null : Number(rating._avg.rating.toFixed(2)),
-        ratingsCount: rating._count._all,
+        averageRating: Number((summary.total / summary.count).toFixed(2)),
+        ratingsCount: summary.count,
       },
     ]),
   );

@@ -56,8 +56,16 @@ describe("reports with primary team", () => {
       _avg: { rating: 4.5 },
       _count: { _all: 2 },
     });
+    mocks.prismaMock.matchRating.findMany.mockResolvedValue([
+      { matchId: "match-1", rating: 4 },
+      { matchId: "match-1", rating: 5 },
+    ]);
     mocks.prismaMock.matchParticipant.findMany.mockResolvedValue([
       {
+        matchId: "match-1",
+        goals: 0,
+        assists: 0,
+        goalsConceded: 0,
         primaryTeam: "B",
         teams: ["A", "B"],
         match: {
@@ -152,6 +160,10 @@ describe("reports with primary team", () => {
       _avg: { rating: 3.5 },
       _count: { _all: 2 },
     });
+    mocks.prismaMock.matchRating.findMany.mockResolvedValue([
+      { matchId: "match-1", rating: 4 },
+      { matchId: "match-2", rating: 3 },
+    ]);
 
     const report = await getPlayerReport("player-1");
 

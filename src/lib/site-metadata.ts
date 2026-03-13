@@ -18,17 +18,28 @@ export function buildSiteMetadata(
   appBaseUrl = process.env.APP_BASE_URL?.trim(),
 ): Metadata {
   const shareImages = settings.shareImageUrl ? [settings.shareImageUrl] : undefined;
-  const faviconHref = `/favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`;
+  const fallbackFaviconHref = `/default-favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`;
+  const faviconHref = settings.faviconUrl || fallbackFaviconHref;
 
   return {
     metadataBase: getMetadataBase(appBaseUrl),
     title: settings.siteName,
     description: settings.siteDescription || undefined,
     applicationName: settings.siteName,
+    manifest: "/manifest.webmanifest",
     icons: {
-      icon: faviconHref,
+      icon: [
+        { url: faviconHref },
+        { url: "/pwa/icon-192", sizes: "192x192", type: "image/png" },
+        { url: "/pwa/icon-512", sizes: "512x512", type: "image/png" },
+      ],
       shortcut: faviconHref,
       apple: faviconHref,
+    },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: settings.siteShortName || settings.siteName,
     },
     openGraph: {
       type: "website",

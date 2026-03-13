@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 import { StatusNote } from "@/components/layout/primitives";
+import { hasTeam, type TeamCode, type TeamSplitStats } from "@/lib/team-utils";
 
 type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 
@@ -17,12 +18,18 @@ type MatchSummary = {
 
 type Participant = {
   playerId: string;
-  team: "A" | "B" | null;
+  teams: TeamCode[];
   player: {
     id: string;
     name: string;
     position: Position;
   };
+  teamAGoals: number;
+  teamAAssists: number;
+  teamAGoalsConceded: number;
+  teamBGoals: number;
+  teamBAssists: number;
+  teamBGoalsConceded: number;
   goals: number;
   assists: number;
   goalsConceded: number;
@@ -41,11 +48,7 @@ type MatchDetails = MatchSummary & {
   ratings: MatchRating[];
 };
 
-type StatRow = {
-  goals: number;
-  assists: number;
-  goalsConceded: number;
-};
+type StatRow = TeamSplitStats;
 
 type ScoreState = {
   teamAScore: string;
@@ -96,6 +99,22 @@ function sanitizeTwoDigitInput(value: string) {
   return value.replace(/\D/g, "").slice(0, 2);
 }
 
+function getTeamFieldNames(team: TeamCode) {
+  if (team === "A") {
+    return {
+      goals: "teamAGoals" as const,
+      assists: "teamAAssists" as const,
+      goalsConceded: "teamAGoalsConceded" as const,
+    };
+  }
+
+  return {
+    goals: "teamBGoals" as const,
+    assists: "teamBAssists" as const,
+    goalsConceded: "teamBGoalsConceded" as const,
+  };
+}
+
 function validateGoalsVsScore(
   participants: Participant[],
   stats: Record<string, StatRow>,
@@ -110,18 +129,11 @@ function validateGoalsVsScore(
   let teamBGoalsConceded = 0;
 
   for (const participant of participants) {
-    const goals = stats[participant.playerId]?.goals ?? 0;
-    const goalsConceded = stats[participant.playerId]?.goalsConceded ?? 0;
-
-    if (participant.team === "A") {
-      teamAGoals += goals;
-      teamAGoalsConceded += goalsConceded;
-    }
-
-    if (participant.team === "B") {
-      teamBGoals += goals;
-      teamBGoalsConceded += goalsConceded;
-    }
+    const participantStats = stats[participant.playerId];
+    teamAGoals += participantStats?.teamAGoals ?? 0;
+    teamBGoals += participantStats?.teamBGoals ?? 0;
+    teamAGoalsConceded += participantStats?.teamAGoalsConceded ?? 0;
+    teamBGoalsConceded += participantStats?.teamBGoalsConceded ?? 0;
   }
 
   if (teamAScore === null && teamAGoals > 0) {
@@ -197,9 +209,12 @@ export default function PartidasPassadasPage() {
 
         for (const participant of payload.participants) {
           nextStats[participant.playerId] = {
-            goals: participant.goals,
-            assists: participant.assists,
-            goalsConceded: participant.goalsConceded,
+            teamAGoals: participant.teamAGoals,
+            teamAAssists: participant.teamAAssists,
+            teamAGoalsConceded: participant.teamAGoalsConceded,
+            teamBGoals: participant.teamBGoals,
+            teamBAssists: participant.teamBAssists,
+            teamBGoalsConceded: participant.teamBGoalsConceded,
           };
         }
 
@@ -261,9 +276,12 @@ export default function PartidasPassadasPage() {
       body: JSON.stringify({
         stats: selected.participants.map((participant) => ({
           playerId: participant.playerId,
-          goals: currentStats[participant.playerId]?.goals ?? 0,
-          assists: currentStats[participant.playerId]?.assists ?? 0,
-          goalsConceded: currentStats[participant.playerId]?.goalsConceded ?? 0,
+          teamAGoals: currentStats[participant.playerId]?.teamAGoals ?? 0,
+          teamAAssists: currentStats[participant.playerId]?.teamAAssists ?? 0,
+          teamAGoalsConceded: currentStats[participant.playerId]?.teamAGoalsConceded ?? 0,
+          teamBGoals: currentStats[participant.playerId]?.teamBGoals ?? 0,
+          teamBAssists: currentStats[participant.playerId]?.teamBAssists ?? 0,
+          teamBGoalsConceded: currentStats[participant.playerId]?.teamBGoalsConceded ?? 0,
         })),
       }),
     });
@@ -311,11 +329,11 @@ export default function PartidasPassadasPage() {
   }, [match, score, scoreDirty, stats, statsDirty]);
 
   const teamA = useMemo(
-    () => sortByPositionAndName((match?.participants ?? []).filter((participant) => participant.team === "A")),
+    () => sortByPositionAndName((match?.participants ?? []).filter((participant) => hasTeam(participant.teams, "A"))),
     [match],
   );
   const teamB = useMemo(
-    () => sortByPositionAndName((match?.participants ?? []).filter((participant) => participant.team === "B")),
+    () => sortByPositionAndName((match?.participants ?? []).filter((participant) => hasTeam(participant.teams, "B"))),
     [match],
   );
 
@@ -347,10 +365,9 @@ export default function PartidasPassadasPage() {
     let teamBGoals = 0;
 
     for (const participant of match?.participants ?? []) {
-      const goals = stats[participant.playerId]?.goals ?? 0;
-
-      if (participant.team === "A") teamAGoals += goals;
-      if (participant.team === "B") teamBGoals += goals;
+      const participantStats = stats[participant.playerId];
+      teamAGoals += participantStats?.teamAGoals ?? 0;
+      teamBGoals += participantStats?.teamBGoals ?? 0;
     }
 
     return { teamAGoals, teamBGoals };
@@ -375,36 +392,28 @@ export default function PartidasPassadasPage() {
   function updateStat(playerId: string, field: keyof StatRow, value: string) {
     const sanitized = sanitizeTwoDigitInput(value);
     const parsed = sanitized === "" ? 0 : Number(sanitized);
+    const nextValue = Number.isNaN(parsed) ? 0 : Math.min(99, Math.max(0, Math.trunc(parsed)));
 
     setStats((prev) => ({
       ...prev,
       [playerId]: {
-        goals:
-          field === "goals"
-            ? Number.isNaN(parsed)
-              ? 0
-              : Math.min(99, Math.max(0, Math.trunc(parsed)))
-            : prev[playerId]?.goals ?? 0,
-        assists:
-          field === "assists"
-            ? Number.isNaN(parsed)
-              ? 0
-              : Math.min(99, Math.max(0, Math.trunc(parsed)))
-            : prev[playerId]?.assists ?? 0,
-        goalsConceded:
-          field === "goalsConceded"
-            ? Number.isNaN(parsed)
-              ? 0
-              : Math.min(99, Math.max(0, Math.trunc(parsed)))
-            : prev[playerId]?.goalsConceded ?? 0,
+        teamAGoals: field === "teamAGoals" ? nextValue : prev[playerId]?.teamAGoals ?? 0,
+        teamAAssists: field === "teamAAssists" ? nextValue : prev[playerId]?.teamAAssists ?? 0,
+        teamAGoalsConceded:
+          field === "teamAGoalsConceded" ? nextValue : prev[playerId]?.teamAGoalsConceded ?? 0,
+        teamBGoals: field === "teamBGoals" ? nextValue : prev[playerId]?.teamBGoals ?? 0,
+        teamBAssists: field === "teamBAssists" ? nextValue : prev[playerId]?.teamBAssists ?? 0,
+        teamBGoalsConceded:
+          field === "teamBGoalsConceded" ? nextValue : prev[playerId]?.teamBGoalsConceded ?? 0,
       },
     }));
     setStatsDirty(true);
   }
 
-  function renderTeamGrid(title: string, participants: Participant[]) {
+  function renderTeamGrid(title: string, team: TeamCode, participants: Participant[]) {
     const gridColumnsClass =
       "grid-cols-[minmax(0,1fr)_30px_30px_30px_64px] sm:grid-cols-[minmax(0,1fr)_52px_52px_52px_140px]";
+    const fields = getTeamFieldNames(team);
 
     return (
       <div className="card p-4">
@@ -438,9 +447,9 @@ export default function PartidasPassadasPage() {
                     pattern="[0-9]*"
                     maxLength={2}
                     className="field-input h-8 w-8 justify-self-center px-1 text-center text-xs sm:w-12 sm:text-sm"
-                    value={stats[participant.playerId]?.goals ?? 0}
+                    value={stats[participant.playerId]?.[fields.goals] ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "goals", event.currentTarget.value)
+                      updateStat(participant.playerId, fields.goals, event.currentTarget.value)
                     }
                   />
                   <input
@@ -449,9 +458,9 @@ export default function PartidasPassadasPage() {
                     pattern="[0-9]*"
                     maxLength={2}
                     className="field-input h-8 w-8 justify-self-center px-1 text-center text-xs sm:w-12 sm:text-sm"
-                    value={stats[participant.playerId]?.assists ?? 0}
+                    value={stats[participant.playerId]?.[fields.assists] ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "assists", event.currentTarget.value)
+                      updateStat(participant.playerId, fields.assists, event.currentTarget.value)
                     }
                   />
                   <input
@@ -460,9 +469,9 @@ export default function PartidasPassadasPage() {
                     pattern="[0-9]*"
                     maxLength={2}
                     className="field-input h-8 w-8 justify-self-center px-1 text-center text-xs sm:w-12 sm:text-sm"
-                    value={stats[participant.playerId]?.goalsConceded ?? 0}
+                    value={stats[participant.playerId]?.[fields.goalsConceded] ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "goalsConceded", event.currentTarget.value)
+                      updateStat(participant.playerId, fields.goalsConceded, event.currentTarget.value)
                     }
                   />
                   <span className="justify-self-center text-xs font-semibold text-emerald-900 sm:text-sm">
@@ -551,8 +560,8 @@ export default function PartidasPassadasPage() {
           </div>
 
           <section className="grid gap-4 xl:grid-cols-2">
-            {renderTeamGrid(match.teamAName || "Time A", teamA)}
-            {renderTeamGrid(match.teamBName || "Time B", teamB)}
+            {renderTeamGrid(match.teamAName || "Time A", "A", teamA)}
+            {renderTeamGrid(match.teamBName || "Time B", "B", teamB)}
           </section>
         </>
       ) : null}

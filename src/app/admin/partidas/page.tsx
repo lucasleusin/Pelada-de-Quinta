@@ -1,9 +1,9 @@
 "use client";
 
-import { X } from "lucide-react";
-import { DragEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { formatDatePtBr } from "@/lib/date-format";
+import { getTeamMembershipRank, hasTeam, normalizeTeams, type TeamCode } from "@/lib/team-utils";
 
 type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 
@@ -16,7 +16,7 @@ type Player = {
 type Participant = {
   playerId: string;
   presenceStatus: "CONFIRMED" | "WAITLIST" | "CANCELED";
-  team: "A" | "B" | null;
+  teams: TeamCode[];
   player: Player;
   goals: number;
   assists: number;
@@ -33,8 +33,6 @@ type Match = {
   teamBScore: number | null;
   participants: Participant[];
 };
-
-type TeamColumn = "POOL" | "A" | "B" | "UNCONFIRMED";
 
 type ScoreState = {
   teamAScore: string;
@@ -88,13 +86,14 @@ export default function AdminPartidasPage() {
     [selectedMatch],
   );
 
-  const confirmedWithoutTeam = useMemo(
+  const confirmedPlayers = useMemo(
     () =>
-      sortByName(
-        (selectedMatch?.participants ?? []).filter(
-          (participant) => participant.presenceStatus === "CONFIRMED" && participant.team === null,
+      [...(selectedMatch?.participants ?? []).filter((participant) => participant.presenceStatus === "CONFIRMED")]
+        .sort(
+          (left, right) =>
+            getTeamMembershipRank(left.teams) - getTeamMembershipRank(right.teams) ||
+            left.player.name.localeCompare(right.player.name),
         ),
-      ),
     [selectedMatch],
   );
 
@@ -102,7 +101,7 @@ export default function AdminPartidasPage() {
     () =>
       sortByName(
         (selectedMatch?.participants ?? []).filter(
-          (participant) => participant.presenceStatus === "CONFIRMED" && participant.team === "A",
+          (participant) => participant.presenceStatus === "CONFIRMED" && hasTeam(participant.teams, "A"),
         ),
       ),
     [selectedMatch],
@@ -112,7 +111,7 @@ export default function AdminPartidasPage() {
     () =>
       sortByName(
         (selectedMatch?.participants ?? []).filter(
-          (participant) => participant.presenceStatus === "CONFIRMED" && participant.team === "B",
+          (participant) => participant.presenceStatus === "CONFIRMED" && hasTeam(participant.teams, "B"),
         ),
       ),
     [selectedMatch],
@@ -126,7 +125,7 @@ export default function AdminPartidasPage() {
             return {
         playerId: player.id,
         presenceStatus: "WAITLIST" as const,
-        team: null,
+        teams: [],
         player,
         goals: 0,
         assists: 0,
@@ -244,18 +243,17 @@ export default function AdminPartidasPage() {
     await loadData();
   }
 
-  async function assignTeam(playerId: string, column: TeamColumn) {
+  async function setPlayerTeams(playerId: string, teams: TeamCode[]) {
     if (!selectedMatch) return;
 
-    const targetTeam = column === "POOL" ? null : column;
     const response = await fetch(`/api/admin/matches/${selectedMatch.id}/teams`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ assignments: [{ playerId, team: targetTeam }] }),
+      body: JSON.stringify({ assignments: [{ playerId, teams: normalizeTeams(teams) }] }),
     });
 
     if (!response.ok) {
-      setMessage("Falha ao mover jogador entre colunas.");
+      setMessage("Falha ao atualizar os times do jogador.");
       return;
     }
 
@@ -284,86 +282,71 @@ export default function AdminPartidasPage() {
     await loadData();
   }
 
-  function onPlayerDragStart(event: DragEvent<HTMLDivElement>, playerId: string) {
-    event.dataTransfer.setData("text/plain", playerId);
-    event.dataTransfer.effectAllowed = "move";
-  }
-
-  function onColumnDragOver(event: DragEvent<HTMLElement>) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }
-
-  function onColumnDrop(event: DragEvent<HTMLElement>, column: TeamColumn) {
-    event.preventDefault();
-    const playerId = event.dataTransfer.getData("text/plain");
-    if (!playerId) return;
-
-    assignTeam(playerId, column).catch(() => setMessage("Falha ao mover jogador."));
-  }
-
   function updateScore(field: keyof ScoreState, value: string) {
     setScore((prev) => ({ ...prev, [field]: value }));
     setScoreDirty(true);
     setScoreSaveStatus("idle");
   }
 
-  function renderPlayerCard(participant: Participant, column: TeamColumn) {
-    const mobileActionClass = "rounded-full border px-2 py-1 text-[11px] font-semibold";
+  function toggleTeamAssignment(participant: Participant, team: TeamCode) {
+    const nextTeams = hasTeam(participant.teams, team)
+      ? participant.teams.filter((currentTeam) => currentTeam !== team)
+      : [...participant.teams, team];
+
+    setPlayerTeams(participant.playerId, nextTeams).catch(() => setMessage("Falha ao atualizar os times."));
+  }
+
+  function renderAssignmentButtons(participant: Participant) {
+    const buttonClass =
+      "rounded-full border px-3 py-1 text-xs font-semibold transition sm:text-sm";
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={`${buttonClass} ${
+            hasTeam(participant.teams, "A")
+              ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+              : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+          }`}
+          onClick={() => toggleTeamAssignment(participant, "A")}
+        >
+          {selectedMatch?.teamAName ?? "Time A"}
+        </button>
+        <button
+          type="button"
+          className={`${buttonClass} ${
+            hasTeam(participant.teams, "B")
+              ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+              : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+          }`}
+          onClick={() => toggleTeamAssignment(participant, "B")}
+        >
+          {selectedMatch?.teamBName ?? "Time B"}
+        </button>
+      </div>
+    );
+  }
+
+  function renderAssignmentRow(participant: Participant, showStatusLabel = false) {
     const statusLabel = participant.presenceStatus === "CANCELED" ? "Desconfirmado" : "Pendente";
-    const canRemoveFromTeam = column === "A" || column === "B";
 
     return (
       <div
         key={participant.playerId}
-        draggable
-        onDragStart={(event) => onPlayerDragStart(event, participant.playerId)}
-        className="cursor-move rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm"
+        className="rounded-xl border border-emerald-200 bg-white px-3 py-3 text-sm font-medium text-emerald-950 shadow-sm"
       >
-        <div className="flex items-start justify-between gap-2">
-          <p className="pr-1">{formatPlayerLabel(participant.player)} <span className="text-xs font-medium text-emerald-700">{formatParticipantStats(participant)}</span></p>
-          {canRemoveFromTeam ? (
-            <button
-              type="button"
-              className="rounded-full bg-red-600 p-1 text-white transition hover:bg-red-700"
-              aria-label="Remover do time"
-              onClick={(event) => {
-                event.stopPropagation();
-                assignTeam(participant.playerId, "POOL").catch(() => setMessage("Falha ao mover jogador."));
-              }}
-            >
-              <X size={14} />
-            </button>
-          ) : null}
-        </div>
-        {column === "UNCONFIRMED" ? (
-          <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-emerald-700">{statusLabel}</p>
-        ) : null}
-        <div className="mt-2 flex flex-wrap gap-1 md:hidden">
-          <button
-            type="button"
-            disabled={column === "POOL" || column === "UNCONFIRMED"}
-            className={`${mobileActionClass} ${column === "POOL" || column === "UNCONFIRMED" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
-            onClick={() => assignTeam(participant.playerId, "POOL")}
-          >
-            Sem time
-          </button>
-          <button
-            type="button"
-            disabled={column === "A"}
-            className={`${mobileActionClass} ${column === "A" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
-            onClick={() => assignTeam(participant.playerId, "A")}
-          >
-            {selectedMatch?.teamAName ?? "Time A"}
-          </button>
-          <button
-            type="button"
-            disabled={column === "B"}
-            className={`${mobileActionClass} ${column === "B" ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-emerald-200 bg-white text-emerald-900"}`}
-            onClick={() => assignTeam(participant.playerId, "B")}
-          >
-            {selectedMatch?.teamBName ?? "Time B"}
-          </button>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <p className="pr-1">
+              {formatPlayerLabel(participant.player)}{" "}
+              <span className="text-xs font-medium text-emerald-700">{formatParticipantStats(participant)}</span>
+            </p>
+            {showStatusLabel ? (
+              <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-emerald-700">{statusLabel}</p>
+            ) : null}
+          </div>
+          {renderAssignmentButtons(participant)}
         </div>
       </div>
     );
@@ -455,72 +438,79 @@ export default function AdminPartidasPage() {
 
       {selectedMatch ? (
         <SectionShell className="p-4">
-          <h3 className="text-xl font-semibold text-emerald-950">Definicao dos times (drag and drop)</h3>
+          <h3 className="text-xl font-semibold text-emerald-950">Definicao dos times</h3>
           <p className="mt-1 text-sm text-emerald-800">
-            Arraste jogadores confirmados entre as colunas para montar os times. No celular, use os botoes de mover em cada jogador.
+            Marque Time A e Time B em cada jogador confirmado. O mesmo atleta pode ficar nos dois times ao mesmo tempo.
           </p>
 
-          <div className="mt-4 overflow-x-auto">
-            <div className="grid min-w-[920px] grid-cols-3 gap-4">
-              <section
-                onDragOver={onColumnDragOver}
-                onDrop={(event) => onColumnDrop(event, "POOL")}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
-              >
-                <h4 className="font-semibold text-emerald-950">
-                  Confirmados sem time ({confirmedWithoutTeam.length})
-                </h4>
-                <div className="mt-3 space-y-2">
-                  {confirmedWithoutTeam.length === 0 ? (
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador confirmado sem time.</p>
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+              <h4 className="font-semibold text-emerald-950">
+                Confirmados ({confirmedPlayers.length})
+              </h4>
+              <p className="mt-1 text-xs text-emerald-800">
+                Sem time ficam no topo. Depois a lista organiza por Time A, Time B e A/B.
+              </p>
+              <div className="mt-3 space-y-2">
+                {confirmedPlayers.length === 0 ? (
+                  <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador confirmado.</p>
+                ) : (
+                  confirmedPlayers.map((participant) => renderAssignmentRow(participant))
+                )}
+              </div>
+
+              <div className="mt-4 border-t border-emerald-200 pt-3">
+                <h5 className="font-semibold text-emerald-950">
+                  Nao confirmados ({nonConfirmedPlayers.length})
+                </h5>
+                <p className="mt-1 text-xs text-emerald-800">
+                  Clique em Time A ou Time B para confirmar automaticamente o jogador e inclui-lo no time.
+                </p>
+                <div className="mt-2 space-y-2">
+                  {nonConfirmedPlayers.length === 0 ? (
+                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nao confirmado.</p>
                   ) : (
-                    confirmedWithoutTeam.map((participant) => renderPlayerCard(participant, "POOL"))
+                    nonConfirmedPlayers.map((participant) => renderAssignmentRow(participant, true))
                   )}
                 </div>
+              </div>
+            </section>
 
-                <div className="mt-4 border-t border-emerald-200 pt-3">
-                  <h5 className="font-semibold text-emerald-950">
-                    Nao confirmados ({nonConfirmedPlayers.length})
-                  </h5>
-                  <p className="mt-1 text-xs text-emerald-800">
-                    Arraste para Time A/B para confirmar automaticamente.
-                  </p>
-                  <div className="mt-2 space-y-2">
-                    {nonConfirmedPlayers.length === 0 ? (
-                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nao confirmado.</p>
-                    ) : (
-                      nonConfirmedPlayers.map((participant) => renderPlayerCard(participant, "UNCONFIRMED"))
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <section
-                onDragOver={onColumnDragOver}
-                onDrop={(event) => onColumnDrop(event, "A")}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
-              >
-                <h4 className="font-semibold text-emerald-950">{selectedMatch.teamAName} ({teamAPlayers.length})</h4>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+              <section className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                <h4 className="font-semibold text-slate-950">{selectedMatch.teamAName} ({teamAPlayers.length})</h4>
                 <div className="mt-3 space-y-2">
                   {teamAPlayers.length === 0 ? (
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700">Nenhum jogador neste time.</p>
                   ) : (
-                    teamAPlayers.map((participant) => renderPlayerCard(participant, "A"))
+                    teamAPlayers.map((participant) => (
+                      <div
+                        key={`${participant.playerId}-A`}
+                        className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      >
+                        <p>{formatPlayerLabel(participant.player)}</p>
+                        <p className="text-xs font-medium text-slate-600">{formatParticipantStats(participant)}</p>
+                      </div>
+                    ))
                   )}
                 </div>
               </section>
 
-              <section
-                onDragOver={onColumnDragOver}
-                onDrop={(event) => onColumnDrop(event, "B")}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
-              >
-                <h4 className="font-semibold text-emerald-950">{selectedMatch.teamBName} ({teamBPlayers.length})</h4>
+              <section className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <h4 className="font-semibold text-slate-950">{selectedMatch.teamBName} ({teamBPlayers.length})</h4>
                 <div className="mt-3 space-y-2">
                   {teamBPlayers.length === 0 ? (
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-emerald-800">Nenhum jogador nesta coluna.</p>
+                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700">Nenhum jogador neste time.</p>
                   ) : (
-                    teamBPlayers.map((participant) => renderPlayerCard(participant, "B"))
+                    teamBPlayers.map((participant) => (
+                      <div
+                        key={`${participant.playerId}-B`}
+                        className="rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      >
+                        <p>{formatPlayerLabel(participant.player)}</p>
+                        <p className="text-xs font-medium text-slate-600">{formatParticipantStats(participant)}</p>
+                      </div>
+                    ))
                   )}
                 </div>
               </section>

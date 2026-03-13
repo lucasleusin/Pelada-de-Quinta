@@ -27,9 +27,12 @@ describe("validators", () => {
       stats: [
         {
           playerId: "d44ff307-eb23-40ad-962f-53d69780ceb2",
-          goals: 2,
-          assists: 1,
-          goalsConceded: 0,
+          teamAGoals: 2,
+          teamAAssists: 1,
+          teamAGoalsConceded: 0,
+          teamBGoals: 0,
+          teamBAssists: 0,
+          teamBGoalsConceded: 0,
         },
       ],
     });

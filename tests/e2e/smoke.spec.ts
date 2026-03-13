@@ -8,6 +8,6 @@ test("home, player selection and quick confirmation pages render", async ({ page
   await expect(page.getByText("Quem e voce?")).toBeVisible();
 
   await page.goto("/confirmacao-rapida");
-  await expect(page.getByRole("heading", { name: "Confirmacao rapida" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Confirmação rápida/i })).toBeVisible();
 });
 

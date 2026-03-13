@@ -105,8 +105,14 @@ model MatchParticipant {
   playerId               String
   presenceStatus         PresenceStatus @default(CANCELED)
   confirmedAt            DateTime?
-  team                   Team?
+  teams                  Team[]         @default([])
   playedAsGoalkeeper     Boolean        @default(false)
+  teamAGoals             Int            @default(0)
+  teamAAssists           Int            @default(0)
+  teamAGoalsConceded     Int            @default(0)
+  teamBGoals             Int            @default(0)
+  teamBAssists           Int            @default(0)
+  teamBGoalsConceded     Int            @default(0)
   goals                  Int            @default(0)
   assists                Int            @default(0)
   goalsConceded          Int            @default(0)

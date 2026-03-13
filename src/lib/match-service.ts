@@ -1,4 +1,4 @@
-import { MatchStatus, Position, PresenceStatus, Prisma } from "@prisma/client";
+import { MatchStatus, Position, PresenceStatus, Prisma, Team } from "@prisma/client";
 import { NextResponse } from "next/server";
 import {
   isMatchOnOrBeforeToday,
@@ -18,6 +18,13 @@ import {
   teamsSchema,
 } from "@/lib/validators";
 import { requireAdminApi } from "@/lib/admin";
+import {
+  emptyTeamSplitStats,
+  normalizeTeams,
+  sanitizeTeamSplitStats,
+  sumTeamSplitStats,
+  type TeamSplitStats,
+} from "@/lib/team-utils";
 import { notifyPresenceChange } from "@/lib/whatsapp-service";
 
 const db = () => getPrismaClient();
@@ -60,22 +67,18 @@ function finishedMatchWhereClause(today: Date) {
 }
 
 function sumGoalsByTeam(
-  participants: Array<{ playerId: string; team: "A" | "B" | null; goals: number }>,
-  overrides: Map<string, number>,
+  participants: Array<{ playerId: string; teams: Team[]; teamAGoals: number; teamBGoals: number }>,
+  overrides: Map<string, TeamSplitStats>,
 ) {
   let teamAGoals = 0;
   let teamBGoals = 0;
 
   for (const participant of participants) {
-    const goals = overrides.get(participant.playerId) ?? participant.goals;
+    const nextStats = overrides.get(participant.playerId) ??
+      sanitizeTeamSplitStats(participant, participant.teams);
 
-    if (participant.team === "A") {
-      teamAGoals += goals;
-    }
-
-    if (participant.team === "B") {
-      teamBGoals += goals;
-    }
+    teamAGoals += nextStats.teamAGoals;
+    teamBGoals += nextStats.teamBGoals;
   }
 
   return { teamAGoals, teamBGoals };
@@ -121,7 +124,17 @@ async function applyPresenceStatusChange(
   const [existing, player] = await Promise.all([
     db().matchParticipant.findUnique({
       where: { matchId_playerId: { matchId: match.id, playerId } },
-      select: { presenceStatus: true, confirmedAt: true },
+      select: {
+        presenceStatus: true,
+        confirmedAt: true,
+        teams: true,
+        teamAGoals: true,
+        teamAAssists: true,
+        teamAGoalsConceded: true,
+        teamBGoals: true,
+        teamBAssists: true,
+        teamBGoalsConceded: true,
+      },
     }),
     db().player.findUnique({
       where: { id: playerId },
@@ -137,10 +150,28 @@ async function applyPresenceStatusChange(
         : now
       : null;
 
+  const nextTeams = presenceStatus === PresenceStatus.CONFIRMED ? existing?.teams ?? [] : [];
+  const nextTeamStats = sanitizeTeamSplitStats(existing ?? emptyTeamSplitStats(), nextTeams);
+  const totals = sumTeamSplitStats(nextTeamStats);
+
   const participant = await db().matchParticipant.upsert({
     where: { matchId_playerId: { matchId: match.id, playerId } },
-    update: { presenceStatus, confirmedAt },
-    create: { matchId: match.id, playerId, presenceStatus, confirmedAt },
+    update: {
+      presenceStatus,
+      confirmedAt,
+      teams: { set: nextTeams },
+      ...nextTeamStats,
+      ...totals,
+    },
+    create: {
+      matchId: match.id,
+      playerId,
+      presenceStatus,
+      confirmedAt,
+      teams: nextTeams,
+      ...nextTeamStats,
+      ...totals,
+    },
   });
 
   if (player && existing?.presenceStatus !== presenceStatus) {
@@ -179,7 +210,7 @@ export async function listMatches(request: Request) {
     where.participants = {
       some: {
         playerId,
-        OR: [{ presenceStatus: PresenceStatus.CONFIRMED }, { team: { not: null } }],
+        presenceStatus: PresenceStatus.CONFIRMED,
       },
     };
   }
@@ -225,6 +256,7 @@ export async function getMatchById(id: string) {
     },
     include: {
       participants: {
+        where: { presenceStatus: PresenceStatus.CONFIRMED },
         include: { player: true },
         orderBy: { player: { name: "asc" } },
       },
@@ -367,11 +399,26 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
 
   const existingParticipants = await db().matchParticipant.findMany({
     where: { matchId },
-    select: { playerId: true, team: true, goals: true },
+    select: {
+      playerId: true,
+      teams: true,
+      teamAGoals: true,
+      teamAAssists: true,
+      teamAGoalsConceded: true,
+      teamBGoals: true,
+      teamBAssists: true,
+      teamBGoalsConceded: true,
+    },
   });
 
-  const nextGoalsByPlayer = new Map(parsed.data.stats.map((entry) => [entry.playerId, entry.goals]));
-  const { teamAGoals, teamBGoals } = sumGoalsByTeam(existingParticipants, nextGoalsByPlayer);
+  const existingParticipantByPlayerId = new Map(existingParticipants.map((participant) => [participant.playerId, participant]));
+  const nextTeamStatsByPlayer = new Map(
+    parsed.data.stats.map((entry) => [
+      entry.playerId,
+      sanitizeTeamSplitStats(entry, existingParticipantByPlayerId.get(entry.playerId)?.teams ?? []),
+    ]),
+  );
+  const { teamAGoals, teamBGoals } = sumGoalsByTeam(existingParticipants, nextTeamStatsByPlayer);
   const scoreValidationError = validateScoreAgainstTeamGoals(
     teamAGoals,
     teamBGoals,
@@ -386,13 +433,16 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
   const now = new Date();
 
   await db().$transaction(
-    parsed.data.stats.map((entry) =>
-      db().matchParticipant.upsert({
+    parsed.data.stats.map((entry) => {
+      const existingParticipant = existingParticipantByPlayerId.get(entry.playerId);
+      const teamStats = nextTeamStatsByPlayer.get(entry.playerId) ?? emptyTeamSplitStats();
+      const totals = sumTeamSplitStats(teamStats);
+
+      return db().matchParticipant.upsert({
         where: { matchId_playerId: { matchId, playerId: entry.playerId } },
         update: {
-          goals: entry.goals,
-          assists: entry.assists,
-          goalsConceded: entry.goalsConceded,
+          ...teamStats,
+          ...totals,
           playedAsGoalkeeper: entry.playedAsGoalkeeper ?? false,
           statsUpdatedByPlayerId: parsed.data.createdByPlayerId ?? null,
           statsUpdatedAt: now,
@@ -400,16 +450,16 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
         create: {
           matchId,
           playerId: entry.playerId,
-          goals: entry.goals,
-          assists: entry.assists,
-          goalsConceded: entry.goalsConceded,
+          teams: existingParticipant?.teams ?? [],
+          ...teamStats,
+          ...totals,
           playedAsGoalkeeper: entry.playedAsGoalkeeper ?? false,
           presenceStatus: PresenceStatus.CANCELED,
           statsUpdatedByPlayerId: parsed.data.createdByPlayerId ?? null,
           statsUpdatedAt: now,
         },
-      }),
-    ),
+      });
+    }),
   );
 
   return NextResponse.json({ ok: true, updated: parsed.data.stats.length });
@@ -578,8 +628,9 @@ export async function updateMatchScore(matchId: string, body: unknown, adminMode
     where: { matchId },
     select: {
       playerId: true,
-      team: true,
-      goals: true,
+      teams: true,
+      teamAGoals: true,
+      teamBGoals: true,
     },
   });
 
@@ -625,9 +676,45 @@ export async function updateTeams(matchId: string, body: unknown) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
   }
 
+  const existingParticipants = await db().matchParticipant.findMany({
+    where: {
+      matchId,
+      playerId: { in: parsed.data.assignments.map((assignment) => assignment.playerId) },
+    },
+    select: {
+      playerId: true,
+      presenceStatus: true,
+      confirmedAt: true,
+      teams: true,
+      teamAGoals: true,
+      teamAAssists: true,
+      teamAGoalsConceded: true,
+      teamBGoals: true,
+      teamBAssists: true,
+      teamBGoalsConceded: true,
+    },
+  });
+  const existingParticipantByPlayerId = new Map(existingParticipants.map((participant) => [participant.playerId, participant]));
+  const now = new Date();
+
   await db().$transaction(
-    parsed.data.assignments.map((assignment) =>
-      db().matchParticipant.upsert({
+    parsed.data.assignments.map((assignment) => {
+      const existingParticipant = existingParticipantByPlayerId.get(assignment.playerId);
+      const nextTeams = normalizeTeams(assignment.teams);
+      const nextPresenceStatus =
+        nextTeams.length > 0
+          ? PresenceStatus.CONFIRMED
+          : existingParticipant?.presenceStatus ?? PresenceStatus.CANCELED;
+      const nextConfirmedAt =
+        nextPresenceStatus === PresenceStatus.CONFIRMED
+          ? existingParticipant?.presenceStatus === PresenceStatus.CONFIRMED
+            ? existingParticipant.confirmedAt ?? now
+            : now
+          : null;
+      const nextTeamStats = sanitizeTeamSplitStats(existingParticipant ?? emptyTeamSplitStats(), nextTeams);
+      const totals = sumTeamSplitStats(nextTeamStats);
+
+      return db().matchParticipant.upsert({
         where: {
           matchId_playerId: {
             matchId,
@@ -635,17 +722,23 @@ export async function updateTeams(matchId: string, body: unknown) {
           },
         },
         update: {
-          team: assignment.team,
-          presenceStatus: assignment.team ? PresenceStatus.CONFIRMED : undefined,
+          teams: { set: nextTeams },
+          presenceStatus: nextPresenceStatus,
+          confirmedAt: nextConfirmedAt,
+          ...nextTeamStats,
+          ...totals,
         },
         create: {
           matchId,
           playerId: assignment.playerId,
-          team: assignment.team,
-          presenceStatus: assignment.team ? PresenceStatus.CONFIRMED : PresenceStatus.CANCELED,
+          teams: nextTeams,
+          presenceStatus: nextPresenceStatus,
+          confirmedAt: nextConfirmedAt,
+          ...nextTeamStats,
+          ...totals,
         },
-      }),
-    ),
+      });
+    }),
   );
 
   return NextResponse.json({ ok: true });
@@ -804,13 +897,19 @@ export async function getGeneralStatsOverview() {
   }
 
   const totals = await db().matchParticipant.aggregate({
-    where: { matchId: { in: matchIds } },
+    where: {
+      matchId: { in: matchIds },
+      presenceStatus: PresenceStatus.CONFIRMED,
+    },
     _sum: { goals: true, assists: true },
   });
 
   const grouped = await db().matchParticipant.groupBy({
     by: ["playerId"],
-    where: { matchId: { in: matchIds } },
+    where: {
+      matchId: { in: matchIds },
+      presenceStatus: PresenceStatus.CONFIRMED,
+    },
     _sum: {
       goals: true,
       assists: true,
@@ -821,11 +920,12 @@ export async function getGeneralStatsOverview() {
   const resultParticipants = await db().matchParticipant.findMany({
     where: {
       matchId: { in: matchIds },
-      team: { not: null },
+      presenceStatus: PresenceStatus.CONFIRMED,
+      teams: { isEmpty: false },
     },
     select: {
       playerId: true,
-      team: true,
+      teams: true,
       match: {
         select: {
           teamAScore: true,
@@ -914,24 +1014,25 @@ export async function getGeneralStatsOverview() {
   >();
 
   for (const participant of resultParticipants) {
-    if (!participant.team) continue;
     if (participant.match.teamAScore === null || participant.match.teamBScore === null) continue;
 
-    const ownScore = participant.team === "A" ? participant.match.teamAScore : participant.match.teamBScore;
-    const opponentScore = participant.team === "A" ? participant.match.teamBScore : participant.match.teamAScore;
-    const points = ownScore > opponentScore ? 3 : ownScore === opponentScore ? 1 : 0;
+    for (const team of normalizeTeams(participant.teams)) {
+      const ownScore = team === "A" ? participant.match.teamAScore : participant.match.teamBScore;
+      const opponentScore = team === "A" ? participant.match.teamBScore : participant.match.teamAScore;
+      const points = ownScore > opponentScore ? 3 : ownScore === opponentScore ? 1 : 0;
 
-    const existing = performanceMap.get(participant.playerId) ?? {
-      playerId: participant.playerId,
-      playerName: playerById.get(participant.playerId)?.name ?? "Jogador",
-      points: 0,
-      matchesWithResult: 0,
-      efficiency: 0,
-    };
+      const existing = performanceMap.get(participant.playerId) ?? {
+        playerId: participant.playerId,
+        playerName: playerById.get(participant.playerId)?.name ?? "Jogador",
+        points: 0,
+        matchesWithResult: 0,
+        efficiency: 0,
+      };
 
-    existing.points += points;
-    existing.matchesWithResult += 1;
-    performanceMap.set(participant.playerId, existing);
+      existing.points += points;
+      existing.matchesWithResult += 1;
+      performanceMap.set(participant.playerId, existing);
+    }
   }
 
   const efficiency = Array.from(performanceMap.values())
@@ -991,6 +1092,7 @@ export async function getPlayerReport(playerId: string) {
   const stats = await db().matchParticipant.aggregate({
     where: {
       playerId,
+      presenceStatus: PresenceStatus.CONFIRMED,
       match: finishedMatchWhere,
     },
     _sum: {
@@ -1013,6 +1115,7 @@ export async function getPlayerReport(playerId: string) {
   const history = await db().matchParticipant.findMany({
     where: {
       playerId,
+      presenceStatus: PresenceStatus.CONFIRMED,
       match: finishedMatchWhere,
     },
     include: {
@@ -1031,17 +1134,18 @@ export async function getPlayerReport(playerId: string) {
   let resultMatches = 0;
 
   for (const item of history) {
-    if (!item.team) continue;
     if (item.match.teamAScore === null || item.match.teamBScore === null) continue;
 
-    resultMatches += 1;
+    for (const team of normalizeTeams(item.teams)) {
+      resultMatches += 1;
 
-    const ownScore = item.team === "A" ? item.match.teamAScore : item.match.teamBScore;
-    const opponentScore = item.team === "A" ? item.match.teamBScore : item.match.teamAScore;
+      const ownScore = team === "A" ? item.match.teamAScore : item.match.teamBScore;
+      const opponentScore = team === "A" ? item.match.teamBScore : item.match.teamAScore;
 
-    if (ownScore > opponentScore) wins += 1;
-    else if (ownScore < opponentScore) losses += 1;
-    else draws += 1;
+      if (ownScore > opponentScore) wins += 1;
+      else if (ownScore < opponentScore) losses += 1;
+      else draws += 1;
+    }
   }
 
   const matches = stats._count._all;

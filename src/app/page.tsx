@@ -31,7 +31,7 @@ type PresenceStatus = "CONFIRMED" | "WAITLIST" | "CANCELED";
 type Participant = {
   playerId: string;
   presenceStatus: PresenceStatus;
-  team: "A" | "B" | null;
+  teams: ("A" | "B")[];
   player: Player;
 };
 

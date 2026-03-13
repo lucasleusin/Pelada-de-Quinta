@@ -9,11 +9,18 @@ import {
 } from "@/components/layout/primitives";
 import { StarRating } from "@/components/star-rating";
 import { Button } from "@/components/ui/button";
+import { hasTeam, type TeamCode, type TeamSplitStats } from "@/lib/team-utils";
 
 type Participant = {
   playerId: string;
   player: { id: string; name: string };
-  team: "A" | "B" | null;
+  teams: TeamCode[];
+  teamAGoals: number;
+  teamAAssists: number;
+  teamAGoalsConceded: number;
+  teamBGoals: number;
+  teamBAssists: number;
+  teamBGoalsConceded: number;
   goals: number;
   assists: number;
   goalsConceded: number;
@@ -28,7 +35,7 @@ type MatchPayload = {
 
 export default function PosJogoPage({ params }: { params: { id: string } }) {
   const [match, setMatch] = useState<MatchPayload | null>(null);
-  const [stats, setStats] = useState<Record<string, { goals: number; assists: number; goalsConceded: number }>>({});
+  const [stats, setStats] = useState<Record<string, TeamSplitStats>>({});
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string>("");
 
@@ -37,12 +44,15 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
       .then((res) => res.json())
       .then((data: MatchPayload) => {
         setMatch(data);
-        const initialStats: Record<string, { goals: number; assists: number; goalsConceded: number }> = {};
+        const initialStats: Record<string, TeamSplitStats> = {};
         for (const participant of data.participants) {
           initialStats[participant.playerId] = {
-            goals: participant.goals,
-            assists: participant.assists,
-            goalsConceded: participant.goalsConceded,
+            teamAGoals: participant.teamAGoals,
+            teamAAssists: participant.teamAAssists,
+            teamAGoalsConceded: participant.teamAGoalsConceded,
+            teamBGoals: participant.teamBGoals,
+            teamBAssists: participant.teamBAssists,
+            teamBGoalsConceded: participant.teamBGoalsConceded,
           };
         }
         setStats(initialStats);
@@ -55,15 +65,43 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
     [],
   );
 
-  const participants = match?.participants ?? [];
+  const participants = useMemo(() => match?.participants ?? [], [match]);
+  const statRows = useMemo(
+    () =>
+      participants.flatMap((participant) =>
+        (["A", "B"] as const)
+          .filter((team) => hasTeam(participant.teams, team))
+          .map((team) => ({ participant, team })),
+      ),
+    [participants],
+  );
 
-  function updateStat(playerId: string, field: "goals" | "assists" | "goalsConceded", value: number) {
+  function getTeamFieldNames(team: TeamCode) {
+    if (team === "A") {
+      return {
+        goals: "teamAGoals" as const,
+        assists: "teamAAssists" as const,
+        goalsConceded: "teamAGoalsConceded" as const,
+      };
+    }
+
+    return {
+      goals: "teamBGoals" as const,
+      assists: "teamBAssists" as const,
+      goalsConceded: "teamBGoalsConceded" as const,
+    };
+  }
+
+  function updateStat(playerId: string, field: keyof TeamSplitStats, value: number) {
     setStats((prev) => ({
       ...prev,
       [playerId]: {
-        goals: prev[playerId]?.goals ?? 0,
-        assists: prev[playerId]?.assists ?? 0,
-        goalsConceded: prev[playerId]?.goalsConceded ?? 0,
+        teamAGoals: prev[playerId]?.teamAGoals ?? 0,
+        teamAAssists: prev[playerId]?.teamAAssists ?? 0,
+        teamAGoalsConceded: prev[playerId]?.teamAGoalsConceded ?? 0,
+        teamBGoals: prev[playerId]?.teamBGoals ?? 0,
+        teamBAssists: prev[playerId]?.teamBAssists ?? 0,
+        teamBGoalsConceded: prev[playerId]?.teamBGoalsConceded ?? 0,
         [field]: Number.isNaN(value) ? 0 : Math.max(0, value),
       },
     }));
@@ -76,9 +114,12 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
       createdByPlayerId: currentPlayerId ?? undefined,
       stats: participants.map((participant) => ({
         playerId: participant.playerId,
-        goals: stats[participant.playerId]?.goals ?? 0,
-        assists: stats[participant.playerId]?.assists ?? 0,
-        goalsConceded: stats[participant.playerId]?.goalsConceded ?? 0,
+        teamAGoals: stats[participant.playerId]?.teamAGoals ?? 0,
+        teamAAssists: stats[participant.playerId]?.teamAAssists ?? 0,
+        teamAGoalsConceded: stats[participant.playerId]?.teamAGoalsConceded ?? 0,
+        teamBGoals: stats[participant.playerId]?.teamBGoals ?? 0,
+        teamBAssists: stats[participant.playerId]?.teamBAssists ?? 0,
+        teamBGoalsConceded: stats[participant.playerId]?.teamBGoalsConceded ?? 0,
       })),
     };
 
@@ -151,18 +192,21 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
             </tr>
           </thead>
           <tbody>
-            {participants.map((participant) => (
-              <tr key={participant.playerId} className="border-t border-emerald-100">
+            {statRows.map(({ participant, team }) => {
+              const fields = getTeamFieldNames(team);
+
+              return (
+              <tr key={`${participant.playerId}-${team}`} className="border-t border-emerald-100">
                 <td className="p-2 font-medium">{participant.player.name}</td>
-                <td className="p-2">{participant.team ?? "-"}</td>
+                <td className="p-2">{team}</td>
                 <td className="p-2">
                   <input
                     className="field-input max-w-20"
                     type="number"
                     min={0}
-                    value={stats[participant.playerId]?.goals ?? 0}
+                    value={stats[participant.playerId]?.[fields.goals] ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "goals", Number(event.currentTarget.value))
+                      updateStat(participant.playerId, fields.goals, Number(event.currentTarget.value))
                     }
                   />
                 </td>
@@ -171,9 +215,9 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
                     className="field-input max-w-20"
                     type="number"
                     min={0}
-                    value={stats[participant.playerId]?.assists ?? 0}
+                    value={stats[participant.playerId]?.[fields.assists] ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "assists", Number(event.currentTarget.value))
+                      updateStat(participant.playerId, fields.assists, Number(event.currentTarget.value))
                     }
                   />
                 </td>
@@ -182,14 +226,15 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
                     className="field-input max-w-20"
                     type="number"
                     min={0}
-                    value={stats[participant.playerId]?.goalsConceded ?? 0}
+                    value={stats[participant.playerId]?.[fields.goalsConceded] ?? 0}
                     onChange={(event) =>
-                      updateStat(participant.playerId, "goalsConceded", Number(event.currentTarget.value))
+                      updateStat(participant.playerId, fields.goalsConceded, Number(event.currentTarget.value))
                     }
                   />
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
 

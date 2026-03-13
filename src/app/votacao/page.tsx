@@ -10,6 +10,7 @@ import {
 } from "@/components/layout/primitives";
 import { StarRating } from "@/components/star-rating";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
+import { hasTeam, type TeamCode } from "@/lib/team-utils";
 
 type Player = {
   id: string;
@@ -27,11 +28,17 @@ type MatchSummary = {
 
 type Participant = {
   playerId: string;
-  team: "A" | "B" | null;
+  teams: TeamCode[];
   player: {
     id: string;
     name: string;
   };
+  teamAGoals: number;
+  teamAAssists: number;
+  teamAGoalsConceded: number;
+  teamBGoals: number;
+  teamBAssists: number;
+  teamBGoalsConceded: number;
   goals: number;
   assists: number;
   goalsConceded: number;
@@ -67,6 +74,22 @@ function getVotesFromRatings(ratings: MatchRating[], raterPlayerId: string) {
   }
 
   return map;
+}
+
+function getParticipantTeamStats(participant: Participant, team: TeamCode) {
+  if (team === "A") {
+    return {
+      goals: participant.teamAGoals,
+      assists: participant.teamAAssists,
+      goalsConceded: participant.teamAGoalsConceded,
+    };
+  }
+
+  return {
+    goals: participant.teamBGoals,
+    assists: participant.teamBAssists,
+    goalsConceded: participant.teamBGoalsConceded,
+  };
 }
 
 export default function VotacaoPage() {
@@ -203,7 +226,7 @@ export default function VotacaoPage() {
       sortByName(
         (match?.participants ?? []).filter(
           (participant) =>
-            participant.team === "A" &&
+            hasTeam(participant.teams, "A") &&
             participant.playerId !== selectedRaterId &&
             !alreadyRatedIds.has(participant.playerId),
         ),
@@ -215,7 +238,7 @@ export default function VotacaoPage() {
       sortByName(
         (match?.participants ?? []).filter(
           (participant) =>
-            participant.team === "B" &&
+            hasTeam(participant.teams, "B") &&
             participant.playerId !== selectedRaterId &&
             !alreadyRatedIds.has(participant.playerId),
         ),
@@ -232,7 +255,7 @@ export default function VotacaoPage() {
     setDirtyVoteIds((prev) => (prev.includes(ratedPlayerId) ? prev : [...prev, ratedPlayerId]));
   }
 
-  function renderTeamGrid(title: string, participants: Participant[]) {
+  function renderTeamGrid(title: string, team: TeamCode, participants: Participant[]) {
     const gridColumnsClass =
       "grid-cols-[minmax(0,1fr)_30px_30px_30px_132px] sm:grid-cols-[minmax(0,1fr)_52px_52px_52px_140px]";
 
@@ -254,26 +277,30 @@ export default function VotacaoPage() {
             </div>
 
             <ul className="mt-2 space-y-2">
-              {participants.map((participant) => (
-                <li
-                  key={participant.playerId}
-                  className={`grid ${gridColumnsClass} items-center gap-1 rounded-lg border border-emerald-100 bg-white px-2 py-2 sm:gap-2 sm:px-3`}
-                >
-                  <span className="pr-1 text-xs font-medium leading-tight text-emerald-950 sm:text-sm">
-                    {participant.player.name}
-                  </span>
-                  <span className="text-center text-xs text-emerald-900 sm:text-sm">{participant.goals}</span>
-                  <span className="text-center text-xs text-emerald-900 sm:text-sm">{participant.assists}</span>
-                  <span className="text-center text-xs text-emerald-900 sm:text-sm">{participant.goalsConceded}</span>
-                  <div className="justify-self-center">
-                    <StarRating
-                      size="xs"
-                      value={votes[participant.playerId] ?? 0}
-                      onChange={(value) => updateVote(participant.playerId, value)}
-                    />
-                  </div>
-                </li>
-              ))}
+              {participants.map((participant) => {
+                const teamStats = getParticipantTeamStats(participant, team);
+
+                return (
+                  <li
+                    key={`${participant.playerId}-${team}`}
+                    className={`grid ${gridColumnsClass} items-center gap-1 rounded-lg border border-emerald-100 bg-white px-2 py-2 sm:gap-2 sm:px-3`}
+                  >
+                    <span className="pr-1 text-xs font-medium leading-tight text-emerald-950 sm:text-sm">
+                      {participant.player.name}
+                    </span>
+                    <span className="text-center text-xs text-emerald-900 sm:text-sm">{teamStats.goals}</span>
+                    <span className="text-center text-xs text-emerald-900 sm:text-sm">{teamStats.assists}</span>
+                    <span className="text-center text-xs text-emerald-900 sm:text-sm">{teamStats.goalsConceded}</span>
+                    <div className="justify-self-center">
+                      <StarRating
+                        size="xs"
+                        value={votes[participant.playerId] ?? 0}
+                        onChange={(value) => updateVote(participant.playerId, value)}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
@@ -350,8 +377,8 @@ export default function VotacaoPage() {
       {selectedRaterId && match ? (
         <>
           <section className="grid gap-4 xl:grid-cols-2">
-            {renderTeamGrid(match.teamAName || "Time A", teamA)}
-            {renderTeamGrid(match.teamBName || "Time B", teamB)}
+            {renderTeamGrid(match.teamAName || "Time A", "A", teamA)}
+            {renderTeamGrid(match.teamBName || "Time B", "B", teamB)}
           </section>
           {teamA.length === 0 && teamB.length === 0 ? (
             <SectionShell className="p-4">

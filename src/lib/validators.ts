@@ -107,7 +107,7 @@ export const teamsSchema = z.object({
   assignments: z.array(
     z.object({
       playerId: z.string().uuid(),
-      team: z.nativeEnum(Team).nullable(),
+      teams: z.array(z.nativeEnum(Team)).max(2).transform((teams) => Array.from(new Set(teams))),
     }),
   ),
 });
@@ -117,9 +117,12 @@ export const statsBatchSchema = z.object({
   stats: z.array(
     z.object({
       playerId: z.string().uuid(),
-      goals: z.number().int().min(0).max(99),
-      assists: z.number().int().min(0).max(99),
-      goalsConceded: z.number().int().min(0).max(99),
+      teamAGoals: z.number().int().min(0).max(99),
+      teamAAssists: z.number().int().min(0).max(99),
+      teamAGoalsConceded: z.number().int().min(0).max(99),
+      teamBGoals: z.number().int().min(0).max(99),
+      teamBAssists: z.number().int().min(0).max(99),
+      teamBGoalsConceded: z.number().int().min(0).max(99),
       playedAsGoalkeeper: z.boolean().optional(),
     }),
   ),

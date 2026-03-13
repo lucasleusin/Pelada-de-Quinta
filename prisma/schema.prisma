@@ -106,6 +106,7 @@ model MatchParticipant {
   presenceStatus         PresenceStatus @default(CANCELED)
   confirmedAt            DateTime?
   teams                  Team[]         @default([])
+  primaryTeam            Team?
   playedAsGoalkeeper     Boolean        @default(false)
   teamAGoals             Int            @default(0)
   teamAAssists           Int            @default(0)
@@ -128,6 +129,7 @@ model MatchParticipant {
   @@unique([matchId, playerId])
   @@index([matchId, presenceStatus])
   @@index([matchId, confirmedAt])
+  @@index([matchId, primaryTeam])
   @@index([playerId])
   @@map("match_participants")
 }

@@ -20,7 +20,9 @@ import {
 import { requireAdminApi } from "@/lib/admin";
 import {
   emptyTeamSplitStats,
+  getPrimaryTeam,
   normalizeTeams,
+  resolveNextPrimaryTeam,
   sanitizeTeamSplitStats,
   sumTeamSplitStats,
   type TeamSplitStats,
@@ -109,6 +111,22 @@ function validateScoreAgainstTeamGoals(
   return null;
 }
 
+function getPerformanceForTeam(
+  team: Team | null,
+  score: { teamAScore: number | null; teamBScore: number | null },
+) {
+  if (!team || score.teamAScore === null || score.teamBScore === null) {
+    return null;
+  }
+
+  const ownScore = team === "A" ? score.teamAScore : score.teamBScore;
+  const opponentScore = team === "A" ? score.teamBScore : score.teamAScore;
+  const points = ownScore > opponentScore ? 3 : ownScore === opponentScore ? 1 : 0;
+  const result = ownScore > opponentScore ? "WIN" : ownScore < opponentScore ? "LOSS" : "DRAW";
+
+  return { points, result };
+}
+
 type PresenceTransitionMatch = {
   id: string;
   matchDate: Date;
@@ -128,6 +146,7 @@ async function applyPresenceStatusChange(
         presenceStatus: true,
         confirmedAt: true,
         teams: true,
+        primaryTeam: true,
         teamAGoals: true,
         teamAAssists: true,
         teamAGoalsConceded: true,
@@ -151,6 +170,10 @@ async function applyPresenceStatusChange(
       : null;
 
   const nextTeams = presenceStatus === PresenceStatus.CONFIRMED ? existing?.teams ?? [] : [];
+  const nextPrimaryTeam =
+    presenceStatus === PresenceStatus.CONFIRMED
+      ? getPrimaryTeam(existing?.primaryTeam ?? null, nextTeams)
+      : null;
   const nextTeamStats = sanitizeTeamSplitStats(existing ?? emptyTeamSplitStats(), nextTeams);
   const totals = sumTeamSplitStats(nextTeamStats);
 
@@ -160,6 +183,7 @@ async function applyPresenceStatusChange(
       presenceStatus,
       confirmedAt,
       teams: { set: nextTeams },
+      primaryTeam: nextPrimaryTeam,
       ...nextTeamStats,
       ...totals,
     },
@@ -169,6 +193,7 @@ async function applyPresenceStatusChange(
       presenceStatus,
       confirmedAt,
       teams: nextTeams,
+      primaryTeam: nextPrimaryTeam,
       ...nextTeamStats,
       ...totals,
     },
@@ -408,6 +433,7 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
       teamBGoals: true,
       teamBAssists: true,
       teamBGoalsConceded: true,
+      primaryTeam: true,
     },
   });
 
@@ -437,12 +463,14 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
       const existingParticipant = existingParticipantByPlayerId.get(entry.playerId);
       const teamStats = nextTeamStatsByPlayer.get(entry.playerId) ?? emptyTeamSplitStats();
       const totals = sumTeamSplitStats(teamStats);
+      const nextPrimaryTeam = getPrimaryTeam(existingParticipant?.primaryTeam ?? null, existingParticipant?.teams ?? []);
 
       return db().matchParticipant.upsert({
         where: { matchId_playerId: { matchId, playerId: entry.playerId } },
         update: {
           ...teamStats,
           ...totals,
+          primaryTeam: nextPrimaryTeam,
           playedAsGoalkeeper: entry.playedAsGoalkeeper ?? false,
           statsUpdatedByPlayerId: parsed.data.createdByPlayerId ?? null,
           statsUpdatedAt: now,
@@ -451,6 +479,7 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
           matchId,
           playerId: entry.playerId,
           teams: existingParticipant?.teams ?? [],
+          primaryTeam: nextPrimaryTeam,
           ...teamStats,
           ...totals,
           playedAsGoalkeeper: entry.playedAsGoalkeeper ?? false,
@@ -686,6 +715,7 @@ export async function updateTeams(matchId: string, body: unknown) {
       presenceStatus: true,
       confirmedAt: true,
       teams: true,
+      primaryTeam: true,
       teamAGoals: true,
       teamAAssists: true,
       teamAGoalsConceded: true,
@@ -701,6 +731,12 @@ export async function updateTeams(matchId: string, body: unknown) {
     parsed.data.assignments.map((assignment) => {
       const existingParticipant = existingParticipantByPlayerId.get(assignment.playerId);
       const nextTeams = normalizeTeams(assignment.teams);
+      const nextPrimaryTeam = resolveNextPrimaryTeam(
+        nextTeams,
+        assignment.primaryTeam ?? null,
+        existingParticipant?.primaryTeam ?? null,
+        existingParticipant?.teams ?? [],
+      );
       const nextPresenceStatus =
         nextTeams.length > 0
           ? PresenceStatus.CONFIRMED
@@ -723,6 +759,7 @@ export async function updateTeams(matchId: string, body: unknown) {
         },
         update: {
           teams: { set: nextTeams },
+          primaryTeam: nextPrimaryTeam,
           presenceStatus: nextPresenceStatus,
           confirmedAt: nextConfirmedAt,
           ...nextTeamStats,
@@ -732,6 +769,7 @@ export async function updateTeams(matchId: string, body: unknown) {
           matchId,
           playerId: assignment.playerId,
           teams: nextTeams,
+          primaryTeam: nextPrimaryTeam,
           presenceStatus: nextPresenceStatus,
           confirmedAt: nextConfirmedAt,
           ...nextTeamStats,
@@ -926,6 +964,7 @@ export async function getGeneralStatsOverview() {
     select: {
       playerId: true,
       teams: true,
+      primaryTeam: true,
       match: {
         select: {
           teamAScore: true,
@@ -1014,25 +1053,23 @@ export async function getGeneralStatsOverview() {
   >();
 
   for (const participant of resultParticipants) {
-    if (participant.match.teamAScore === null || participant.match.teamBScore === null) continue;
+    const performance = getPerformanceForTeam(
+      getPrimaryTeam(participant.primaryTeam, participant.teams),
+      participant.match,
+    );
+    if (!performance) continue;
 
-    for (const team of normalizeTeams(participant.teams)) {
-      const ownScore = team === "A" ? participant.match.teamAScore : participant.match.teamBScore;
-      const opponentScore = team === "A" ? participant.match.teamBScore : participant.match.teamAScore;
-      const points = ownScore > opponentScore ? 3 : ownScore === opponentScore ? 1 : 0;
+    const existing = performanceMap.get(participant.playerId) ?? {
+      playerId: participant.playerId,
+      playerName: playerById.get(participant.playerId)?.name ?? "Jogador",
+      points: 0,
+      matchesWithResult: 0,
+      efficiency: 0,
+    };
 
-      const existing = performanceMap.get(participant.playerId) ?? {
-        playerId: participant.playerId,
-        playerName: playerById.get(participant.playerId)?.name ?? "Jogador",
-        points: 0,
-        matchesWithResult: 0,
-        efficiency: 0,
-      };
-
-      existing.points += points;
-      existing.matchesWithResult += 1;
-      performanceMap.set(participant.playerId, existing);
-    }
+    existing.points += performance.points;
+    existing.matchesWithResult += 1;
+    performanceMap.set(participant.playerId, existing);
   }
 
   const efficiency = Array.from(performanceMap.values())
@@ -1134,18 +1171,13 @@ export async function getPlayerReport(playerId: string) {
   let resultMatches = 0;
 
   for (const item of history) {
-    if (item.match.teamAScore === null || item.match.teamBScore === null) continue;
+    const performance = getPerformanceForTeam(getPrimaryTeam(item.primaryTeam, item.teams), item.match);
+    if (!performance) continue;
 
-    for (const team of normalizeTeams(item.teams)) {
-      resultMatches += 1;
-
-      const ownScore = team === "A" ? item.match.teamAScore : item.match.teamBScore;
-      const opponentScore = team === "A" ? item.match.teamBScore : item.match.teamAScore;
-
-      if (ownScore > opponentScore) wins += 1;
-      else if (ownScore < opponentScore) losses += 1;
-      else draws += 1;
-    }
+    resultMatches += 1;
+    if (performance.result === "WIN") wins += 1;
+    else if (performance.result === "LOSS") losses += 1;
+    else draws += 1;
   }
 
   const matches = stats._count._all;

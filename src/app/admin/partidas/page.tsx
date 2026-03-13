@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { formatDatePtBr } from "@/lib/date-format";
-import { getTeamMembershipRank, hasTeam, normalizeTeams, type TeamCode } from "@/lib/team-utils";
+import { getPrimaryTeam, getTeamMembershipRank, hasTeam, normalizeTeams, type TeamCode } from "@/lib/team-utils";
 
 type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 
@@ -17,6 +17,7 @@ type Participant = {
   playerId: string;
   presenceStatus: "CONFIRMED" | "WAITLIST" | "CANCELED";
   teams: TeamCode[];
+  primaryTeam: TeamCode | null;
   player: Player;
   goals: number;
   assists: number;
@@ -139,6 +140,7 @@ export default function AdminPartidasPage() {
         playerId: player.id,
         presenceStatus: "WAITLIST" as const,
         teams: [],
+        primaryTeam: null,
         player,
         goals: 0,
         assists: 0,
@@ -279,7 +281,7 @@ export default function AdminPartidasPage() {
 
     const payload = (await response.json()) as {
       updatedParticipants: Array<
-        Pick<Participant, "playerId" | "presenceStatus" | "teams" | "goals" | "assists" | "goalsConceded">
+        Pick<Participant, "playerId" | "presenceStatus" | "teams" | "primaryTeam" | "goals" | "assists" | "goalsConceded">
       >;
     };
 
@@ -311,6 +313,57 @@ export default function AdminPartidasPage() {
     setMessage("Times atualizados somente para a partida selecionada.");
   }
 
+  async function setPlayerPrimaryTeam(participant: Participant, primaryTeam: TeamCode) {
+    if (!selectedMatch) return;
+    const matchId = selectedMatch.id;
+
+    const response = await fetch(`/api/admin/matches/${matchId}/teams`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        assignments: [{ playerId: participant.playerId, teams: normalizeTeams(participant.teams), primaryTeam }],
+      }),
+    });
+
+    if (!response.ok) {
+      setMessage("Falha ao atualizar o time principal.");
+      return;
+    }
+
+    const payload = (await response.json()) as {
+      updatedParticipants: Array<
+        Pick<Participant, "playerId" | "presenceStatus" | "teams" | "primaryTeam" | "goals" | "assists" | "goalsConceded">
+      >;
+    };
+
+    const updatedParticipant = payload.updatedParticipants.find(
+      (updatedItem) => updatedItem.playerId === participant.playerId,
+    );
+    if (!updatedParticipant) return;
+
+    setMatches((prev) =>
+      prev.map((match) => {
+        if (match.id !== matchId) return match;
+
+        const nextParticipant: Participant = {
+          ...updatedParticipant,
+          player: participant.player,
+        };
+
+        const remainingParticipants = match.participants.filter(
+          (currentParticipant) => currentParticipant.playerId !== participant.playerId,
+        );
+
+        return {
+          ...match,
+          participants: [...remainingParticipants, nextParticipant],
+        };
+      }),
+    );
+
+    setMessage(`Time principal de ${participant.player.name} atualizado nesta partida.`);
+  }
+
   async function setPlayerPresenceStatus(playerId: string, presenceStatus: Participant["presenceStatus"]) {
     if (!selectedMatch) return;
     const matchId = selectedMatch.id;
@@ -328,7 +381,7 @@ export default function AdminPartidasPage() {
 
     const updatedParticipant = (await response.json()) as Pick<
       Participant,
-      "playerId" | "presenceStatus" | "teams" | "goals" | "assists" | "goalsConceded"
+      "playerId" | "presenceStatus" | "teams" | "primaryTeam" | "goals" | "assists" | "goalsConceded"
     >;
 
     setMatches((prev) =>
@@ -463,6 +516,38 @@ export default function AdminPartidasPage() {
           </div>
           {renderAssignmentButtons(participant, allowUnconfirm)}
         </div>
+      </div>
+    );
+  }
+
+  function renderTeamCardEntry(participant: Participant, team: TeamCode) {
+    const primaryTeam = getPrimaryTeam(participant.primaryTeam, participant.teams);
+    const showPrimaryTeamButton = participant.teams.length === 2 && primaryTeam !== null && primaryTeam !== team;
+
+    return (
+      <div
+        key={`${participant.playerId}-${team}`}
+        className={`rounded-lg border bg-white px-3 py-2 text-sm font-medium text-slate-900 ${
+          team === "A" ? "border-blue-100" : "border-red-100"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <p>{formatPlayerLabel(participant.player)}</p>
+          {showPrimaryTeamButton ? (
+            <button
+              type="button"
+              className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-800 transition hover:bg-emerald-100"
+              onClick={() =>
+                setPlayerPrimaryTeam(participant, team).catch(() =>
+                  setMessage("Falha ao atualizar o time principal."),
+                )
+              }
+            >
+              Time Principal
+            </button>
+          ) : null}
+        </div>
+        <p className="text-xs font-medium text-slate-600">{formatParticipantStats(participant)}</p>
       </div>
     );
   }
@@ -629,15 +714,7 @@ export default function AdminPartidasPage() {
                   {teamAPlayers.length === 0 ? (
                     <p className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700">Nenhum jogador neste time.</p>
                   ) : (
-                    teamAPlayers.map((participant) => (
-                      <div
-                        key={`${participant.playerId}-A`}
-                        className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                      >
-                        <p>{formatPlayerLabel(participant.player)}</p>
-                        <p className="text-xs font-medium text-slate-600">{formatParticipantStats(participant)}</p>
-                      </div>
-                    ))
+                    teamAPlayers.map((participant) => renderTeamCardEntry(participant, "A"))
                   )}
                 </div>
               </section>
@@ -648,15 +725,7 @@ export default function AdminPartidasPage() {
                   {teamBPlayers.length === 0 ? (
                     <p className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700">Nenhum jogador neste time.</p>
                   ) : (
-                    teamBPlayers.map((participant) => (
-                      <div
-                        key={`${participant.playerId}-B`}
-                        className="rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                      >
-                        <p>{formatPlayerLabel(participant.player)}</p>
-                        <p className="text-xs font-medium text-slate-600">{formatParticipantStats(participant)}</p>
-                      </div>
-                    ))
+                    teamBPlayers.map((participant) => renderTeamCardEntry(participant, "B"))
                   )}
                 </div>
               </section>

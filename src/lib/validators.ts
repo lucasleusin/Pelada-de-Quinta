@@ -105,10 +105,16 @@ export const participantsPresenceSchema = z.object({
 
 export const teamsSchema = z.object({
   assignments: z.array(
-    z.object({
-      playerId: z.string().uuid(),
-      teams: z.array(z.nativeEnum(Team)).max(2).transform((teams) => Array.from(new Set(teams))),
-    }),
+    z
+      .object({
+        playerId: z.string().uuid(),
+        teams: z.array(z.nativeEnum(Team)).max(2).transform((teams) => Array.from(new Set(teams))),
+        primaryTeam: z.nativeEnum(Team).nullable().optional(),
+      })
+      .refine(
+        (value) => value.primaryTeam == null || value.teams.includes(value.primaryTeam),
+        "Time principal precisa estar entre os times selecionados.",
+      ),
   ),
 });
 

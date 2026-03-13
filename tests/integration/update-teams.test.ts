@@ -50,6 +50,7 @@ describe("updateTeams", () => {
       playerId,
       presenceStatus: PresenceStatus.CONFIRMED,
       teams: ["A"],
+      primaryTeam: "A",
       goals: 0,
       assists: 0,
       goalsConceded: 0,
@@ -70,6 +71,7 @@ describe("updateTeams", () => {
         playerId,
         presenceStatus: PresenceStatus.CONFIRMED,
         teams: ["A"],
+        primaryTeam: "A",
       }),
     ]);
     expect(mocks.prismaMock.matchParticipant.upsert).toHaveBeenCalledWith(
@@ -82,13 +84,62 @@ describe("updateTeams", () => {
         },
         update: expect.objectContaining({
           presenceStatus: PresenceStatus.CONFIRMED,
+          primaryTeam: "A",
           teams: { set: ["A"] },
         }),
         create: expect.objectContaining({
           matchId,
           playerId,
           presenceStatus: PresenceStatus.CONFIRMED,
+          primaryTeam: "A",
           teams: ["A"],
+        }),
+      }),
+    );
+  });
+
+  it("keeps the first assigned team as primary when adding a second team", async () => {
+    mocks.prismaMock.matchParticipant.findMany.mockResolvedValue([
+      {
+        playerId,
+        presenceStatus: PresenceStatus.CONFIRMED,
+        confirmedAt: new Date("2030-03-01T10:00:00.000Z"),
+        teams: ["B"],
+        primaryTeam: null,
+        teamAGoals: 0,
+        teamAAssists: 0,
+        teamAGoalsConceded: 0,
+        teamBGoals: 0,
+        teamBAssists: 0,
+        teamBGoalsConceded: 0,
+      },
+    ]);
+    mocks.prismaMock.matchParticipant.upsert.mockResolvedValue({
+      playerId,
+      presenceStatus: PresenceStatus.CONFIRMED,
+      teams: ["A", "B"],
+      primaryTeam: "B",
+      goals: 0,
+      assists: 0,
+      goalsConceded: 0,
+    });
+
+    const response = await updateTeams(matchId, {
+      assignments: [{ playerId, teams: ["A", "B"] }],
+    });
+    const payload = (await response.json()) as {
+      updatedParticipants: Array<{ playerId: string; primaryTeam: string | null }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(payload.updatedParticipants[0]?.primaryTeam).toBe("B");
+    expect(mocks.prismaMock.matchParticipant.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          primaryTeam: "B",
+        }),
+        create: expect.objectContaining({
+          primaryTeam: "B",
         }),
       }),
     );

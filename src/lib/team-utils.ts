@@ -27,6 +27,40 @@ export function hasTeam(input: readonly (string | null | undefined)[] | null | u
   return normalizeTeams(input).includes(team);
 }
 
+export function getPrimaryTeam(
+  primaryTeam: string | null | undefined,
+  teamsInput: readonly (string | null | undefined)[] | null | undefined,
+) {
+  const teams = normalizeTeams(teamsInput);
+
+  if (primaryTeam === "A" || primaryTeam === "B") {
+    return teams.includes(primaryTeam) ? primaryTeam : null;
+  }
+
+  return teams[0] ?? null;
+}
+
+export function resolveNextPrimaryTeam(
+  teamsInput: readonly (string | null | undefined)[] | null | undefined,
+  nextPrimaryTeam?: string | null,
+  currentPrimaryTeam?: string | null,
+  currentTeamsInput?: readonly (string | null | undefined)[] | null | undefined,
+) {
+  const teams = normalizeTeams(teamsInput);
+  if (teams.length === 0) return null;
+
+  if ((nextPrimaryTeam === "A" || nextPrimaryTeam === "B") && teams.includes(nextPrimaryTeam)) {
+    return nextPrimaryTeam;
+  }
+
+  const currentEffectivePrimaryTeam = getPrimaryTeam(currentPrimaryTeam, currentTeamsInput);
+  if (currentEffectivePrimaryTeam && teams.includes(currentEffectivePrimaryTeam)) {
+    return currentEffectivePrimaryTeam;
+  }
+
+  return teams[0] ?? null;
+}
+
 export function emptyTeamSplitStats(): TeamSplitStats {
   return {
     teamAGoals: 0,

@@ -387,7 +387,7 @@ export default function MeuPerfilPage() {
               <div className="mt-4 rounded-lg bg-emerald-50 p-3">
                 <p className="text-sm font-medium text-emerald-900">Foto do jogador</p>
                 <div className="mt-2 flex flex-wrap items-end gap-2">
-                  <label className="min-w-[240px] flex-1">
+                <label className="min-w-0 flex-1">
                     <span className="field-label">Arquivo</span>
                     <input
                       className="field-input"
@@ -463,6 +463,10 @@ export default function MeuPerfilPage() {
                         <p className="text-sm font-semibold text-emerald-950">
                           {item.averageRating === null ? "Sem Nota" : item.averageRating.toFixed(1)}
                         </p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                          Nro de votos
+                        </p>
+                        <p className="text-sm font-semibold text-emerald-950">{item.ratingsCount}</p>
                       </div>
                     </div>
                   </li>

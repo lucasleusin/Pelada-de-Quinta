@@ -337,7 +337,7 @@ export default function PartidasPassadasPage() {
     [match],
   );
 
-  const averageVoteByPlayerId = useMemo(() => {
+  const voteSummaryByPlayerId = useMemo(() => {
     if (!match) return {};
 
     const grouped = new Map<string, { total: number; count: number }>();
@@ -350,14 +350,17 @@ export default function PartidasPassadasPage() {
       });
     }
 
-    const averages: Record<string, string> = {};
+    const summaries: Record<string, { average: string; count: number }> = {};
 
     for (const [playerId, value] of grouped.entries()) {
       const rounded = Math.round((value.total / value.count) * 10) / 10;
-      averages[playerId] = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+      summaries[playerId] = {
+        average: Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1),
+        count: value.count,
+      };
     }
 
-    return averages;
+    return summaries;
   }, [match]);
 
   const goalsByTeam = useMemo(() => {
@@ -412,7 +415,7 @@ export default function PartidasPassadasPage() {
 
   function renderTeamGrid(title: string, team: TeamCode, participants: Participant[]) {
     const gridColumnsClass =
-      "grid-cols-[minmax(0,1fr)_30px_30px_30px_64px] sm:grid-cols-[minmax(0,1fr)_52px_52px_52px_140px]";
+      "grid-cols-[minmax(0,1fr)_30px_30px_30px_56px_42px] sm:grid-cols-[minmax(0,1fr)_52px_52px_52px_120px_72px]";
     const fields = getTeamFieldNames(team);
 
     return (
@@ -430,6 +433,7 @@ export default function PartidasPassadasPage() {
               <span className="text-center">A</span>
               <span className="text-center">GS</span>
               <span className="text-center">Nota</span>
+              <span className="text-center">#</span>
             </div>
 
             <ul className="mt-2 space-y-2">
@@ -475,7 +479,10 @@ export default function PartidasPassadasPage() {
                     }
                   />
                   <span className="justify-self-center text-xs font-semibold text-emerald-900 sm:text-sm">
-                    {averageVoteByPlayerId[participant.playerId] ?? "-"}
+                    {voteSummaryByPlayerId[participant.playerId]?.average ?? "-"}
+                  </span>
+                  <span className="justify-self-center text-xs font-semibold text-emerald-900 sm:text-sm">
+                    {voteSummaryByPlayerId[participant.playerId]?.count ?? 0}
                   </span>
                 </li>
               ))}

@@ -146,27 +146,33 @@ export default function VotacaoPage() {
     resetSelectedMatchState();
   }
 
-  useEffect(() => {
-    if (!match || !selectedRaterId) {
+  function handleSelectRater(nextRaterId: string) {
+    setSelectedRaterId(nextRaterId);
+
+    if (!match || !nextRaterId) {
       setVotes({});
       setDirtyVoteIds([]);
+      setSaveStatus("idle");
+      setMessage("");
       return;
     }
 
-    const raterIsEligible = match.participants.some((participant) => participant.playerId === selectedRaterId);
+    const raterIsEligible = match.participants.some((participant) => participant.playerId === nextRaterId);
 
     if (!raterIsEligible) {
       setSelectedRaterId("");
       setVotes({});
       setDirtyVoteIds([]);
+      setSaveStatus("idle");
+      setMessage("");
       return;
     }
 
-    setVotes(getVotesFromRatings(match.ratings, selectedRaterId));
+    setVotes(getVotesFromRatings(match.ratings, nextRaterId));
     setDirtyVoteIds([]);
     setSaveStatus("idle");
     setMessage("");
-  }, [match, selectedRaterId]);
+  }
 
   useEffect(() => {
     if (!selectedRaterId || !selectedMatchId) return;
@@ -341,7 +347,7 @@ export default function VotacaoPage() {
                     key={matchItem.id}
                     type="button"
                     onClick={() => handleSelectMatch(matchItem.id)}
-                    className={`min-w-[248px] snap-start rounded-2xl border px-4 py-4 text-left transition md:min-w-0 ${
+                    className={`min-w-[220px] snap-start rounded-2xl border px-4 py-4 text-left transition sm:min-w-[248px] md:min-w-0 ${
                       isActive
                         ? "border-emerald-500 bg-emerald-950 text-white shadow-lg shadow-emerald-950/20"
                         : "border-emerald-200 bg-white text-emerald-950 hover:border-emerald-300 hover:bg-emerald-50"
@@ -368,11 +374,7 @@ export default function VotacaoPage() {
             <select
               className="field-input mt-2"
               value={selectedRaterId}
-              onChange={(event) => {
-                setSelectedRaterId(event.currentTarget.value);
-                setSaveStatus("idle");
-                setMessage("");
-              }}
+              onChange={(event) => handleSelectRater(event.currentTarget.value)}
               disabled={!match}
             >
               <option value="">{match ? "Selecione..." : "Escolha primeiro a partida"}</option>

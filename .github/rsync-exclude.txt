@@ -1,0 +1,11 @@
+.git/
+.github/
+.next/
+backups/
+coverage/
+node_modules/
+storage/
+.env
+.env.*
+deploy/*.env
+tsconfig.tsbuildinfo

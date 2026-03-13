@@ -5,6 +5,7 @@ Aplicacao web para organizar a pelada semanal de quinta-feira em Cachoeira do Su
 ## Stack
 
 - Next.js (App Router + TypeScript)
+- PWA instalavel para iPhone e Android
 - Tailwind CSS
 - Prisma ORM
 - PostgreSQL
@@ -136,11 +137,37 @@ Ele sobe a Pelada em um `docker compose` proprio, sem mexer nas outras aplicacoe
 - `Caddy` compartilhado
 - `PostgreSQL` dedicado
 - storage local persistente para fotos
+- manifesto PWA + service worker no mesmo dominio HTTPS
 
-## Ambiente legado (Vercel + Supabase)
+## PWA
 
-Enquanto o cutover nao acontece, o ambiente atual continua funcionando com o driver `supabase` e com as mesmas variaveis ja usadas no deploy atual.
-Se precisar manter o comportamento antigo, garanta no ambiente:
+O sistema continua funcionando normalmente na web e agora tambem pode ser instalado como app no celular:
+
+- Android: use `Instalar app` no navegador ou `Adicionar a tela inicial`.
+- iPhone: abra no Safari e use `Compartilhar -> Adicionar a Tela de Inicio`.
+
+O PWA usa o mesmo backend, o mesmo banco e o mesmo deploy da VPS. O suporte offline e propositalmente simples:
+
+- telas publicas ja visitadas podem abrir sem conexao;
+- confirmacoes, votos, uploads, placares e admin continuam exigindo internet.
+
+## Deploy pelo GitHub
+
+O repositório tambem tem deploy automatico para a VPS via GitHub Actions:
+
+- `push` na branch `main`
+- execucao manual via `workflow_dispatch`
+- sync do codigo para `/opt/stacks/pelada`
+- rebuild apenas da stack da Pelada
+- `prisma migrate deploy` apos subir o app
+
+O workflow usa o secret `PELADA_VPS_SSH_PRIVATE_KEY`.
+Os detalhes de preparacao da chave e do servidor ficam em [docs/DEPLOYMENT_VPS.md](docs/DEPLOYMENT_VPS.md).
+
+## Compatibilidade com Supabase
+
+O driver `supabase` ainda existe para rollback e migracao de fotos.
+Se precisar manter esse comportamento de forma temporaria, garanta no ambiente:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`

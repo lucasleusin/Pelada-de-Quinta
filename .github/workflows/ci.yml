@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+env:
+  VPS_HOST: 89.167.118.60
+  VPS_USER: deploy
+  VPS_PATH: /opt/stacks/pelada
+  APP_URL: https://pelada.losportsconsulting.com
 
 jobs:
   test-and-build:
@@ -33,3 +40,40 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  deploy-to-vps:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pelada-vps-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.PELADA_VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          cat <<'EOF' >> ~/.ssh/known_hosts
+          89.167.118.60 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJljI/+A4DHFu++rkKFHK+uBnHb/10hyvvGFpZ59gj9X
+          EOF
+
+      - name: Verify remote deploy files
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "${VPS_USER}@${VPS_HOST}" "mkdir -p '${VPS_PATH}' && test -f '${VPS_PATH}/.env.production' && test -f '${VPS_PATH}/deploy/pelada.env'"
+
+      - name: Sync repository to VPS
+        shell: bash
+        run: |
+          rsync -az --delete --exclude-from=.github/rsync-exclude.txt -e "ssh -i ~/.ssh/id_ed25519" ./ "${VPS_USER}@${VPS_HOST}:${VPS_PATH}/"
+
+      - name: Deploy Pelada stack
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "${VPS_USER}@${VPS_HOST}" "cd '${VPS_PATH}' && APP_URL='${APP_URL}' bash scripts/deploy-vps.sh"

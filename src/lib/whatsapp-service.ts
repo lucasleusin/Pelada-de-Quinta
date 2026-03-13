@@ -18,7 +18,7 @@ import {
 
 const DEFAULT_SETTINGS_ID = "default";
 const DEFAULT_LEGACY_TEMPLATE = "Mensagem padrao de snapshot da pelada.";
-const DEFAULT_APP_BASE_URL = "https://pelada-de-quinta.vercel.app";
+const DEFAULT_APP_BASE_URL = "https://pelada.losportsconsulting.com";
 const MIN_VISIBLE_SLOTS = 16;
 const TEST_PREVIEW_START_TIME = "19:00";
 

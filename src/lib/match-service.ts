@@ -54,12 +54,11 @@ function finishedMatchWhereClause(today: Date) {
 
   return {
     status: { not: MatchStatus.ARCHIVED },
+    matchDate: { lt: tomorrow },
     OR: [
-      { matchDate: { lt: today } },
+      { status: MatchStatus.FINISHED },
       {
         AND: [
-          { matchDate: { gte: today } },
-          { matchDate: { lt: tomorrow } },
           { teamAScore: { not: null } },
           { teamBScore: { not: null } },
         ],
@@ -125,6 +124,38 @@ function getPerformanceForTeam(
   const result = ownScore > opponentScore ? "WIN" : ownScore < opponentScore ? "LOSS" : "DRAW";
 
   return { points, result };
+}
+
+function getMatchPlayerKey(matchId: string, playerId: string) {
+  return `${matchId}:${playerId}`;
+}
+
+function buildRatingsByPlayer(
+  ratings: Array<{ matchId: string; ratedPlayerId: string; rating: number }>,
+  validRatedPlayerKeys: Set<string>,
+) {
+  const ratingsByPlayer = new Map<string, { ratingsCount: number; averageRating: number }>();
+  const sumsByPlayer = new Map<string, { total: number; count: number }>();
+
+  for (const rating of ratings) {
+    if (!validRatedPlayerKeys.has(getMatchPlayerKey(rating.matchId, rating.ratedPlayerId))) {
+      continue;
+    }
+
+    const current = sumsByPlayer.get(rating.ratedPlayerId) ?? { total: 0, count: 0 };
+    current.total += rating.rating;
+    current.count += 1;
+    sumsByPlayer.set(rating.ratedPlayerId, current);
+  }
+
+  for (const [playerId, summary] of sumsByPlayer.entries()) {
+    ratingsByPlayer.set(playerId, {
+      ratingsCount: summary.count,
+      averageRating: summary.count > 0 ? Number((summary.total / summary.count).toFixed(2)) : 0,
+    });
+  }
+
+  return ratingsByPlayer;
 }
 
 type PresenceTransitionMatch = {
@@ -236,6 +267,7 @@ export async function listMatches(request: Request) {
       some: {
         playerId,
         presenceStatus: PresenceStatus.CONFIRMED,
+        teams: { isEmpty: false },
       },
     };
   }
@@ -281,7 +313,10 @@ export async function getMatchById(id: string) {
     },
     include: {
       participants: {
-        where: { presenceStatus: PresenceStatus.CONFIRMED },
+        where: {
+          presenceStatus: PresenceStatus.CONFIRMED,
+          teams: { isEmpty: false },
+        },
         include: { player: true },
         orderBy: { player: { name: "asc" } },
       },
@@ -519,6 +554,31 @@ export async function saveRatings(matchId: string, body: unknown) {
     );
   }
 
+  const participantIds = Array.from(
+    new Set(parsed.data.ratings.flatMap((item) => [item.raterPlayerId, item.ratedPlayerId])),
+  );
+  const eligibleParticipants = await db().matchParticipant.findMany({
+    where: {
+      matchId,
+      presenceStatus: PresenceStatus.CONFIRMED,
+      teams: { isEmpty: false },
+      playerId: { in: participantIds },
+    },
+    select: { playerId: true },
+  });
+  const eligiblePlayerIds = new Set(eligibleParticipants.map((participant) => participant.playerId));
+
+  const hasInvalidRatingTarget = parsed.data.ratings.some(
+    (item) => !eligiblePlayerIds.has(item.raterPlayerId) || !eligiblePlayerIds.has(item.ratedPlayerId),
+  );
+
+  if (hasInvalidRatingTarget) {
+    return NextResponse.json(
+      { error: "Avaliacao permitida apenas para jogadores com time definido nesta partida." },
+      { status: 400 },
+    );
+  }
+
   await db().$transaction(
     parsed.data.ratings.map((item) =>
       db().matchRating.upsert({
@@ -544,24 +604,42 @@ export async function saveRatings(matchId: string, body: unknown) {
 }
 
 export async function getRatingsSummary(matchId: string) {
-  const grouped = await db().matchRating.groupBy({
-    by: ["ratedPlayerId"],
-    where: { matchId },
-    _avg: { rating: true },
-    _count: { rating: true },
+  const participants = await db().matchParticipant.findMany({
+    where: {
+      matchId,
+      presenceStatus: PresenceStatus.CONFIRMED,
+      teams: { isEmpty: false },
+    },
+    select: {
+      matchId: true,
+      playerId: true,
+    },
   });
+  const validRatedPlayerKeys = new Set(
+    participants.map((participant) => getMatchPlayerKey(participant.matchId, participant.playerId)),
+  );
+  const ratings = await db().matchRating.findMany({
+    where: { matchId },
+    select: {
+      matchId: true,
+      ratedPlayerId: true,
+      rating: true,
+    },
+  });
+  const ratingsByPlayer = buildRatingsByPlayer(ratings, validRatedPlayerKeys);
+  const ratedPlayerIds = Array.from(ratingsByPlayer.keys());
 
   const players = await db().player.findMany({
-    where: { id: { in: grouped.map((item) => item.ratedPlayerId) } },
+    where: { id: { in: ratedPlayerIds } },
   });
 
   const playerById = new Map(players.map((player) => [player.id, player]));
 
-  return grouped.map((item) => ({
-    ratedPlayerId: item.ratedPlayerId,
-    playerName: playerById.get(item.ratedPlayerId)?.name ?? "Jogador",
-    averageRating: Number(item._avg.rating?.toFixed(2) ?? 0),
-    ratingsCount: item._count.rating,
+  return ratedPlayerIds.map((ratedPlayerId) => ({
+    ratedPlayerId,
+    playerName: playerById.get(ratedPlayerId)?.name ?? "Jogador",
+    averageRating: ratingsByPlayer.get(ratedPlayerId)?.averageRating ?? 0,
+    ratingsCount: ratingsByPlayer.get(ratedPlayerId)?.ratingsCount ?? 0,
   }));
 }
 
@@ -828,46 +906,74 @@ export async function getLeaderboards() {
     };
   }
 
-  const groups = await db().matchParticipant.groupBy({
-    by: ["playerId"],
-    where: { matchId: { in: matchIds } },
-    _sum: {
+  const participants = await db().matchParticipant.findMany({
+    where: {
+      matchId: { in: matchIds },
+      presenceStatus: PresenceStatus.CONFIRMED,
+      teams: { isEmpty: false },
+    },
+    select: {
+      matchId: true,
+      playerId: true,
       goals: true,
       assists: true,
       goalsConceded: true,
     },
   });
-
-  const ratingGroups = await db().matchRating.groupBy({
-    by: ["ratedPlayerId"],
-    where: { matchId: { in: matchIds } },
-    _avg: { rating: true },
-    _count: { rating: true },
-  });
-
-  const players = await db().player.findMany({ where: { id: { in: groups.map((g) => g.playerId) } } });
+  const playerIds = Array.from(new Set(participants.map((participant) => participant.playerId)));
+  const [players, ratings] = await Promise.all([
+    db().player.findMany({ where: { id: { in: playerIds } } }),
+    db().matchRating.findMany({
+      where: { matchId: { in: matchIds } },
+      select: {
+        matchId: true,
+        ratedPlayerId: true,
+        rating: true,
+      },
+    }),
+  ]);
   const playerById = new Map(players.map((player) => [player.id, player]));
-  const ratingsByPlayer = new Map(ratingGroups.map((item) => [item.ratedPlayerId, item]));
+  const validRatedPlayerKeys = new Set(
+    participants.map((participant) => getMatchPlayerKey(participant.matchId, participant.playerId)),
+  );
+  const ratingsByPlayer = buildRatingsByPlayer(ratings, validRatedPlayerKeys);
+  const statsByPlayer = new Map<
+    string,
+    { playerId: string; playerName: string; goals: number; assists: number; goalsConceded: number }
+  >();
 
-  const rows = groups.map((group) => {
-    const rating = ratingsByPlayer.get(group.playerId);
-
-    return {
-      playerId: group.playerId,
-      playerName: playerById.get(group.playerId)?.name ?? "Jogador",
-      goals: group._sum.goals ?? 0,
-      assists: group._sum.assists ?? 0,
-      goalsConceded: group._sum.goalsConceded ?? 0,
-      averageRating: Number(rating?._avg.rating?.toFixed(2) ?? 0),
-      ratingsCount: rating?._count.rating ?? 0,
+  for (const participant of participants) {
+    const existing = statsByPlayer.get(participant.playerId) ?? {
+      playerId: participant.playerId,
+      playerName: playerById.get(participant.playerId)?.name ?? "Jogador",
+      goals: 0,
+      assists: 0,
+      goalsConceded: 0,
     };
-  });
+    existing.goals += participant.goals;
+    existing.assists += participant.assists;
+    existing.goalsConceded += participant.goalsConceded;
+    statsByPlayer.set(participant.playerId, existing);
+  }
+
+  const rows = Array.from(statsByPlayer.values()).map((row) => ({
+    ...row,
+    averageRating: ratingsByPlayer.get(row.playerId)?.averageRating ?? 0,
+    ratingsCount: ratingsByPlayer.get(row.playerId)?.ratingsCount ?? 0,
+  }));
 
   return {
-    topScorers: [...rows].sort((a, b) => b.goals - a.goals),
-    topAssists: [...rows].sort((a, b) => b.assists - a.assists),
-    mostConceded: [...rows].sort((a, b) => b.goalsConceded - a.goalsConceded),
-    mvp: [...rows].sort((a, b) => b.averageRating - a.averageRating),
+    topScorers: [...rows].sort((a, b) => b.goals - a.goals || a.playerName.localeCompare(b.playerName)),
+    topAssists: [...rows].sort((a, b) => b.assists - a.assists || a.playerName.localeCompare(b.playerName)),
+    mostConceded: [...rows].sort(
+      (a, b) => b.goalsConceded - a.goalsConceded || a.playerName.localeCompare(b.playerName),
+    ),
+    mvp: [...rows].sort(
+      (a, b) =>
+        b.averageRating - a.averageRating ||
+        b.ratingsCount - a.ratingsCount ||
+        a.playerName.localeCompare(b.playerName),
+    ),
   };
 }
 
@@ -886,6 +992,7 @@ export async function getAttendanceReport() {
     where: {
       presenceStatus: PresenceStatus.CONFIRMED,
       matchId: { in: eligibleMatchIds },
+      teams: { isEmpty: false },
     },
     _count: { _all: true },
   });
@@ -934,37 +1041,20 @@ export async function getGeneralStatsOverview() {
     };
   }
 
-  const totals = await db().matchParticipant.aggregate({
-    where: {
-      matchId: { in: matchIds },
-      presenceStatus: PresenceStatus.CONFIRMED,
-    },
-    _sum: { goals: true, assists: true },
-  });
-
-  const grouped = await db().matchParticipant.groupBy({
-    by: ["playerId"],
-    where: {
-      matchId: { in: matchIds },
-      presenceStatus: PresenceStatus.CONFIRMED,
-    },
-    _sum: {
-      goals: true,
-      assists: true,
-      goalsConceded: true,
-    },
-  });
-
-  const resultParticipants = await db().matchParticipant.findMany({
+  const playedParticipants = await db().matchParticipant.findMany({
     where: {
       matchId: { in: matchIds },
       presenceStatus: PresenceStatus.CONFIRMED,
       teams: { isEmpty: false },
     },
     select: {
+      matchId: true,
       playerId: true,
       teams: true,
       primaryTeam: true,
+      goals: true,
+      assists: true,
+      goalsConceded: true,
       match: {
         select: {
           teamAScore: true,
@@ -977,32 +1067,70 @@ export async function getGeneralStatsOverview() {
   const players = await db().player.findMany({
     where: {
       id: {
-        in: Array.from(
-          new Set([...grouped.map((item) => item.playerId), ...resultParticipants.map((item) => item.playerId)]),
-        ),
+        in: Array.from(new Set(playedParticipants.map((item) => item.playerId))),
       },
     },
     select: { id: true, name: true, position: true },
   });
 
   const playerById = new Map(players.map((player) => [player.id, player]));
-
-  const rows = grouped.map((item) => ({
-    playerId: item.playerId,
-    playerName: playerById.get(item.playerId)?.name ?? "Jogador",
-    position: playerById.get(item.playerId)?.position ?? Position.OUTRO,
-    goals: item._sum.goals ?? 0,
-    assists: item._sum.assists ?? 0,
-    goalsConceded: item._sum.goalsConceded ?? 0,
-  }));
-
-  const ratingGroups = await db().matchRating.groupBy({
-    by: ["ratedPlayerId"],
+  const ratings = await db().matchRating.findMany({
     where: { matchId: { in: matchIds } },
-    _avg: { rating: true },
-    _count: { rating: true },
+    select: {
+      matchId: true,
+      ratedPlayerId: true,
+      rating: true,
+    },
   });
-  const ratingsByPlayer = new Map(ratingGroups.map((item) => [item.ratedPlayerId, item]));
+  const validRatedPlayerKeys = new Set(
+    playedParticipants.map((participant) => getMatchPlayerKey(participant.matchId, participant.playerId)),
+  );
+  const ratingsByPlayer = buildRatingsByPlayer(ratings, validRatedPlayerKeys);
+  const statsByPlayer = new Map<
+    string,
+    {
+      playerId: string;
+      playerName: string;
+      position: Position;
+      goals: number;
+      assists: number;
+      goalsConceded: number;
+      confirmed: number;
+    }
+  >();
+
+  let totalGoals = 0;
+  let totalAssists = 0;
+
+  for (const participant of playedParticipants) {
+    totalGoals += participant.goals;
+    totalAssists += participant.assists;
+
+    const existing = statsByPlayer.get(participant.playerId) ?? {
+      playerId: participant.playerId,
+      playerName: playerById.get(participant.playerId)?.name ?? "Jogador",
+      position: playerById.get(participant.playerId)?.position ?? Position.OUTRO,
+      goals: 0,
+      assists: 0,
+      goalsConceded: 0,
+      confirmed: 0,
+    };
+    existing.goals += participant.goals;
+    existing.assists += participant.assists;
+    existing.goalsConceded += participant.goalsConceded;
+    existing.confirmed += 1;
+    statsByPlayer.set(participant.playerId, existing);
+  }
+
+  const rows = Array.from(statsByPlayer.values()).map((item) => ({
+    playerId: item.playerId,
+    playerName: item.playerName,
+    position: item.position,
+    goals: item.goals,
+    assists: item.assists,
+    goalsConceded: item.goalsConceded,
+    confirmed: item.confirmed,
+  }));
 
   const rankingRows = rows.map((row) => ({
     playerId: row.playerId,
@@ -1010,29 +1138,18 @@ export async function getGeneralStatsOverview() {
     goals: row.goals,
     assists: row.assists,
     goalsConceded: row.goalsConceded,
-    averageRating: Number(ratingsByPlayer.get(row.playerId)?._avg.rating?.toFixed(2) ?? 0),
-    ratingsCount: ratingsByPlayer.get(row.playerId)?._count.rating ?? 0,
+    averageRating: ratingsByPlayer.get(row.playerId)?.averageRating ?? 0,
+    ratingsCount: ratingsByPlayer.get(row.playerId)?.ratingsCount ?? 0,
   }));
-
-  const confirmedByPlayer = await db().matchParticipant.groupBy({
-    by: ["playerId"],
-    where: {
-      presenceStatus: PresenceStatus.CONFIRMED,
-      matchId: { in: matchIds },
-    },
-    _count: { _all: true },
-  });
-  const confirmedMap = new Map(confirmedByPlayer.map((item) => [item.playerId, item._count._all]));
   const attendance = rows
     .map((row) => {
-      const confirmed = confirmedMap.get(row.playerId) ?? 0;
       const attendancePercentage =
-        totalMatches > 0 ? Number(((confirmed / totalMatches) * 100).toFixed(1)) : 0;
+        totalMatches > 0 ? Number(((row.confirmed / totalMatches) * 100).toFixed(1)) : 0;
 
       return {
         playerId: row.playerId,
         playerName: row.playerName,
-        confirmed,
+        confirmed: row.confirmed,
         eligibleMatches: totalMatches,
         attendancePercentage,
       };
@@ -1052,7 +1169,7 @@ export async function getGeneralStatsOverview() {
     { playerId: string; playerName: string; points: number; matchesWithResult: number; efficiency: number }
   >();
 
-  for (const participant of resultParticipants) {
+  for (const participant of playedParticipants) {
     const performance = getPerformanceForTeam(
       getPrimaryTeam(participant.primaryTeam, participant.teams),
       participant.match,
@@ -1090,8 +1207,8 @@ export async function getGeneralStatsOverview() {
 
   return {
     totalMatches,
-    totalGoals: totals._sum.goals ?? 0,
-    totalAssists: totals._sum.assists ?? 0,
+    totalGoals,
+    totalAssists,
     topScorer: {
       name: topScorer?.playerName ?? "-",
       goals: topScorer?.goals ?? 0,
@@ -1126,33 +1243,11 @@ export async function getPlayerReport(playerId: string) {
     return null;
   }
 
-  const stats = await db().matchParticipant.aggregate({
-    where: {
-      playerId,
-      presenceStatus: PresenceStatus.CONFIRMED,
-      match: finishedMatchWhere,
-    },
-    _sum: {
-      goals: true,
-      assists: true,
-      goalsConceded: true,
-    },
-    _count: { _all: true },
-  });
-
-  const ratings = await db().matchRating.aggregate({
-    where: {
-      ratedPlayerId: playerId,
-      match: finishedMatchWhere,
-    },
-    _avg: { rating: true },
-    _count: { _all: true },
-  });
-
   const history = await db().matchParticipant.findMany({
     where: {
       playerId,
       presenceStatus: PresenceStatus.CONFIRMED,
+      teams: { isEmpty: false },
       match: finishedMatchWhere,
     },
     include: {
@@ -1165,12 +1260,35 @@ export async function getPlayerReport(playerId: string) {
     },
   });
 
+  const historyMatchIds = history.map((item) => item.matchId);
+  const ratings =
+    historyMatchIds.length > 0
+      ? await db().matchRating.aggregate({
+          where: {
+            ratedPlayerId: playerId,
+            matchId: { in: historyMatchIds },
+          },
+          _avg: { rating: true },
+          _count: { _all: true },
+        })
+      : {
+          _avg: { rating: null },
+          _count: { _all: 0 },
+        };
+
   let wins = 0;
   let losses = 0;
   let draws = 0;
   let resultMatches = 0;
+  let goals = 0;
+  let assists = 0;
+  let goalsConceded = 0;
 
   for (const item of history) {
+    goals += item.goals;
+    assists += item.assists;
+    goalsConceded += item.goalsConceded;
+
     const performance = getPerformanceForTeam(getPrimaryTeam(item.primaryTeam, item.teams), item.match);
     if (!performance) continue;
 
@@ -1180,10 +1298,7 @@ export async function getPlayerReport(playerId: string) {
     else draws += 1;
   }
 
-  const matches = stats._count._all;
-  const goals = stats._sum.goals ?? 0;
-  const assists = stats._sum.assists ?? 0;
-  const goalsConceded = stats._sum.goalsConceded ?? 0;
+  const matches = history.length;
   const avgRating = Number(ratings._avg.rating?.toFixed(2) ?? 0);
   const ratingsCount = ratings._count._all;
   const goalsPerMatch = matches > 0 ? Number((goals / matches).toFixed(2)) : 0;

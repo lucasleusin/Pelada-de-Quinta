@@ -10,7 +10,7 @@ import {
 } from "@/components/layout/primitives";
 import { StarRating } from "@/components/star-rating";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
-import { hasTeam, type TeamCode } from "@/lib/team-utils";
+import { getPrimaryTeam, type TeamCode } from "@/lib/team-utils";
 
 type Player = {
   id: string;
@@ -29,6 +29,7 @@ type MatchSummary = {
 type Participant = {
   playerId: string;
   teams: TeamCode[];
+  primaryTeam: TeamCode | null;
   player: {
     id: string;
     name: string;
@@ -226,7 +227,7 @@ export default function VotacaoPage() {
       sortByName(
         (match?.participants ?? []).filter(
           (participant) =>
-            hasTeam(participant.teams, "A") &&
+            getPrimaryTeam(participant.primaryTeam, participant.teams) === "A" &&
             participant.playerId !== selectedRaterId &&
             !alreadyRatedIds.has(participant.playerId),
         ),
@@ -238,7 +239,7 @@ export default function VotacaoPage() {
       sortByName(
         (match?.participants ?? []).filter(
           (participant) =>
-            hasTeam(participant.teams, "B") &&
+            getPrimaryTeam(participant.primaryTeam, participant.teams) === "B" &&
             participant.playerId !== selectedRaterId &&
             !alreadyRatedIds.has(participant.playerId),
         ),

@@ -34,7 +34,9 @@ export function getPrimaryTeam(
   const teams = normalizeTeams(teamsInput);
 
   if (primaryTeam === "A" || primaryTeam === "B") {
-    return teams.includes(primaryTeam) ? primaryTeam : null;
+    if (teams.includes(primaryTeam)) {
+      return primaryTeam;
+    }
   }
 
   return teams[0] ?? null;

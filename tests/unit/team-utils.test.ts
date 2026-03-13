@@ -7,6 +7,11 @@ describe("team utils", () => {
     expect(getPrimaryTeam(null, ["B"])).toBe("B");
   });
 
+  it("falls back to the only assigned team when primaryTeam is stale", () => {
+    expect(getPrimaryTeam("B", ["A"])).toBe("A");
+    expect(getPrimaryTeam("A", ["B"])).toBe("B");
+  });
+
   it("preserves the current effective primary team when adding a second team", () => {
     expect(resolveNextPrimaryTeam(["A", "B"], null, null, ["B"])).toBe("B");
     expect(resolveNextPrimaryTeam(["A", "B"], null, "A", ["A"])).toBe("A");

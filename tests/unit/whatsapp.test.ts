@@ -30,6 +30,7 @@ describe("whatsapp utils", () => {
       matchDate: "2026-03-12",
       startTime: "19:00",
       appBaseUrl: "https://pelada-de-quinta.vercel.app",
+      siteName: "Lo Sports FC",
       confirmedPlayers: [
         { name: "Marcio", position: Position.GOLEIRO },
         { name: "Pedro", position: Position.ZAGUEIRO },
@@ -38,7 +39,7 @@ describe("whatsapp utils", () => {
       ],
     });
 
-    expect(rendered).toContain("PELADA DE QUINTA");
+    expect(rendered).toContain("LO SPORTS FC");
     expect(rendered).toContain("12/03/2026 - 19:00");
     expect(rendered).toContain("1 - Marcio (G)");
     expect(rendered).toContain("4 - Bruno (A)");

@@ -1,0 +1,49 @@
+services:
+  pelada-db:
+    image: postgres:17-alpine
+    container_name: ${PELADA_DB_CONTAINER_NAME:-pelada-db}
+    restart: unless-stopped
+    env_file:
+      - ../.env.production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pelada_db_data:/var/lib/postgresql/data
+    networks:
+      - app
+
+  pelada-app:
+    container_name: ${PELADA_CONTAINER_NAME:-pelada-app}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      pelada-db:
+        condition: service_healthy
+    env_file:
+      - ../.env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    expose:
+      - "3000"
+    volumes:
+      - pelada_storage:/app/storage
+    networks:
+      - proxy
+      - app
+
+volumes:
+  pelada_db_data:
+  pelada_storage:
+
+networks:
+  proxy:
+    external: true
+    name: ${PELADA_PROXY_NETWORK:-caddy_proxy}
+  app:
+    name: ${PELADA_APP_NETWORK:-pelada_internal}

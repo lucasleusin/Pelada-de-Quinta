@@ -16,7 +16,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "votes:reset": "prisma db execute --schema prisma/schema.prisma --file scripts/reset-votes.sql"
+    "votes:reset": "prisma db execute --schema prisma/schema.prisma --file scripts/reset-votes.sql",
+    "photos:rewrite-urls": "tsx scripts/rewrite-photo-urls.ts",
+    "photos:migrate:local": "tsx scripts/migrate-player-photos-to-local.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

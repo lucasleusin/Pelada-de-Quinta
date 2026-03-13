@@ -8,6 +8,8 @@ import {
 } from "@prisma/client";
 import { formatDatePtBr } from "@/lib/date-format";
 import { getPrismaClient } from "@/lib/db";
+import { DEFAULT_SITE_SETTINGS_VALUES } from "@/lib/site-settings-contract";
+import { getSiteSettingsRecord } from "@/lib/site-settings";
 import {
   getWhatsAppEnvStatus,
   normalizePhoneToE164,
@@ -126,6 +128,7 @@ export function buildWhatsAppRosterMessage(input: {
   startTime: string;
   confirmedPlayers: RosterPlayer[];
   appBaseUrl?: string;
+  siteName?: string;
 }) {
   const visibleSlots = Math.max(MIN_VISIBLE_SLOTS, input.confirmedPlayers.length);
   const slotLines = Array.from({ length: visibleSlots }, (_, index) => {
@@ -134,7 +137,7 @@ export function buildWhatsAppRosterMessage(input: {
   });
 
   return [
-    "PELADA DE QUINTA",
+    (input.siteName?.trim() || DEFAULT_SITE_SETTINGS_VALUES.siteName).toUpperCase(),
     `${formatDatePtBr(input.matchDate)} - ${input.startTime}`,
     "",
     ...slotLines,
@@ -265,6 +268,8 @@ async function buildRosterBodyForMatch(matchId: string, prisma: DbClient = db())
     throw new Error("Partida nao encontrada para gerar a mensagem de WhatsApp.");
   }
 
+  const siteSettings = await getSiteSettingsRecord(prisma);
+
   const confirmedPlayers = [...match.participants]
     .sort(compareRosterParticipants)
     .map((participant) => ({
@@ -276,10 +281,12 @@ async function buildRosterBodyForMatch(matchId: string, prisma: DbClient = db())
     matchDate: match.matchDate,
     startTime: match.startTime,
     confirmedPlayers,
+    siteName: siteSettings.siteName,
   });
 }
 
 async function buildTestRosterBody(prisma: DbClient = db()) {
+  const siteSettings = await getSiteSettingsRecord(prisma);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -300,6 +307,7 @@ async function buildTestRosterBody(prisma: DbClient = db()) {
     matchDate: new Date(),
     startTime: TEST_PREVIEW_START_TIME,
     confirmedPlayers: [],
+    siteName: siteSettings.siteName,
   });
 }
 

@@ -1,0 +1,14 @@
+.git
+.github
+.next
+coverage
+backups
+docs
+node_modules
+storage
+tests
+.env
+.env.*
+deploy/*.env
+npm-debug.log*
+tsconfig.tsbuildinfo

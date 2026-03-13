@@ -3,6 +3,7 @@ import {
   playerCreateSchema,
   playerProfileUpdateSchema,
   ratingsBatchSchema,
+  siteSettingsUpdateSchema,
   statsBatchSchema,
 } from "@/lib/validators";
 
@@ -70,5 +71,17 @@ describe("validators", () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  it("accepts valid site settings payload", () => {
+    const parsed = siteSettingsUpdateSchema.safeParse({
+      siteName: "Lo Sports FC",
+      siteShortName: "Lo Sports",
+      siteDescription: "Liga semanal com estatisticas e confirmacao de presenca.",
+      locationLabel: "Porto Alegre",
+      headerBadge: "Temporada 2026",
+    });
+
+    expect(parsed.success).toBe(true);
   });
 });

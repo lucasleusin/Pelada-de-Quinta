@@ -106,40 +106,69 @@ Recomendado mudar via `.env`:
 - `npm run prisma:migrate`
 - `npm run prisma:migrate:deploy`
 - `npm run prisma:seed`
+- `npm run photos:migrate:local`
+- `npm run photos:rewrite-urls`
 
-## Bootstrap Supabase + Vercel
+## Storage de fotos
 
-Como voce ja criou os projetos, agora faltam 3 passos:
+O app agora suporta dois drivers de storage para fotos:
 
-1. Configurar variaveis no Vercel (Project Settings > Environment Variables):
-- `DATABASE_URL`: string do Supabase Pooler (porta `6543`)
-- `DIRECT_URL`: string direta do Supabase (porta `5432`)
-- `AUTH_SECRET`: segredo forte para Auth.js
-- `AUTH_TRUST_HOST`: `true`
-- `ADMIN_SEED_EMAIL` e `ADMIN_SEED_PASSWORD`
-- `ADMIN_LOGIN_USERNAME` e `ADMIN_LOGIN_PASSWORD`
+- `supabase`: preserva o comportamento atual do ambiente legado.
+- `local`: grava em disco e serve os arquivos em `/uploads/...`.
+
+Selecao do driver:
+
+- se `PHOTO_STORAGE_DRIVER` estiver definido, ele vence;
+- se nao estiver definido mas `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` existirem, o app usa `supabase`;
+- caso contrario, o app usa `local`.
+
+Para o driver local:
+
+- `PHOTO_STORAGE_DIR`: pasta onde as fotos serao gravadas;
+- `PHOTO_PUBLIC_BASE_PATH`: rota publica usada para servir as fotos.
+
+## Deploy na VPS
+
+O fluxo novo de self-hosting esta documentado em [docs/DEPLOYMENT_VPS.md](docs/DEPLOYMENT_VPS.md).
+Ele sobe a Pelada em um `docker compose` proprio, sem mexer nas outras aplicacoes da VPS, e usa:
+
+- `Docker Compose`
+- `Caddy` compartilhado
+- `PostgreSQL` dedicado
+- storage local persistente para fotos
+
+## Ambiente legado (Vercel + Supabase)
+
+Enquanto o cutover nao acontece, o ambiente atual continua funcionando com o driver `supabase` e com as mesmas variaveis ja usadas no deploy atual.
+Se precisar manter o comportamento antigo, garanta no ambiente:
+
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-2. Criar tabelas no Supabase:
-- opcao A (recomendada): rodar `npm run prisma:migrate:deploy` com `DATABASE_URL` e `DIRECT_URL` apontando para seu Supabase;
-- opcao B: executar o SQL de [prisma/migrations/20260304130000_init/migration.sql](c:\CODEX\Pelada da Quinta\prisma\migrations\20260304130000_init\migration.sql) no SQL Editor do Supabase.
+## Bootstrap local
 
-3. Popular admin e jogadores iniciais:
+Para criar um ambiente do zero localmente:
+
+1. Ajuste as variaveis em `.env`.
+2. Rode `npm run prisma:migrate`.
+3. Rode `npm run prisma:seed`.
+4. Rode `npm run dev`.
+
+## Migracao de fotos para o driver local
+
+No momento do cutover, com `PHOTO_STORAGE_DRIVER=local`:
+
+1. Baixe as fotos atuais para o storage local:
 
 ```bash
-npm run prisma:seed
+PHOTO_STORAGE_DRIVER=local npm run photos:migrate:local
 ```
 
-Depois disso, o deploy no Vercel ja sobe com banco pronto.
+2. Reescreva `photoUrl` para a rota local:
 
-## Fotos de jogadores (Admin)
-
-Para upload de fotos via Admin/Jogadores:
-
-1. Crie no Supabase Storage o bucket `player-photos`.
-2. Configure o bucket como publico (MVP).
-3. Garanta `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no ambiente.
+```bash
+PHOTO_STORAGE_DRIVER=local npm run photos:rewrite-urls
+```
 
 ## Endpoints principais
 

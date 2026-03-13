@@ -433,7 +433,7 @@ export default function PartidasPassadasPage() {
               <span className="text-center">A</span>
               <span className="text-center">GS</span>
               <span className="text-center">Nota</span>
-              <span className="text-center">#</span>
+              <span className="text-center">Votos</span>
             </div>
 
             <ul className="mt-2 space-y-2">

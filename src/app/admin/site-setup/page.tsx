@@ -237,7 +237,10 @@ export default function AdminSiteSetupPage() {
             <input
               className="field-input"
               value={formState.siteName}
-              onChange={(event) => setFormState((current) => ({ ...current, siteName: event.currentTarget.value }))}
+              onChange={(event) => {
+                const { value } = event.currentTarget;
+                setFormState((current) => ({ ...current, siteName: value }));
+              }}
               required
             />
           </label>
@@ -247,7 +250,10 @@ export default function AdminSiteSetupPage() {
             <input
               className="field-input"
               value={formState.siteShortName}
-              onChange={(event) => setFormState((current) => ({ ...current, siteShortName: event.currentTarget.value }))}
+              onChange={(event) => {
+                const { value } = event.currentTarget;
+                setFormState((current) => ({ ...current, siteShortName: value }));
+              }}
               required
             />
           </label>
@@ -257,7 +263,10 @@ export default function AdminSiteSetupPage() {
             <textarea
               className="field-input min-h-24"
               value={formState.siteDescription}
-              onChange={(event) => setFormState((current) => ({ ...current, siteDescription: event.currentTarget.value }))}
+              onChange={(event) => {
+                const { value } = event.currentTarget;
+                setFormState((current) => ({ ...current, siteDescription: value }));
+              }}
             />
           </label>
 
@@ -266,7 +275,10 @@ export default function AdminSiteSetupPage() {
             <input
               className="field-input"
               value={formState.locationLabel}
-              onChange={(event) => setFormState((current) => ({ ...current, locationLabel: event.currentTarget.value }))}
+              onChange={(event) => {
+                const { value } = event.currentTarget;
+                setFormState((current) => ({ ...current, locationLabel: value }));
+              }}
               placeholder="Cachoeira do Sul"
             />
           </label>
@@ -276,7 +288,10 @@ export default function AdminSiteSetupPage() {
             <input
               className="field-input"
               value={formState.headerBadge}
-              onChange={(event) => setFormState((current) => ({ ...current, headerBadge: event.currentTarget.value }))}
+              onChange={(event) => {
+                const { value } = event.currentTarget;
+                setFormState((current) => ({ ...current, headerBadge: value }));
+              }}
               placeholder="Gestao Semanal"
             />
           </label>
@@ -331,12 +346,13 @@ export default function AdminSiteSetupPage() {
                     className="field-input"
                     type="file"
                     accept={getSiteAssetAccept(asset.kind)}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const nextFile = event.currentTarget.files?.[0] ?? null;
                       setFiles((current) => ({
                         ...current,
-                        [asset.kind]: event.currentTarget.files?.[0] ?? null,
-                      }))
-                    }
+                        [asset.kind]: nextFile,
+                      }));
+                    }}
                   />
                 </label>
 

@@ -18,6 +18,8 @@ type MatchSummary = {
   startTime: string;
   teamAName: string;
   teamBName: string;
+  teamAScore: number | null;
+  teamBScore: number | null;
 };
 
 type Participant = {
@@ -114,6 +116,11 @@ export default function VotacaoPage() {
           .slice(0, 3);
 
         setMatches(latestMatches);
+        setSelectedMatchId((current) =>
+          current && latestMatches.some((matchItem) => matchItem.id === current)
+            ? current
+            : (latestMatches[0]?.id ?? ""),
+        );
       })
       .catch(() => {
         setMatches([]);
@@ -338,7 +345,7 @@ export default function VotacaoPage() {
         <div className="mt-4 space-y-4">
           <div>
             <span className="field-label">Partida</span>
-            <div className="mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:overflow-visible md:pb-0">
+            <div className="mt-2 space-y-2">
               {matches.map((matchItem) => {
                 const isActive = selectedMatchId === matchItem.id;
 
@@ -347,21 +354,15 @@ export default function VotacaoPage() {
                     key={matchItem.id}
                     type="button"
                     onClick={() => handleSelectMatch(matchItem.id)}
-                    className={`min-w-[220px] snap-start rounded-2xl border px-4 py-4 text-left transition sm:min-w-[248px] md:min-w-0 ${
+                    className={`block w-full rounded-2xl border px-4 py-3 text-left transition ${
                       isActive
                         ? "border-emerald-500 bg-emerald-950 text-white shadow-lg shadow-emerald-950/20"
                         : "border-emerald-200 bg-white text-emerald-950 hover:border-emerald-300 hover:bg-emerald-50"
                     }`}
                   >
-                    <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${isActive ? "text-emerald-200" : "text-emerald-700"}`}>
-                      {formatDatePtBr(matchItem.matchDate)}
-                    </p>
-                    <p className="mt-2 text-lg font-semibold">
-                      {matchItem.startTime}
-                      {matchItem.location ? ` - ${matchItem.location}` : ""}
-                    </p>
-                    <p className={`mt-3 text-sm ${isActive ? "text-emerald-100" : "text-emerald-800"}`}>
-                      {matchItem.teamAName || "Time A"} x {matchItem.teamBName || "Time B"}
+                    <p className={`text-base font-semibold sm:text-lg ${isActive ? "text-white" : "text-emerald-950"}`}>
+                      {formatDatePtBr(matchItem.matchDate)} - {matchItem.teamAName || "Time A"} {matchItem.teamAScore ?? "-"} x{" "}
+                      {matchItem.teamBScore ?? "-"} {matchItem.teamBName || "Time B"}
                     </p>
                   </button>
                 );

@@ -181,7 +181,7 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
       </HeroBlock>
 
       <SectionShell className="overflow-x-auto p-4">
-        <table className="min-w-full text-sm">
+        <table className="min-w-[36rem] text-sm">
           <thead>
             <tr className="text-left text-emerald-900">
               <th className="p-2">Jogador</th>
@@ -238,7 +238,7 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
           </tbody>
         </table>
 
-        <Button className="mt-4 rounded-full" onClick={saveStats}>
+        <Button className="mt-4 w-full rounded-full sm:w-auto" onClick={saveStats}>
           Salvar estatisticas
         </Button>
       </SectionShell>
@@ -267,7 +267,7 @@ export default function PosJogoPage({ params }: { params: { id: string } }) {
             ))}
         </div>
 
-        <Button className="mt-4 rounded-full" variant="outline" onClick={saveRatings}>
+        <Button className="mt-4 w-full rounded-full sm:w-auto" variant="outline" onClick={saveRatings}>
           Salvar avaliacoes
         </Button>
       </SectionShell>

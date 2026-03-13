@@ -1,4 +1,7 @@
+import type { Viewport } from "next";
 import { Rajdhani, Work_Sans } from "next/font/google";
+import { PublicMobileNav } from "@/components/public-mobile-nav";
+import { PwaRegistration } from "@/components/pwa-registration";
 import { SiteSettingsProvider } from "@/components/site-settings-provider";
 import { SiteHeader } from "@/components/site-header";
 import { buildSiteMetadata } from "@/lib/site-metadata";
@@ -19,6 +22,13 @@ const body = Work_Sans({
 
 export const dynamic = "force-dynamic";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0e6b3d",
+};
+
 export async function generateMetadata() {
   const siteSettings = await getCachedSiteSettings();
   return buildSiteMetadata(siteSettings);
@@ -34,10 +44,14 @@ export default async function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${heading.variable} ${body.variable} bg-canvas text-ink antialiased`}>
+        <PwaRegistration />
         <SiteSettingsProvider initialSettings={siteSettings}>
           <div className="app-bg min-h-screen">
             <SiteHeader />
-            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-5 lg:px-8">{children}</main>
+            <main className="mobile-main-shell mx-auto w-full max-w-7xl px-4 py-6 sm:px-5 lg:px-8">
+              {children}
+            </main>
+            <PublicMobileNav />
           </div>
         </SiteSettingsProvider>
       </body>

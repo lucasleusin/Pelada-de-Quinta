@@ -37,10 +37,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <PageShell>
-      <ActionBar className="flex flex-wrap items-center justify-between gap-2 border-emerald-300/80 bg-emerald-200/70 p-3">
-        <div className="flex flex-wrap gap-2">
+      <ActionBar className="flex flex-col gap-3 border-emerald-300/80 bg-emerald-200/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
           {adminLinks.map((link) => (
-            <Link key={link.href} href={link.href} className={navClass(link.href)}>
+            <Link key={link.href} href={link.href} className={cn(navClass(link.href), "shrink-0")}>
               {link.label}
             </Link>
           ))}

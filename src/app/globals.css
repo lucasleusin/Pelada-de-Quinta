@@ -189,6 +189,22 @@ h4 {
     var(--surface-0);
 }
 
+.header-safe-zone {
+  padding-top: env(safe-area-inset-top);
+}
+
+.mobile-main-shell {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+
+.mobile-bottom-nav {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+}
+
+.sticky-app-offset {
+  top: calc(5rem + env(safe-area-inset-top));
+}
+
 .card {
   border: 1px solid color-mix(in srgb, var(--brand-green) 22%, #ffffff);
   border-radius: 20px;
@@ -403,6 +419,20 @@ h4 {
   .section-shell,
   .card {
     border-radius: 16px;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-main-shell {
+    padding-bottom: 1.5rem;
+  }
+
+  .mobile-bottom-nav {
+    padding-bottom: 0;
+  }
+
+  .sticky-app-offset {
+    top: 6rem;
   }
 }
 

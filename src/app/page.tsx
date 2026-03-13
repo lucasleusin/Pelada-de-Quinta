@@ -399,7 +399,7 @@ export default function HomePage() {
           </>
         ) : (
           <>
-            <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-2 md:hidden">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:hidden">
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Próxima Partida</p>
@@ -508,8 +508,8 @@ export default function HomePage() {
           <p className="text-sm text-emerald-900">{quickSelectedPresenceStatus === "CONFIRMED" ? "Você já está confirmado." : quickSelectedPresenceStatus === "CANCELED" ? "Você está desconfirmado." : "Escolha o jogador e confirme com um toque."}</p>
         </div>
 
-        <div className="flex items-end gap-2">
-          <label className="w-[60%] min-w-[144px] sm:min-w-[240px] sm:max-w-md sm:flex-1">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end">
+          <label className="w-full min-w-0 sm:w-[60%] sm:min-w-[240px] sm:max-w-md sm:flex-1">
             <span className="field-label">Jogador</span>
             <select
               className="field-input"
@@ -539,7 +539,7 @@ export default function HomePage() {
                 <span className="hidden sm:inline">Desconfirmar</span>
               </Button>
             ) : (
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                 <Button
                   type="button"
                   className="h-10 w-10 shrink-0 rounded-full bg-emerald-600 p-0 text-white hover:bg-emerald-700 sm:w-auto sm:px-4"
@@ -593,7 +593,7 @@ export default function HomePage() {
       ) : null}
 
       {selectedMatch ? (
-        <ActionBar className="sticky top-24 z-10 p-1.5 sm:p-2">
+        <ActionBar className="sticky sticky-app-offset z-10 p-1.5 sm:p-2">
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"

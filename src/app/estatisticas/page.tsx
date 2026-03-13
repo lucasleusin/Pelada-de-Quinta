@@ -150,9 +150,9 @@ function RankingCard<T extends { playerId: string; playerName: string }>({
           <li className="empty-state text-sm">Sem dados.</li>
         ) : (
           rows.map((row) => (
-            <li key={row.playerId} className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2">
+            <li key={row.playerId} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2">
               <span className="truncate">{row.playerName}</span>
-              <span className="font-semibold">{metric(row)}</span>
+              <span className="shrink-0 font-semibold">{metric(row)}</span>
             </li>
           ))
         )}

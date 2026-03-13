@@ -522,7 +522,8 @@ export default function AdminPartidasPage() {
 
   function renderTeamCardEntry(participant: Participant, team: TeamCode) {
     const primaryTeam = getPrimaryTeam(participant.primaryTeam, participant.teams);
-    const showPrimaryTeamButton = participant.teams.length === 2 && primaryTeam !== null && primaryTeam !== team;
+    const isDualTeamPlayer = participant.teams.length === 2 && primaryTeam !== null;
+    const isPrimaryTeam = primaryTeam === team;
 
     return (
       <div
@@ -532,8 +533,19 @@ export default function AdminPartidasPage() {
         }`}
       >
         <div className="flex items-center justify-between gap-3">
-          <p>{formatPlayerLabel(participant.player)}</p>
-          {showPrimaryTeamButton ? (
+          <div className="min-w-0">
+            <p>{formatPlayerLabel(participant.player)}</p>
+            {isDualTeamPlayer && isPrimaryTeam ? (
+              <p
+                className={`mt-1 text-[10px] italic font-medium ${
+                  team === "A" ? "text-blue-700" : "text-red-700"
+                }`}
+              >
+                Considerado o time principal
+              </p>
+            ) : null}
+          </div>
+          {isDualTeamPlayer && !isPrimaryTeam ? (
             <button
               type="button"
               className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-800 transition hover:bg-emerald-100"
@@ -543,7 +555,7 @@ export default function AdminPartidasPage() {
                 )
               }
             >
-              Time Principal
+              Definir este time como principal
             </button>
           ) : null}
         </div>

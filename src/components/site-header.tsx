@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { PwaInstallMenu } from "@/components/pwa-install-menu";
 import { useSiteSettings } from "@/components/site-settings-provider";
@@ -60,22 +59,6 @@ export function SiteHeader() {
               <p className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700 md:block">
                 {siteSettings.headerBadge}
               </p>
-            ) : null}
-
-            {!isAdminPath ? (
-              <Link
-                href="/admin"
-                className={cn(
-                  buttonVariants({
-                    variant: pathname === "/admin" || pathname.startsWith("/admin/") ? "default" : "outline",
-                    size: "sm",
-                  }),
-                  "hidden rounded-full bg-white md:inline-flex",
-                )}
-              >
-                <LayoutDashboard className="size-4" />
-                Admin
-              </Link>
             ) : null}
 
             <div className="md:hidden">

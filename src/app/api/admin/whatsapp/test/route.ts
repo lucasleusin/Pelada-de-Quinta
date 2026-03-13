@@ -17,6 +17,16 @@ export async function POST(request: Request) {
   try {
     const notification = await sendWhatsAppTest(parsed.data.recipientId);
 
+    if (notification.status === "FAILED" || notification.status === "SKIPPED") {
+      return NextResponse.json(
+        {
+          error: notification.errorMessage ?? "Falha ao enviar teste.",
+          notification,
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json(notification);
   } catch (error) {
     if (error instanceof Error) {

@@ -113,7 +113,7 @@ describe("admin whatsapp api", () => {
   });
 
   it("sends a manual test without event type", async () => {
-    mocks.sendWhatsAppTest.mockResolvedValue({ id: "log-1" });
+    mocks.sendWhatsAppTest.mockResolvedValue({ id: "log-1", status: "SENT", errorMessage: null });
 
     const response = await postTest(
       new Request("http://localhost/api/admin/whatsapp/test", {
@@ -125,5 +125,28 @@ describe("admin whatsapp api", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.sendWhatsAppTest).toHaveBeenCalledWith("7f21ab95-ef41-4fc4-b073-9de6488020a8");
+  });
+
+  it("returns the enriched Twilio error when a manual test fails", async () => {
+    mocks.sendWhatsAppTest.mockResolvedValue({
+      id: "log-1",
+      status: "FAILED",
+      errorMessage:
+        "Twilio 63007: o canal WhatsApp configurado em TWILIO_WHATSAPP_FROM (whatsapp:+14155238886) nao foi encontrado para esta conta.",
+    });
+
+    const response = await postTest(
+      new Request("http://localhost/api/admin/whatsapp/test", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ recipientId: "7f21ab95-ef41-4fc4-b073-9de6488020a8" }),
+      }),
+    );
+
+    const payload = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toContain("Twilio 63007");
+    expect(payload.error).toContain("TWILIO_WHATSAPP_FROM");
   });
 });

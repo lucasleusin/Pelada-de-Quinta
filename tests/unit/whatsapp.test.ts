@@ -1,9 +1,22 @@
 import { Position } from "@prisma/client";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildWhatsAppRosterMessage } from "@/lib/whatsapp-service";
-import { normalizePhoneToE164 } from "@/lib/whatsapp";
+import { normalizePhoneToE164, sendTwilioWhatsAppMessage } from "@/lib/whatsapp";
+
+const originalEnv = { ...process.env };
 
 describe("whatsapp utils", () => {
+  beforeEach(() => {
+    process.env.TWILIO_ACCOUNT_SID = "ACtest";
+    process.env.TWILIO_AUTH_TOKEN = "test-token";
+    process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886";
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.env = { ...originalEnv };
+  });
+
   it("normalizes brazil phone numbers to E.164", () => {
     expect(normalizePhoneToE164("(51) 99999-9999")).toBe("+5551999999999");
   });
@@ -69,5 +82,28 @@ describe("whatsapp utils", () => {
     expect(rendered).toContain("17 - P17 (M)");
     expect(rendered).toContain("18 - P18 (M)");
     expect(rendered).not.toContain("19 -");
+  });
+
+  it("maps Twilio 63007 to an actionable sandbox error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: vi.fn().mockResolvedValue({
+          code: 63007,
+          message: "Twilio could not find a Channel with the specified From address",
+        }),
+      }),
+    );
+
+    const result = await sendTwilioWhatsAppMessage({
+      toE164: "+5551999999999",
+      body: "Teste",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorMessage).toContain("Twilio 63007");
+    expect(result.errorMessage).toContain("TWILIO_WHATSAPP_FROM");
+    expect(result.errorMessage).toContain("WhatsApp Sandbox");
   });
 });

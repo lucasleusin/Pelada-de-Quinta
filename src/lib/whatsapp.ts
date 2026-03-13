@@ -88,6 +88,29 @@ function getTwilioConfig() {
   };
 }
 
+function getTwilioErrorMessage(payload: unknown, from: string) {
+  const fallbackMessage =
+    typeof payload === "object" && payload !== null && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : "Falha ao enviar mensagem via Twilio.";
+
+  const code =
+    typeof payload === "object" && payload !== null && "code" in payload && typeof payload.code === "number"
+      ? payload.code
+      : null;
+
+  if (code === 63007) {
+    return [
+      `Twilio 63007: o canal WhatsApp configurado em TWILIO_WHATSAPP_FROM (${from}) nao foi encontrado para esta conta.`,
+      "Verifique se o WhatsApp Sandbox esta ativado na mesma conta/subconta do TWILIO_ACCOUNT_SID,",
+      "se o TWILIO_AUTH_TOKEN pertence a essa mesma conta,",
+      "e se TWILIO_WHATSAPP_FROM corresponde exatamente ao remetente exibido no console da Twilio.",
+    ].join(" ");
+  }
+
+  return fallbackMessage;
+}
+
 export async function sendTwilioWhatsAppMessage(input: WhatsAppSendInput): Promise<WhatsAppSendResult> {
   const envStatus = getWhatsAppEnvStatus();
   if (!envStatus.configured) {
@@ -120,10 +143,7 @@ export async function sendTwilioWhatsAppMessage(input: WhatsAppSendInput): Promi
       ok: false,
       providerMessageId: null,
       rawPayload: payload,
-      errorMessage:
-        typeof payload === "object" && payload !== null && "message" in payload && typeof payload.message === "string"
-          ? payload.message
-          : "Falha ao enviar mensagem via Twilio.",
+      errorMessage: getTwilioErrorMessage(payload, from),
     };
   }
 

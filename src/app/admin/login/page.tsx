@@ -7,7 +7,7 @@ import { HeroBlock, PageShell, StatusNote } from "@/components/layout/primitives
 import { Button } from "@/components/ui/button";
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ identifier: email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
 
     setLoading(false);
@@ -45,8 +45,14 @@ export default function AdminLoginPage() {
 
         <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
           <label>
-            <span className="field-label">Email</span>
-            <input className="field-input" type="email" required value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
+            <span className="field-label">Email ou usuario</span>
+            <input
+              className="field-input"
+              type="text"
+              required
+              value={identifier}
+              onChange={(event) => setIdentifier(event.currentTarget.value)}
+            />
           </label>
 
           <label>

@@ -2,46 +2,44 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import { HeroBlock, PageShell, StatusNote } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 
-export default function AdminLoginPage() {
+export default function EsqueciSenhaPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
+    setMessage("");
     setError("");
 
-    const response = await fetch("/api/admin/login", {
+    const response = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ identifier: email, password }),
+      body: JSON.stringify({ email }),
     });
 
     setLoading(false);
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "Falha no login." }));
-      setError(payload.error ?? "Falha no login.");
+      const payload = await response.json().catch(() => ({ error: "Nao foi possivel enviar o email." }));
+      setError(payload.error ?? "Nao foi possivel enviar o email.");
       return;
     }
 
-    router.push("/admin");
-    router.refresh();
+    setMessage("Se existir uma conta local com este email, enviaremos um link de redefinicao.");
   }
 
   return (
     <PageShell>
       <HeroBlock className="mx-auto w-full max-w-lg p-6 sm:p-7">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Admin</p>
-        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Login administrativo</h2>
-        <p className="text-sm text-emerald-800">Acesso ao painel protegido.</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Conta</p>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Esqueci a senha</h2>
+        <p className="text-sm text-emerald-800">Informe seu email para receber um link de redefinicao.</p>
 
         <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
           <label>
@@ -49,20 +47,16 @@ export default function AdminLoginPage() {
             <input className="field-input" type="email" required value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
           </label>
 
-          <label>
-            <span className="field-label">Senha</span>
-            <input className="field-input" type="password" required value={password} onChange={(event) => setPassword(event.currentTarget.value)} />
-          </label>
-
           <Button className="w-full rounded-full" type="submit" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
+            {loading ? "Enviando..." : "Enviar link"}
           </Button>
         </form>
 
         <div className="mt-4 text-sm font-semibold text-emerald-700">
-          <Link href="/entrar">Voltar para login geral</Link>
+          <Link href="/entrar">Voltar para entrar</Link>
         </div>
 
+        {message ? <StatusNote className="mt-4" tone="success">{message}</StatusNote> : null}
         {error ? <StatusNote className="mt-4" tone="error">{error}</StatusNote> : null}
       </HeroBlock>
     </PageShell>

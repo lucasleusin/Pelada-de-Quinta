@@ -1,18 +1,41 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-user";
 import { getPrismaClient } from "@/lib/db";
 import { deletePhoto, storePhoto } from "@/lib/photo-storage";
 import { buildPlayerPhotoPath, validatePlayerPhotoFile } from "@/lib/player-photo";
 
 export const runtime = "nodejs";
 
+async function resolveRequestedPlayer(id: string) {
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser || currentUser.status !== "ACTIVE" || !currentUser.playerId) {
+    return { error: NextResponse.json({ error: "Cadastro pendente de aprovacao." }, { status: 403 }) };
+  }
+
+  const requestedId = id === "me" ? currentUser.playerId : id;
+
+  if (requestedId !== currentUser.playerId) {
+    return { error: NextResponse.json({ error: "Acesso negado ao perfil solicitado." }, { status: 403 }) };
+  }
+
+  return { playerId: requestedId };
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const resolved = await resolveRequestedPlayer(id);
+
+    if ("error" in resolved) {
+      return resolved.error;
+    }
+
     const prisma = getPrismaClient();
 
     const player = await prisma.player.findFirst({
       where: {
-        id,
+        id: resolved.playerId,
         isActive: true,
       },
       select: { id: true, photoPath: true },
@@ -62,11 +85,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const resolved = await resolveRequestedPlayer(id);
+
+    if ("error" in resolved) {
+      return resolved.error;
+    }
+
     const prisma = getPrismaClient();
 
     const player = await prisma.player.findFirst({
       where: {
-        id,
+        id: resolved.playerId,
         isActive: true,
       },
       select: { id: true, photoPath: true },

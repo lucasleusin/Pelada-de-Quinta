@@ -7,6 +7,7 @@ import { formatDatePtBr } from "@/lib/date-format";
 type Player = {
   id: string;
   name: string;
+  nickname: string | null;
   position: "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
   shirtNumberPreference: number | null;
   email: string | null;
@@ -76,6 +77,7 @@ function toNullableString(value: string) {
 export default function AdminJogadoresPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [position, setPosition] = useState<Player["position"]>("MEIA");
   const [shirtNumberPreference, setShirtNumberPreference] = useState("");
   const [email, setEmail] = useState("");
@@ -88,6 +90,7 @@ export default function AdminJogadoresPage() {
 
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editNickname, setEditNickname] = useState("");
   const [editPosition, setEditPosition] = useState<Player["position"]>("MEIA");
   const [editShirtNumber, setEditShirtNumber] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -112,6 +115,7 @@ export default function AdminJogadoresPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name,
+        nickname: toNullableString(nickname),
         position,
         shirtNumberPreference: shirtNumberPreference ? Number(shirtNumberPreference) : null,
         email: toNullableString(email),
@@ -127,6 +131,7 @@ export default function AdminJogadoresPage() {
     }
 
     setName("");
+    setNickname("");
     setPosition("MEIA");
     setShirtNumberPreference("");
     setEmail("");
@@ -154,6 +159,7 @@ export default function AdminJogadoresPage() {
   function startEdit(player: Player) {
     setEditingPlayerId(player.id);
     setEditName(player.name);
+    setEditNickname(player.nickname ?? "");
     setEditPosition(player.position);
     setEditShirtNumber(player.shirtNumberPreference === null ? "" : String(player.shirtNumberPreference));
     setEditEmail(player.email ?? "");
@@ -163,6 +169,7 @@ export default function AdminJogadoresPage() {
   function cancelEdit() {
     setEditingPlayerId(null);
     setEditName("");
+    setEditNickname("");
     setEditPosition("MEIA");
     setEditShirtNumber("");
     setEditEmail("");
@@ -175,6 +182,7 @@ export default function AdminJogadoresPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: editName,
+        nickname: toNullableString(editNickname),
         position: editPosition,
         shirtNumberPreference: editShirtNumber ? Number(editShirtNumber) : null,
         email: toNullableString(editEmail),
@@ -277,10 +285,15 @@ export default function AdminJogadoresPage() {
     <div className="space-y-4">
       <HeroBlock className="p-5 sm:p-6">
         <h2 className="text-3xl font-bold text-emerald-950">Jogadores</h2>
-        <form className="mt-4 grid gap-3 md:grid-cols-6" onSubmit={createPlayer}>
+        <form className="mt-4 grid gap-3 md:grid-cols-7" onSubmit={createPlayer}>
           <label>
             <span className="field-label">Nome</span>
             <input className="field-input" required value={name} onChange={(event) => setName(event.currentTarget.value)} />
+          </label>
+
+          <label>
+            <span className="field-label">Apelido</span>
+            <input className="field-input" value={nickname} onChange={(event) => setNickname(event.currentTarget.value)} />
           </label>
 
           <label>
@@ -348,13 +361,21 @@ export default function AdminJogadoresPage() {
               <li key={player.id} className="rounded-xl border border-emerald-100 p-3">
                 {isEditing ? (
                   <div className="space-y-3">
-                    <div className="grid gap-2 md:grid-cols-6 md:items-end">
+                    <div className="grid gap-2 md:grid-cols-7 md:items-end">
                       <label>
                         <span className="field-label">Nome</span>
                         <input
                           className="field-input"
                           value={editName}
                           onChange={(event) => setEditName(event.currentTarget.value)}
+                        />
+                      </label>
+                      <label>
+                        <span className="field-label">Apelido</span>
+                        <input
+                          className="field-input"
+                          value={editNickname}
+                          onChange={(event) => setEditNickname(event.currentTarget.value)}
                         />
                       </label>
                       <label>
@@ -471,7 +492,9 @@ export default function AdminJogadoresPage() {
                         </div>
                       )}
                       <div>
-                        <p className="font-semibold text-emerald-950">{player.name}</p>
+                        <p className="font-semibold text-emerald-950">
+                          {player.nickname ? `${player.nickname} (${player.name})` : player.name}
+                        </p>
                         <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">
                           {positionLabel[player.position]}
                           {player.shirtNumberPreference !== null ? ` | #${player.shirtNumberPreference}` : ""}

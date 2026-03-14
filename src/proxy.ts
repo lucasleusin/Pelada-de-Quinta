@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
-export default auth((request) => {
-  const isAdminPath = request.nextUrl.pathname.startsWith("/admin");
-  const isLoginPath = request.nextUrl.pathname === "/admin/login";
+const athleteProtectedPaths = ["/partidas-passadas", "/votacao", "/meu-perfil"];
 
-  if (!isAdminPath || isLoginPath) {
+export default auth((request) => {
+  const pathname = request.nextUrl.pathname;
+  const isAdminPath = pathname.startsWith("/admin");
+  const isAdminLoginPath = pathname === "/admin/login";
+  const isAthleteProtectedPath = athleteProtectedPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+
+  if (isAdminPath && !isAdminLoginPath) {
+    if (!request.auth?.user?.id) {
+      return NextResponse.redirect(new URL("/admin/login", request.nextUrl.origin));
+    }
+
+    if (request.auth.user.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/entrar", request.nextUrl.origin));
+    }
+
     return NextResponse.next();
   }
 
-  if (!request.auth?.user?.id) {
-    const redirectUrl = new URL("/admin/login", request.nextUrl.origin);
+  if (isAthleteProtectedPath && !request.auth?.user?.id) {
+    const redirectUrl = new URL("/entrar", request.nextUrl.origin);
+    redirectUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -18,5 +33,5 @@ export default auth((request) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/partidas-passadas", "/votacao", "/meu-perfil"],
 };

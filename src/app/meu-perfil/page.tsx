@@ -2,24 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatDatePtBr } from "@/lib/date-format";
-import {
-  HeroBlock,
-  PageShell,
-  SectionShell,
-  StatusNote,
-} from "@/components/layout/primitives";
+import { HeroBlock, PageShell, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { PlayerFifaCard, type PlayerCardPosition } from "@/components/player-fifa-card";
 import { Button } from "@/components/ui/button";
 
-type ActivePlayer = {
-  id: string;
-  name: string;
-};
-
 type EditablePosition = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE";
+
+type CurrentUser = {
+  id: string;
+  status: "PENDING_VERIFICATION" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED";
+  playerId: string | null;
+};
 
 type ProfileFormState = {
   name: string;
+  nickname: string;
   position: EditablePosition;
   shirtNumberPreference: string;
   email: string;
@@ -30,6 +27,7 @@ type PlayerHistoryPayload = {
   player: {
     id: string;
     name: string;
+    nickname: string | null;
     position: PlayerCardPosition;
     shirtNumberPreference: number | null;
     photoUrl: string | null;
@@ -84,12 +82,19 @@ function getResultLabel(result: "WIN" | "DRAW" | "LOSS" | null) {
   return "Sem resultado";
 }
 
+function pendingMessage(status: CurrentUser["status"]) {
+  if (status === "PENDING_VERIFICATION") return "Confirme seu email para liberar sua conta.";
+  if (status === "PENDING_APPROVAL") return "Seu cadastro esta aguardando aprovacao do administrador.";
+  if (status === "REJECTED") return "Seu cadastro foi rejeitado. Fale com o administrador.";
+  return "Sua conta ainda nao esta pronta para uso.";
+}
+
 export default function MeuPerfilPage() {
-  const [players, setPlayers] = useState<ActivePlayer[]>([]);
-  const [selectedPlayerId, setSelectedPlayerId] = useState("");
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [profileData, setProfileData] = useState<PlayerHistoryPayload | null>(null);
   const [formState, setFormState] = useState<ProfileFormState>({
     name: "",
+    nickname: "",
     position: "MEIA",
     shirtNumberPreference: "",
     email: "",
@@ -101,54 +106,37 @@ export default function MeuPerfilPage() {
   const [photoStatus, setPhotoStatus] = useState("");
   const [message, setMessage] = useState("");
 
-  const canRenderProfile = useMemo(() => profileData !== null && selectedPlayerId !== "", [profileData, selectedPlayerId]);
+  const canEditProfile = currentUser?.status === "ACTIVE" && currentUser.playerId !== null;
+  const canRenderProfile = useMemo(() => canEditProfile && profileData !== null, [canEditProfile, profileData]);
 
   useEffect(() => {
-    fetch("/api/players?active=true")
-      .then((response) => response.json())
-      .then((payload: ActivePlayer[]) => {
-        setPlayers(payload);
-      })
-      .catch(() => setMessage("Falha ao carregar jogadores ativos."));
-  }, []);
-
-  function resetProfileState() {
-    setProfileData(null);
-    setFormState({
-      name: "",
-      position: "MEIA",
-      shirtNumberPreference: "",
-      email: "",
-      phone: "",
-    });
-    setIsDirty(false);
-    setSaveStatus("idle");
-    setSaveMessage("");
-    setPhotoStatus("");
-  }
-
-  function handleSelectPlayer(playerId: string) {
-    setSelectedPlayerId(playerId);
-    setMessage("");
-
-    if (!playerId) {
-      resetProfileState();
-    }
-  }
-
-  useEffect(() => {
-    if (!selectedPlayerId) return;
-
-    fetch(`/api/players/${selectedPlayerId}/history`, { cache: "no-store" })
+    fetch("/api/auth/me", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Nao foi possivel carregar os dados deste jogador.");
+          throw new Error("Nao foi possivel carregar a sessao atual.");
+        }
+
+        const payload = (await response.json()) as CurrentUser;
+        setCurrentUser(payload);
+      })
+      .catch((error) => setMessage(error instanceof Error ? error.message : "Falha ao carregar a sessao."));
+  }, []);
+
+  useEffect(() => {
+    if (!canEditProfile) return;
+
+    fetch("/api/players/me/history", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({ error: "Nao foi possivel carregar o perfil." }));
+          throw new Error(payload.error ?? "Nao foi possivel carregar o perfil.");
         }
 
         const payload = (await response.json()) as PlayerHistoryPayload;
         setProfileData(payload);
         setFormState({
           name: payload.player.name,
+          nickname: payload.player.nickname ?? "",
           position: toEditablePosition(payload.player.position),
           shirtNumberPreference:
             payload.player.shirtNumberPreference === null ? "" : String(payload.player.shirtNumberPreference),
@@ -161,24 +149,24 @@ export default function MeuPerfilPage() {
         setPhotoStatus("");
       })
       .catch((error) => {
-        const errorMessage =
-          error instanceof Error ? error.message : "Nao foi possivel carregar os dados deste jogador.";
+        const errorMessage = error instanceof Error ? error.message : "Nao foi possivel carregar o perfil.";
         setMessage(errorMessage);
       });
-  }, [selectedPlayerId]);
+  }, [canEditProfile]);
 
   useEffect(() => {
-    if (!selectedPlayerId || !profileData || !isDirty) return;
+    if (!canEditProfile || !profileData || !isDirty) return;
 
     const timeout = setTimeout(async () => {
       setSaveStatus("saving");
       setSaveMessage("");
 
-      const response = await fetch(`/api/players/${selectedPlayerId}/profile`, {
+      const response = await fetch("/api/players/me/profile", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: formState.name,
+          nickname: formState.nickname.trim() === "" ? null : formState.nickname.trim(),
           position: formState.position,
           shirtNumberPreference: formState.shirtNumberPreference ? Number(formState.shirtNumberPreference) : null,
           email: formState.email.trim() === "" ? null : formState.email.trim(),
@@ -206,16 +194,13 @@ export default function MeuPerfilPage() {
             }
           : current,
       );
-      setPlayers((current) =>
-        current.map((player) => (player.id === updatedPlayer.id ? { ...player, name: updatedPlayer.name } : player)),
-      );
       setIsDirty(false);
       setSaveStatus("saved");
       setSaveMessage(`Alteracoes salvas automaticamente em ${new Date().toLocaleTimeString("pt-BR")}.`);
     }, 700);
 
     return () => clearTimeout(timeout);
-  }, [formState, isDirty, profileData, selectedPlayerId]);
+  }, [canEditProfile, formState, isDirty, profileData]);
 
   function updateForm<K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) {
     setFormState((current) => ({
@@ -226,13 +211,13 @@ export default function MeuPerfilPage() {
   }
 
   async function handlePhotoUpload(file: File | null) {
-    if (!file || !selectedPlayerId) return;
+    if (!file || !canEditProfile) return;
 
     setPhotoStatus("Enviando foto...");
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`/api/players/${selectedPlayerId}/photo`, {
+    const response = await fetch("/api/players/me/photo", {
       method: "POST",
       body: formData,
     });
@@ -260,10 +245,10 @@ export default function MeuPerfilPage() {
   }
 
   async function removePhoto() {
-    if (!selectedPlayerId) return;
+    if (!canEditProfile) return;
 
     setPhotoStatus("Removendo foto...");
-    const response = await fetch(`/api/players/${selectedPlayerId}/photo`, {
+    const response = await fetch("/api/players/me/photo", {
       method: "DELETE",
     });
 
@@ -292,32 +277,12 @@ export default function MeuPerfilPage() {
     <PageShell>
       <HeroBlock className="p-5 sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Cadastro</p>
-        <div className="mt-1 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="text-3xl font-bold text-emerald-950">Perfil do Atleta</h2>
-            <p className="mt-1 text-sm text-emerald-800">
-              Selecione o jogador e atualize os dados. O salvamento e automatico.
-            </p>
-          </div>
-
-          <label className="w-full max-w-md" htmlFor="profile-player-select">
-            <span className="field-label">Jogador</span>
-            <select
-              id="profile-player-select"
-              className="field-input"
-              value={selectedPlayerId}
-              onChange={(event) => handleSelectPlayer(event.currentTarget.value)}
-            >
-              <option value="">Selecione...</option>
-              {players.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Perfil do Atleta</h2>
+        <p className="mt-1 text-sm text-emerald-800">Edite seus dados e acompanhe o historico das suas partidas.</p>
       </HeroBlock>
+
+      {!currentUser ? <StatusNote tone="warning">Carregando sua conta...</StatusNote> : null}
+      {currentUser && !canEditProfile ? <StatusNote tone="warning">{pendingMessage(currentUser.status)}</StatusNote> : null}
 
       {canRenderProfile && profileData ? (
         <>
@@ -327,33 +292,23 @@ export default function MeuPerfilPage() {
 
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <label>
-                  <span className="field-label">Nome</span>
-                  <input
-                    className="field-input"
-                    value={formState.name}
-                    onChange={(event) => updateForm("name", event.currentTarget.value)}
-                  />
+                  <span className="field-label">Nome Completo</span>
+                  <input className="field-input" value={formState.name} onChange={(event) => updateForm("name", event.currentTarget.value)} />
+                </label>
+
+                <label>
+                  <span className="field-label">Apelido</span>
+                  <input className="field-input" value={formState.nickname} onChange={(event) => updateForm("nickname", event.currentTarget.value)} />
                 </label>
 
                 <label>
                   <span className="field-label">Numero</span>
-                  <input
-                    className="field-input"
-                    type="number"
-                    min={0}
-                    max={99}
-                    value={formState.shirtNumberPreference}
-                    onChange={(event) => updateForm("shirtNumberPreference", event.currentTarget.value)}
-                  />
+                  <input className="field-input" type="number" min={0} max={99} value={formState.shirtNumberPreference} onChange={(event) => updateForm("shirtNumberPreference", event.currentTarget.value)} />
                 </label>
 
                 <label>
                   <span className="field-label">Posicao</span>
-                  <select
-                    className="field-input"
-                    value={formState.position}
-                    onChange={(event) => updateForm("position", event.currentTarget.value as EditablePosition)}
-                  >
+                  <select className="field-input" value={formState.position} onChange={(event) => updateForm("position", event.currentTarget.value as EditablePosition)}>
                     <option value="GOLEIRO">Goleiro</option>
                     <option value="ZAGUEIRO">Zagueiro</option>
                     <option value="MEIA">Meio Campo</option>
@@ -363,46 +318,23 @@ export default function MeuPerfilPage() {
 
                 <label>
                   <span className="field-label">Email</span>
-                  <input
-                    className="field-input"
-                    type="email"
-                    placeholder="email@exemplo.com"
-                    value={formState.email}
-                    onChange={(event) => updateForm("email", event.currentTarget.value)}
-                  />
+                  <input className="field-input" type="email" placeholder="email@exemplo.com" value={formState.email} onChange={(event) => updateForm("email", event.currentTarget.value)} />
                 </label>
 
-                <label className="md:col-span-2">
-                  <span className="field-label">Telefone</span>
-                  <input
-                    className="field-input"
-                    type="tel"
-                    placeholder="(51) 99999-9999"
-                    value={formState.phone}
-                    onChange={(event) => updateForm("phone", event.currentTarget.value)}
-                  />
+                <label>
+                  <span className="field-label">Whatsapp</span>
+                  <input className="field-input" type="tel" placeholder="(51) 99999-9999" value={formState.phone} onChange={(event) => updateForm("phone", event.currentTarget.value)} />
                 </label>
               </div>
 
               <div className="mt-4 rounded-lg bg-emerald-50 p-3">
                 <p className="text-sm font-medium text-emerald-900">Foto do jogador</p>
                 <div className="mt-2 flex flex-wrap items-end gap-2">
-                <label className="min-w-0 flex-1">
+                  <label className="min-w-0 flex-1">
                     <span className="field-label">Arquivo</span>
-                    <input
-                      className="field-input"
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={(event) => handlePhotoUpload(event.currentTarget.files?.[0] ?? null)}
-                    />
+                    <input className="field-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handlePhotoUpload(event.currentTarget.files?.[0] ?? null)} />
                   </label>
-                  <Button
-                    className="rounded-full"
-                    variant="outline"
-                    type="button"
-                    onClick={removePhoto}
-                    disabled={!profileData.player.photoUrl}
-                  >
+                  <Button className="rounded-full" variant="outline" type="button" onClick={removePhoto} disabled={!profileData.player.photoUrl}>
                     Remover foto
                   </Button>
                 </div>
@@ -417,7 +349,7 @@ export default function MeuPerfilPage() {
             <div className="order-2 lg:order-1">
               <PlayerFifaCard
                 player={{
-                  name: profileData.player.name,
+                  name: profileData.player.nickname ?? profileData.player.name,
                   position: profileData.player.position,
                   shirtNumberPreference: profileData.player.shirtNumberPreference,
                   photoUrl: profileData.player.photoUrl,
@@ -432,9 +364,7 @@ export default function MeuPerfilPage() {
             <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-emerald-950">Partidas jogadas</h3>
-                <p className="text-sm text-emerald-800">
-                  Historico detalhado do atleta com desempenho por partida.
-                </p>
+                <p className="text-sm text-emerald-800">Historico detalhado do atleta com desempenho por partida.</p>
               </div>
               <p className="text-xs font-semibold uppercase tracking-[0.1em] text-emerald-700">
                 {profileData.history.length} partida{profileData.history.length === 1 ? "" : "s"}
@@ -448,8 +378,7 @@ export default function MeuPerfilPage() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="font-semibold text-emerald-950">
-                          {formatDatePtBr(item.match.matchDate)} - {item.match.teamAScore ?? "-"} x {item.match.teamBScore ?? "-"} (
-                          {getResultLabel(item.result)})
+                          {formatDatePtBr(item.match.matchDate)} - {item.match.teamAScore ?? "-"} x {item.match.teamBScore ?? "-"} ({getResultLabel(item.result)})
                         </p>
                         <p className="mt-1 text-sm text-emerald-800">
                           Gols: {item.goals} | Assistencias: {item.assists} | Gols sofridos: {item.goalsConceded}
@@ -457,15 +386,9 @@ export default function MeuPerfilPage() {
                       </div>
 
                       <div className="shrink-0 text-left sm:text-right">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
-                          Nota media
-                        </p>
-                        <p className="text-sm font-semibold text-emerald-950">
-                          {item.averageRating === null ? "Sem Nota" : item.averageRating.toFixed(1)}
-                        </p>
-                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
-                          Votos
-                        </p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Nota media</p>
+                        <p className="text-sm font-semibold text-emerald-950">{item.averageRating === null ? "Sem Nota" : item.averageRating.toFixed(1)}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Votos</p>
                         <p className="text-sm font-semibold text-emerald-950">{item.ratingsCount}</p>
                       </div>
                     </div>
@@ -477,11 +400,7 @@ export default function MeuPerfilPage() {
             )}
           </SectionShell>
         </>
-      ) : (
-        <SectionShell className="p-4">
-          <p className="empty-state text-sm">Selecione um jogador para editar o perfil.</p>
-        </SectionShell>
-      )}
+      ) : null}
 
       {message ? <StatusNote tone="error">{message}</StatusNote> : null}
     </PageShell>

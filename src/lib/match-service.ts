@@ -49,7 +49,7 @@ function startOfTomorrow() {
   return tomorrow;
 }
 
-function finishedMatchWhereClause(today: Date) {
+function finishedMatchWhereClause() {
   const tomorrow = startOfTomorrow();
 
   return {
@@ -529,7 +529,7 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
   return NextResponse.json({ ok: true, updated: parsed.data.stats.length });
 }
 
-export async function saveRatings(matchId: string, body: unknown) {
+export async function saveRatings(matchId: string, body: unknown, currentRaterPlayerId?: string | null) {
   const parsed = ratingsBatchSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -554,8 +554,19 @@ export async function saveRatings(matchId: string, body: unknown) {
     );
   }
 
+  const normalizedRatings = parsed.data.ratings.map((item) => ({
+    ...item,
+    raterPlayerId: item.raterPlayerId ?? currentRaterPlayerId ?? "",
+  }));
+
+  const hasMissingRater = normalizedRatings.some((item) => !item.raterPlayerId);
+
+  if (hasMissingRater) {
+    return NextResponse.json({ error: "Jogador autenticado nao encontrado para registrar a avaliacao." }, { status: 400 });
+  }
+
   const participantIds = Array.from(
-    new Set(parsed.data.ratings.flatMap((item) => [item.raterPlayerId, item.ratedPlayerId])),
+    new Set(normalizedRatings.flatMap((item) => [item.raterPlayerId, item.ratedPlayerId])),
   );
   const eligibleParticipants = await db().matchParticipant.findMany({
     where: {
@@ -568,7 +579,7 @@ export async function saveRatings(matchId: string, body: unknown) {
   });
   const eligiblePlayerIds = new Set(eligibleParticipants.map((participant) => participant.playerId));
 
-  const hasInvalidRatingTarget = parsed.data.ratings.some(
+  const hasInvalidRatingTarget = normalizedRatings.some(
     (item) => !eligiblePlayerIds.has(item.raterPlayerId) || !eligiblePlayerIds.has(item.ratedPlayerId),
   );
 
@@ -580,7 +591,7 @@ export async function saveRatings(matchId: string, body: unknown) {
   }
 
   await db().$transaction(
-    parsed.data.ratings.map((item) =>
+    normalizedRatings.map((item) =>
       db().matchRating.upsert({
         where: {
           matchId_raterPlayerId_ratedPlayerId: {
@@ -600,7 +611,7 @@ export async function saveRatings(matchId: string, body: unknown) {
     ),
   );
 
-  return NextResponse.json({ ok: true, saved: parsed.data.ratings.length });
+  return NextResponse.json({ ok: true, saved: normalizedRatings.length });
 }
 
 export async function getRatingsSummary(matchId: string) {
@@ -890,9 +901,8 @@ export async function updateParticipantPresence(matchId: string, playerId: strin
 }
 
 export async function getLeaderboards() {
-  const today = startOfToday();
   const finishedMatches = await db().match.findMany({
-    where: finishedMatchWhereClause(today),
+    where: finishedMatchWhereClause(),
     select: { id: true },
   });
   const matchIds = finishedMatches.map((match) => match.id);
@@ -978,9 +988,8 @@ export async function getLeaderboards() {
 }
 
 export async function getAttendanceReport() {
-  const today = startOfToday();
   const finishedMatches = await db().match.findMany({
-    where: finishedMatchWhereClause(today),
+    where: finishedMatchWhereClause(),
     select: { id: true },
   });
   const eligibleMatchIds = finishedMatches.map((match) => match.id);
@@ -1014,10 +1023,8 @@ export async function getAttendanceReport() {
 }
 
 export async function getGeneralStatsOverview() {
-  const today = startOfToday();
-
   const finishedMatches = await db().match.findMany({
-    where: finishedMatchWhereClause(today),
+    where: finishedMatchWhereClause(),
     select: { id: true },
   });
 
@@ -1235,8 +1242,7 @@ export async function getGeneralStatsOverview() {
 }
 
 export async function getPlayerReport(playerId: string) {
-  const today = startOfToday();
-  const finishedMatchWhere = finishedMatchWhereClause(today);
+  const finishedMatchWhere = finishedMatchWhereClause();
   const player = await db().player.findUnique({ where: { id: playerId } });
 
   if (!player) {

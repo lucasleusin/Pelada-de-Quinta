@@ -43,11 +43,47 @@ async function main() {
   const email = process.env.ADMIN_SEED_EMAIL ?? "marcio";
   const password = process.env.ADMIN_SEED_PASSWORD ?? "sop";
   const passwordHash = await hash(password, 10);
+  const adminPlayerName = "Administrador";
+
+  const adminPlayer = await prisma.player.upsert({
+    where: { name: adminPlayerName },
+    update: {
+      email,
+      isActive: true,
+    },
+    create: {
+      name: adminPlayerName,
+      position: Position.OUTRO,
+      email,
+      isActive: true,
+    },
+  });
 
   await prisma.adminUser.upsert({
     where: { email },
     update: { passwordHash },
     create: { email, passwordHash },
+  });
+
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      name: adminPlayerName,
+      emailVerified: new Date(),
+      passwordHash,
+      role: "ADMIN",
+      status: "ACTIVE",
+      playerId: adminPlayer.id,
+    },
+    create: {
+      name: adminPlayerName,
+      email,
+      emailVerified: new Date(),
+      passwordHash,
+      role: "ADMIN",
+      status: "ACTIVE",
+      playerId: adminPlayer.id,
+    },
   });
 
   for (const [name, position, shirtNumberPreference] of players) {

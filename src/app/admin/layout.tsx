@@ -11,6 +11,7 @@ const adminLinks = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/partidas", label: "Partidas" },
   { href: "/admin/jogadores", label: "Jogadores" },
+  { href: "/admin/cadastros", label: "Cadastros" },
   { href: "/admin/site-setup", label: "Site Setup" },
   { href: "/admin/whatsapp", label: "Whatsapp" },
   { href: "/admin/relatorios", label: "Relatorios" },

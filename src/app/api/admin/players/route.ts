@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     const player = await prisma.player.create({
       data: {
         name: parsed.data.name,
+        nickname: parsed.data.nickname ?? null,
         position: parsed.data.position,
         shirtNumberPreference: parsed.data.shirtNumberPreference ?? null,
         email: parsed.data.email ?? null,

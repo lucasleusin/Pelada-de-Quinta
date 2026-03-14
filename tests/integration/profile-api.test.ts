@@ -12,6 +12,15 @@ vi.mock("@/lib/db", () => ({
   getPrismaClient: () => prismaMock,
 }));
 
+vi.mock("@/lib/auth-user", () => ({
+  getCurrentUser: vi.fn(async () => ({
+    id: "user-1",
+    role: "PLAYER",
+    status: "ACTIVE",
+    playerId: "player-1",
+  })),
+}));
+
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/players/player-1/profile", {
     method: "PUT",
@@ -31,6 +40,7 @@ describe("profile api route", () => {
     prismaMock.player.update.mockResolvedValue({
       id: "player-1",
       name: "Novo Nome",
+      nickname: "Novo",
       position: "MEIA",
       shirtNumberPreference: 10,
       email: "novo@teste.com",

@@ -25,6 +25,11 @@ export default function AdminHomePage() {
           <p className="text-sm text-emerald-800">Datas, times, presencas e placar.</p>
         </Link>
 
+        <Link href="/admin/cadastros" className="section-shell p-4 transition hover:border-emerald-400">
+          <h3 className="text-xl font-semibold text-emerald-950">Cadastros</h3>
+          <p className="text-sm text-emerald-800">Aprove, vincule ou rejeite novas contas de atletas.</p>
+        </Link>
+
         <SectionShell className="p-4">
           <h3 className="text-xl font-semibold text-emerald-950">Relatorios</h3>
           <p className="text-sm text-emerald-800">Rankings, presenca e exportacao CSV consolidados.</p>

@@ -57,9 +57,22 @@ enum WhatsAppMessageStatus {
   SKIPPED
 }
 
+enum UserRole {
+  ADMIN
+  PLAYER
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+}
+
 model Player {
   id                    String             @id @default(uuid())
   name                  String             @unique
+  nickname              String?
   position              Position           @default(OUTRO)
   shirtNumberPreference Int?
   email                 String?            @unique
@@ -74,6 +87,7 @@ model Player {
   ratingsReceived       MatchRating[]      @relation("RatingsReceived")
   statsUpdatedEntries   MatchParticipant[] @relation("StatsUpdatedBy")
   whatsAppMessages      WhatsAppMessageLog[]
+  user                  User?
 
   @@index([name])
   @@map("players")
@@ -158,6 +172,68 @@ model AdminUser {
   createdAt    DateTime @default(now())
 
   @@map("admin_users")
+}
+
+model User {
+  id                    String       @id @default(cuid())
+  name                  String?
+  email                 String       @unique
+  emailVerified         DateTime?
+  image                 String?
+  passwordHash          String?
+  role                  UserRole     @default(PLAYER)
+  status                UserStatus   @default(PENDING_VERIFICATION)
+  playerId              String?      @unique
+  nickname              String?
+  position              Position?
+  shirtNumberPreference Int?
+  whatsApp              String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  accounts              Account[]
+  sessions              Session[]
+  player                Player?      @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 model SiteSettings {

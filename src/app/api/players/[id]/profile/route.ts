@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-user";
 import { getPrismaClient } from "@/lib/db";
 import { playerProfileUpdateSchema } from "@/lib/validators";
 
@@ -34,6 +35,18 @@ function uniqueConstraintMessage(error: PrismaUniqueErrorLike) {
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser || currentUser.status !== "ACTIVE" || !currentUser.playerId) {
+    return NextResponse.json({ error: "Cadastro pendente de aprovacao." }, { status: 403 });
+  }
+
+  const requestedId = id === "me" ? currentUser.playerId : id;
+
+  if (requestedId !== currentUser.playerId) {
+    return NextResponse.json({ error: "Acesso negado ao perfil solicitado." }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = playerProfileUpdateSchema.safeParse(body);
 
@@ -44,7 +57,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const prisma = getPrismaClient();
   const existingPlayer = await prisma.player.findFirst({
     where: {
-      id,
+      id: requestedId,
       isActive: true,
     },
     select: {
@@ -58,7 +71,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   try {
     const player = await prisma.player.update({
-      where: { id },
+      where: { id: requestedId },
       data: parsed.data,
     });
 

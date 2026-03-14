@@ -1,10 +1,24 @@
-import { MatchStatus, Position, PresenceStatus, Team } from "@prisma/client";
+import { MatchStatus, Position, PresenceStatus, Team, UserStatus } from "@prisma/client";
 import { z } from "zod";
 
+const optionalNicknameSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  },
+  z.string().min(2, "Apelido invalido.").max(60, "Apelido muito longo.").nullable().optional(),
+);
+
 export const loginSchema = z.object({
-  username: z.string().trim().min(1, "Usuario obrigatorio."),
+  identifier: z.string().trim().min(1, "Email obrigatorio.").optional(),
+  email: z.string().trim().min(1, "Email obrigatorio.").optional(),
+  username: z.string().trim().min(1, "Email obrigatorio.").optional(),
   password: z.string().min(1, "Senha obrigatoria."),
-});
+}).transform((data) => ({
+  identifier: (data.identifier ?? data.email ?? data.username ?? "").trim().toLowerCase(),
+  password: data.password,
+}));
 
 const shirtNumberSchema = z.number().int().min(0).max(99).nullable().optional();
 
@@ -50,6 +64,7 @@ const siteOptionalTextSchema = (max: number, message: string) =>
 
 export const playerCreateSchema = z.object({
   name: z.string().trim().min(2, "Nome obrigatorio."),
+  nickname: optionalNicknameSchema,
   position: z.nativeEnum(Position),
   shirtNumberPreference: shirtNumberSchema,
   email: optionalEmailSchema,
@@ -64,6 +79,7 @@ export const playerUpdateSchema = playerCreateSchema.partial().extend({
 export const playerProfileUpdateSchema = z
   .object({
     name: z.string().trim().min(2, "Nome obrigatorio.").optional(),
+    nickname: optionalNicknameSchema,
     position: z.enum(["GOLEIRO", "ZAGUEIRO", "MEIA", "ATACANTE"]).optional(),
     shirtNumberPreference: shirtNumberSchema,
     email: optionalEmailSchema,
@@ -75,6 +91,48 @@ export const playerProfileUpdateSchema = z
 
 export const activeToggleSchema = z.object({
   isActive: z.boolean(),
+});
+
+export const registrationSchema = z.object({
+  name: z.string().trim().min(2, "Nome completo obrigatorio."),
+  email: z.string().trim().toLowerCase().email("Email invalido."),
+  password: z.string().min(8, "Senha deve ter ao menos 8 caracteres."),
+  nickname: optionalNicknameSchema,
+  position: z.nativeEnum(Position).nullable().optional(),
+  shirtNumberPreference: shirtNumberSchema,
+  whatsApp: optionalPhoneSchema,
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Email invalido."),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1, "Token obrigatorio."),
+  password: z.string().min(8, "Senha deve ter ao menos 8 caracteres."),
+});
+
+export const verificationTokenSchema = z.object({
+  token: z.string().trim().min(1, "Token obrigatorio."),
+});
+
+export const approveRegistrationSchema = z
+  .object({
+    action: z.enum(["link", "create", "reject"]),
+    playerId: z.string().uuid().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.action === "link" && !data.playerId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["playerId"],
+        message: "Selecione um jogador existente para vincular.",
+      });
+    }
+  });
+
+export const accountStatusSchema = z.object({
+  status: z.nativeEnum(UserStatus),
 });
 
 export const matchCreateSchema = z.object({
@@ -147,7 +205,7 @@ export const ratingsBatchSchema = z.object({
   ratings: z
     .array(
       z.object({
-        raterPlayerId: z.string().uuid(),
+        raterPlayerId: z.string().uuid().optional(),
         ratedPlayerId: z.string().uuid(),
         rating: z.number().int().min(1).max(5),
       }),

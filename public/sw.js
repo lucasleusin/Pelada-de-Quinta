@@ -1,14 +1,13 @@
-const STATIC_CACHE = "pelada-static-v1";
-const DATA_CACHE = "pelada-data-v1";
+const STATIC_CACHE = "pelada-static-v2";
+const DATA_CACHE = "pelada-data-v2";
 const OFFLINE_URL = "/offline";
+const PROTECTED_PATHS = ["/partidas-passadas", "/votacao", "/meu-perfil"];
 
 const PRECACHE_URLS = [
   "/",
   "/estatisticas",
-  "/meu-perfil",
-  "/partidas-passadas",
-  "/votacao",
   "/confirmacao-rapida",
+  "/entrar",
   OFFLINE_URL,
   "/manifest.webmanifest",
   "/apple-icon",
@@ -38,7 +37,12 @@ function shouldBypass(request, url) {
     return true;
   }
 
-  return url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/admin") || url.pathname.startsWith("/api/auth");
+  return (
+    url.pathname.startsWith("/admin") ||
+    url.pathname.startsWith("/api/admin") ||
+    url.pathname.startsWith("/api/auth") ||
+    PROTECTED_PATHS.some((path) => url.pathname === path || url.pathname.startsWith(`${path}/`))
+  );
 }
 
 async function cacheFirst(request) {

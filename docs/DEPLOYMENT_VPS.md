@@ -7,6 +7,7 @@ O deploy da Pelada fica isolado em um `docker compose` proprio e usa apenas a re
 
 - `.env.production.example`: modelo das variaveis reais da producao.
 - `deploy/pelada.env.example`: nomes do container e da rede Docker compartilhada com o Caddy.
+- `docs/AUTH_SETUP.md`: setup de Google, Microsoft, Resend e procedimento seguro da migration da auth.
 - `deploy/docker-compose.pelada.yml`: compose isolado da Pelada.
 - `deploy/Caddyfile.pelada.snippet`: bloco do subdominio no Caddy.
 - `.github/workflows/ci.yml`: CI + deploy automatico para a VPS.
@@ -64,6 +65,7 @@ cat ~/.ssh/pelada_github_actions.pub | ssh deploy@89.167.118.60 "cat >> ~/.ssh/a
 2. Copie `deploy/pelada.env.example` para `deploy/pelada.env`.
 3. Revise se `APP_BASE_URL` esta como `https://pelada.losportsconsulting.com`.
 4. Confirme se `PHOTO_STORAGE_DRIVER=local`.
+5. Se a autenticacao nova for entrar em producao, siga tambem `docs/AUTH_SETUP.md` antes de fazer merge em `main`.
 
 ## Subida segura da stack
 

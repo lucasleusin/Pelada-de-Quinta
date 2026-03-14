@@ -25,11 +25,11 @@ function isActivePath(pathname: string, href: string) {
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { isAuthenticated } = usePublicAuthState();
   const siteSettings = useSiteSettings();
   const logoUrl = siteSettings.logoUrl ?? undefined;
   const hasLogo = Boolean(logoUrl);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
+  const { isAuthenticated } = usePublicAuthState(!isAdminPath);
 
   function resolveHref(href: string) {
     if (isAuthenticated || !protectedHrefs.has(href)) {

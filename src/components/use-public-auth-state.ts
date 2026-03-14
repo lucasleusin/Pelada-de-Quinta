@@ -10,11 +10,17 @@ type AuthState = {
   nickname?: string | null;
 };
 
-export function usePublicAuthState() {
+export function usePublicAuthState(enabled = true) {
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!enabled) {
+      setAuthState(null);
+      setLoading(false);
+      return;
+    }
+
     let active = true;
 
     async function loadUser() {
@@ -51,7 +57,7 @@ export function usePublicAuthState() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [enabled]);
 
   return {
     authState,

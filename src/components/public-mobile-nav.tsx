@@ -42,9 +42,10 @@ const mobileLinks = [
 
 export function PublicMobileNav() {
   const pathname = usePathname();
-  const { isAuthenticated } = usePublicAuthState();
+  const isAdminPath = pathname.startsWith("/admin");
+  const { isAuthenticated } = usePublicAuthState(!isAdminPath);
 
-  if (pathname.startsWith("/admin")) {
+  if (isAdminPath) {
     return null;
   }
 

@@ -155,12 +155,13 @@ export default function AdminCadastrosPage() {
                       <select
                         className="field-input"
                         value={selectedPlayers[user.id] ?? ""}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const nextPlayerId = event.currentTarget.value;
                           setSelectedPlayers((current) => ({
                             ...current,
-                            [user.id]: event.currentTarget.value,
-                          }))
-                        }
+                            [user.id]: nextPlayerId,
+                          }));
+                        }}
                       >
                         <option value="">Selecione...</option>
                         {sortedPlayers.map((player) => (

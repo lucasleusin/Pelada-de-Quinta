@@ -13,11 +13,15 @@ export default auth((request) => {
 
   if (isAdminPath && !isAdminLoginPath) {
     if (!request.auth?.user?.id) {
-      return NextResponse.redirect(new URL("/admin/login", request.nextUrl.origin));
+      const redirectUrl = new URL("/entrar", request.nextUrl.origin);
+      redirectUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(redirectUrl);
     }
 
     if (request.auth.user.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/entrar", request.nextUrl.origin));
+      const redirectUrl = new URL("/entrar", request.nextUrl.origin);
+      redirectUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(redirectUrl);
     }
 
     return NextResponse.next();

@@ -303,6 +303,7 @@ export default function AdminSiteSetupPage() {
 
                 <div className="mt-3 flex min-h-40 items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-emerald-50 p-3">
                   {currentUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={currentUrl}
                       alt={asset.label}

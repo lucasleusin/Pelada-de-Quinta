@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminPasswordResetSchema,
+  changePasswordSchema,
+  accountProfileUpdateSchema,
   playerCreateSchema,
   playerProfileUpdateSchema,
   ratingsBatchSchema,
   siteSettingsUpdateSchema,
   statsBatchSchema,
+  userRoleUpdateSchema,
+  userStatusUpdateSchema,
 } from "@/lib/validators";
 
 describe("validators", () => {
@@ -83,5 +88,40 @@ describe("validators", () => {
     });
 
     expect(parsed.success).toBe(true);
+  });
+
+  it("accepts valid account profile payload", () => {
+    const parsed = accountProfileUpdateSchema.safeParse({
+      name: "Lucas Leusin",
+      email: "lucas@teste.com",
+      nickname: "Lucas",
+      position: "MEIA",
+      shirtNumberPreference: 10,
+      whatsApp: "(51) 99999-9999",
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects invalid role update", () => {
+    const parsed = userRoleUpdateSchema.safeParse({
+      role: "SUPERADMIN",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts valid status update action", () => {
+    const parsed = userStatusUpdateSchema.safeParse({
+      action: "reactivate",
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts admin password reset modes", () => {
+    expect(adminPasswordResetSchema.safeParse({ mode: "email" }).success).toBe(true);
+    expect(adminPasswordResetSchema.safeParse({ mode: "temporary" }).success).toBe(true);
+    expect(changePasswordSchema.safeParse({ password: "NovaSenha123!" }).success).toBe(true);
   });
 });

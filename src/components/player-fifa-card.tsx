@@ -146,6 +146,7 @@ export function PlayerFifaCard({
         <div className={styles.playerWrap}>
           <div className={styles.playerPlaceholder}>
             {player.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={player.photoUrl} alt={`Foto de ${player.name}`} className={styles.playerImage} />
             ) : (
               <>

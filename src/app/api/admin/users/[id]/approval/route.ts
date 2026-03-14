@@ -1,30 +1,11 @@
-import { Position, Prisma } from "@prisma/client";
+import { Position } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth-user";
 import { getPrismaClient } from "@/lib/db";
+import { buildPlayerPatchFromUserSnapshot } from "@/lib/user-management";
 import { approveRegistrationSchema } from "@/lib/validators";
 
 const db = () => getPrismaClient();
-
-function buildPlayerPatch(user: {
-  name: string | null;
-  nickname: string | null;
-  position: Position | null;
-  shirtNumberPreference: number | null;
-  email: string;
-  whatsApp: string | null;
-}) {
-  const patch: Prisma.PlayerUpdateInput = {
-    name: user.name ?? undefined,
-    nickname: user.nickname ?? undefined,
-    position: user.position ?? undefined,
-    shirtNumberPreference: user.shirtNumberPreference ?? undefined,
-    email: user.email,
-    phone: user.whatsApp ?? undefined,
-  };
-
-  return patch;
-}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const adminCheck = await requireAdminApi();
@@ -95,11 +76,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Este jogador ja esta vinculado a outra conta." }, { status: 409 });
   }
 
-  await db().$transaction(async (tx) => {
-    await tx.player.update({
-      where: { id: player.id },
-      data: buildPlayerPatch(user),
-    });
+    await db().$transaction(async (tx) => {
+      await tx.player.update({
+        where: { id: player.id },
+        data: buildPlayerPatchFromUserSnapshot(user),
+      });
 
     await tx.user.update({
       where: { id },

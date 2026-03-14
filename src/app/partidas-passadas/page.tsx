@@ -7,8 +7,9 @@ import { hasTeam, type TeamCode } from "@/lib/team-utils";
 
 type CurrentUser = {
   id: string;
-  status: "PENDING_VERIFICATION" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED";
+  status: "PENDING_VERIFICATION" | "PENDING_APPROVAL" | "ACTIVE" | "DISABLED" | "REJECTED";
   playerId: string | null;
+  mustChangePassword?: boolean;
 };
 
 type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
@@ -94,6 +95,7 @@ function pendingMessage(status: CurrentUser["status"]) {
   if (status === "PENDING_VERIFICATION") return "Confirme seu email para liberar sua conta.";
   if (status === "PENDING_APPROVAL") return "Seu cadastro esta aguardando aprovacao do administrador.";
   if (status === "REJECTED") return "Seu cadastro foi rejeitado. Fale com o administrador.";
+  if (status === "DISABLED") return "Seu acesso foi removido. Fale com o administrador.";
   return "Sua conta ainda nao esta pronta para uso.";
 }
 

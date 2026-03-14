@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 
 type AuthState = {
   id: string;
-  role: string;
-  status: string;
+  role: "ADMIN" | "PLAYER";
+  status: "PENDING_VERIFICATION" | "PENDING_APPROVAL" | "ACTIVE" | "DISABLED" | "REJECTED";
   name: string | null;
   nickname?: string | null;
+  playerId?: string | null;
+  mustChangePassword?: boolean;
 };
 
 export function usePublicAuthState(enabled = true) {

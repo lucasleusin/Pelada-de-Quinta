@@ -434,6 +434,7 @@ export default function AdminJogadoresPage() {
                     <div className="rounded-lg bg-emerald-50 p-3">
                       <div className="mb-3 flex items-center gap-3">
                         {player.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={player.photoUrl}
                             alt={`Foto de ${player.name}`}
@@ -481,6 +482,7 @@ export default function AdminJogadoresPage() {
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex items-center gap-3">
                       {player.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={player.photoUrl}
                           alt={`Foto de ${player.name}`}

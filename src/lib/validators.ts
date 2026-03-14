@@ -1,4 +1,4 @@
-import { MatchStatus, Position, PresenceStatus, Team, UserStatus } from "@prisma/client";
+import { MatchStatus, Position, PresenceStatus, Team, UserRole, UserStatus } from "@prisma/client";
 import { z } from "zod";
 
 const optionalNicknameSchema = z.preprocess(
@@ -112,6 +112,10 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8, "Senha deve ter ao menos 8 caracteres."),
 });
 
+export const changePasswordSchema = z.object({
+  password: z.string().min(8, "Senha deve ter ao menos 8 caracteres."),
+});
+
 export const verificationTokenSchema = z.object({
   token: z.string().trim().min(1, "Token obrigatorio."),
 });
@@ -130,6 +134,31 @@ export const approveRegistrationSchema = z
       });
     }
   });
+
+export const accountProfileUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Nome completo obrigatorio.").optional(),
+    nickname: optionalNicknameSchema,
+    position: z.nativeEnum(Position).nullable().optional(),
+    shirtNumberPreference: shirtNumberSchema,
+    email: z.string().trim().toLowerCase().email("Email invalido.").optional(),
+    whatsApp: optionalPhoneSchema,
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo para atualizar.",
+  });
+
+export const userRoleUpdateSchema = z.object({
+  role: z.nativeEnum(UserRole),
+});
+
+export const userStatusUpdateSchema = z.object({
+  action: z.enum(["disable", "reactivate", "reopen"]),
+});
+
+export const adminPasswordResetSchema = z.object({
+  mode: z.enum(["email", "temporary"]),
+});
 
 export const accountStatusSchema = z.object({
   status: z.nativeEnum(UserStatus),

@@ -16,5 +16,7 @@ export async function GET() {
     status: user.status,
     playerId: user.playerId,
     nickname: user.nickname,
+    mustChangePassword: user.mustChangePassword,
+    emailVerified: user.emailVerified,
   });
 }

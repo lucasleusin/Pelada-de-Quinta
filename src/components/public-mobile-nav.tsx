@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BarChart3, CircleUserRound, House, Medal, ScrollText } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { usePublicAuthState } from "@/components/use-public-auth-state";
+import { resolveAuthenticatedLandingPath } from "@/lib/auth-redirect";
 import { cn } from "@/lib/utils";
 
 const mobileLinks = [
@@ -43,14 +44,23 @@ const mobileLinks = [
 export function PublicMobileNav() {
   const pathname = usePathname();
   const isAdminPath = pathname.startsWith("/admin");
-  const { isAuthenticated } = usePublicAuthState(!isAdminPath);
+  const { authState, isAuthenticated } = usePublicAuthState(!isAdminPath);
 
   if (isAdminPath) {
     return null;
   }
 
   function resolveHref(href: string) {
-    if (isAuthenticated || href === "/" || href === "/estatisticas") {
+    if (href === "/" || href === "/estatisticas") {
+      return href;
+    }
+
+    if (authState?.id) {
+      const landingPath = resolveAuthenticatedLandingPath(authState);
+      return landingPath === "/meu-perfil" ? href : landingPath;
+    }
+
+    if (isAuthenticated) {
       return href;
     }
 

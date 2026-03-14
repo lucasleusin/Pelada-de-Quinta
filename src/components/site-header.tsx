@@ -7,6 +7,7 @@ import { PublicAuthButton } from "@/components/public-auth-button";
 import { usePublicAuthState } from "@/components/use-public-auth-state";
 import { useSiteSettings } from "@/components/site-settings-provider";
 import { buttonVariants } from "@/components/ui/button";
+import { resolveAuthenticatedLandingPath } from "@/lib/auth-redirect";
 import { cn } from "@/lib/utils";
 
 const protectedHrefs = new Set(["/partidas-passadas", "/votacao", "/meu-perfil"]);
@@ -29,10 +30,19 @@ export function SiteHeader() {
   const logoUrl = siteSettings.logoUrl ?? undefined;
   const hasLogo = Boolean(logoUrl);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
-  const { isAuthenticated } = usePublicAuthState(!isAdminPath);
+  const { authState, isAuthenticated } = usePublicAuthState(!isAdminPath);
 
   function resolveHref(href: string) {
-    if (isAuthenticated || !protectedHrefs.has(href)) {
+    if (!protectedHrefs.has(href)) {
+      return href;
+    }
+
+    if (authState?.id) {
+      const landingPath = resolveAuthenticatedLandingPath(authState);
+      return landingPath === "/meu-perfil" ? href : landingPath;
+    }
+
+    if (isAuthenticated) {
       return href;
     }
 
@@ -49,6 +59,7 @@ export function SiteHeader() {
           >
             <div className="flex items-center gap-3">
               {hasLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={logoUrl}
                   alt={siteSettings.siteName}

@@ -66,6 +66,7 @@ enum UserStatus {
   PENDING_VERIFICATION
   PENDING_APPROVAL
   ACTIVE
+  DISABLED
   REJECTED
 }
 
@@ -181,6 +182,8 @@ model User {
   emailVerified         DateTime?
   image                 String?
   passwordHash          String?
+  mustChangePassword    Boolean      @default(false)
+  sessionVersion        Int          @default(0)
   role                  UserRole     @default(PLAYER)
   status                UserStatus   @default(PENDING_VERIFICATION)
   playerId              String?      @unique

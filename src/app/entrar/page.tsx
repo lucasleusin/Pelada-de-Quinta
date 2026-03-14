@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { HeroBlock, PageShell, StatusNote } from "@/components/layout/primitives";
@@ -34,24 +34,26 @@ function MicrosoftIcon() {
 export default function EntrarPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [identifier, setIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    return window.localStorage.getItem(rememberedIdentifierKey) ?? "";
+  });
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return Boolean(window.localStorage.getItem(rememberedIdentifierKey));
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const callbackUrl = useMemo(() => searchParams.get("callbackUrl") || "/meu-perfil", [searchParams]);
   const rejected = searchParams.get("erro") === "rejeitado";
-
-  useEffect(() => {
-    const rememberedIdentifier = window.localStorage.getItem(rememberedIdentifierKey);
-
-    if (!rememberedIdentifier) {
-      return;
-    }
-
-    setIdentifier(rememberedIdentifier);
-    setRememberMe(true);
-  }, []);
+  const removed = searchParams.get("erro") === "removido";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -178,6 +180,7 @@ export default function EntrarPage() {
           </div>
 
           {rejected ? <StatusNote className="mt-4" tone="error">Seu cadastro foi rejeitado. Fale com o administrador.</StatusNote> : null}
+          {removed ? <StatusNote className="mt-4" tone="error">Seu acesso foi removido. Fale com o administrador.</StatusNote> : null}
           {error ? <StatusNote className="mt-4" tone="error">{error}</StatusNote> : null}
         </div>
       </HeroBlock>

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { formatDatePtBr } from "@/lib/date-format";
 import { getPrimaryTeam, getTeamMembershipRank, hasTeam, normalizeTeams, type TeamCode } from "@/lib/team-utils";
@@ -64,6 +64,17 @@ function parseNullableScore(value: string): number | null {
   if (value.trim() === "") return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : Math.min(99, Math.max(0, Math.trunc(parsed)));
+}
+
+function scoreStateFromMatch(match: Match | null): ScoreState {
+  if (!match) {
+    return { teamAScore: "", teamBScore: "" };
+  }
+
+  return {
+    teamAScore: match.teamAScore === null ? "" : String(match.teamAScore),
+    teamBScore: match.teamBScore === null ? "" : String(match.teamBScore),
+  };
 }
 
 export default function AdminPartidasPage() {
@@ -151,7 +162,17 @@ export default function AdminPartidasPage() {
     return sortByName(list.filter((participant) => participant.presenceStatus !== "CONFIRMED"));
   }, [participantByPlayerId, players]);
 
-  async function loadData() {
+  const applyMatchSelection = useCallback((nextMatchId: string, availableMatches: Match[] = matches) => {
+    const nextMatch = availableMatches.find((match) => match.id === nextMatchId) ?? null;
+    setSelectedMatchId(nextMatchId);
+    setShowNonConfirmedPlayers(false);
+    setScore(scoreStateFromMatch(nextMatch));
+    setScoreDirty(false);
+    setScoreSaveStatus("idle");
+    setScoreMessage("");
+  }, [matches]);
+
+  const loadData = useCallback(async () => {
     const [matchesRes, playersRes] = await Promise.all([
       fetch("/api/admin/matches"),
       fetch("/api/players?active=true"),
@@ -163,43 +184,35 @@ export default function AdminPartidasPage() {
     setMatches(matchesPayload);
     setPlayers(playersPayload);
 
-    setSelectedMatchId((currentSelection) => {
-      if (matchesPayload.length === 0) {
-        return "";
-      }
+    const nextSelectedMatchId =
+      matchesPayload.length === 0
+        ? ""
+        : selectedMatchId && matchesPayload.some((match) => match.id === selectedMatchId)
+          ? selectedMatchId
+          : matchesPayload[0].id;
 
-      if (currentSelection && matchesPayload.some((match) => match.id === currentSelection)) {
-        return currentSelection;
-      }
-
-      return matchesPayload[0].id;
-    });
-  }
+    applyMatchSelection(nextSelectedMatchId, matchesPayload);
+  }, [applyMatchSelection, selectedMatchId]);
 
   useEffect(() => {
-    loadData().catch(() => setMessage("Falha ao carregar partidas."));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let active = true;
 
-  useEffect(() => {
-    if (!selectedMatch) {
-      setScore({ teamAScore: "", teamBScore: "" });
-      setScoreDirty(false);
-      setScoreSaveStatus("idle");
-      return;
+    async function run() {
+      try {
+        await loadData();
+      } catch {
+        if (active) {
+          setMessage("Falha ao carregar partidas.");
+        }
+      }
     }
 
-    setScore({
-      teamAScore: selectedMatch.teamAScore === null ? "" : String(selectedMatch.teamAScore),
-      teamBScore: selectedMatch.teamBScore === null ? "" : String(selectedMatch.teamBScore),
-    });
-    setScoreDirty(false);
-    setScoreSaveStatus("idle");
-  }, [selectedMatch]);
+    void run();
 
-  useEffect(() => {
-    setShowNonConfirmedPlayers(false);
-  }, [selectedMatchId]);
+    return () => {
+      active = false;
+    };
+  }, [loadData]);
 
   useEffect(() => {
     if (!selectedMatch || !scoreDirty) return;
@@ -426,7 +439,6 @@ export default function AdminPartidasPage() {
       return;
     }
 
-    setSelectedMatchId("");
     setMessage("Partida excluida.");
     await loadData();
   }
@@ -593,7 +605,7 @@ export default function AdminPartidasPage() {
               id="match-select"
               className="field-input"
               value={selectedMatchId}
-              onChange={(event) => setSelectedMatchId(event.currentTarget.value)}
+              onChange={(event) => applyMatchSelection(event.currentTarget.value)}
             >
               <option value="">-- selecione --</option>
               {matches.map((match) => (

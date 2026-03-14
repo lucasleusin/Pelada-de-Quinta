@@ -19,11 +19,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Token invalido ou expirado." }, { status: 400 });
   }
 
+  const user = await db().user.findUnique({
+    where: { id: token.userId },
+    select: {
+      status: true,
+    },
+  });
+
+  if (!user) {
+    return NextResponse.json({ error: "Conta nao encontrada." }, { status: 404 });
+  }
+
   await db().user.update({
     where: { id: token.userId },
     data: {
       emailVerified: new Date(),
-      status: "PENDING_APPROVAL",
+      status:
+        user.status === "REJECTED" || user.status === "DISABLED"
+          ? user.status
+          : "PENDING_APPROVAL",
     },
   });
 

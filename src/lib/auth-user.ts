@@ -43,7 +43,7 @@ export async function requireAdminApi() {
     return authCheck;
   }
 
-  if (authCheck.user.role !== UserRole.ADMIN) {
+  if (authCheck.user.role !== UserRole.ADMIN || authCheck.user.status !== UserStatus.ACTIVE) {
     return {
       ok: false as const,
       response: NextResponse.json({ error: "Administrador invalido." }, { status: 403 }),
@@ -58,6 +58,13 @@ export async function requireActivePlayerApi() {
 
   if (!authCheck.ok) {
     return authCheck;
+  }
+
+  if (authCheck.user.mustChangePassword) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: "Troca de senha obrigatoria." }, { status: 403 }),
+    };
   }
 
   if (authCheck.user.status !== UserStatus.ACTIVE || !authCheck.user.playerId) {

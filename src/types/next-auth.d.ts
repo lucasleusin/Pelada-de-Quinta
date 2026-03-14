@@ -11,6 +11,7 @@ declare module "next-auth" {
       role: UserRole;
       status: UserStatus;
       playerId: string | null;
+      mustChangePassword: boolean;
     };
   }
 }
@@ -20,5 +21,7 @@ declare module "next-auth/jwt" {
     role?: UserRole;
     status?: UserStatus;
     playerId?: string | null;
+    mustChangePassword?: boolean;
+    sessionVersion?: number;
   }
 }

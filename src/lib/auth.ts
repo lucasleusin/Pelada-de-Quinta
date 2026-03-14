@@ -23,6 +23,8 @@ function serializeUser(user: {
   role: UserRole;
   status: UserStatus;
   playerId: string | null;
+  mustChangePassword: boolean;
+  sessionVersion: number;
 }) {
   return {
     id: user.id,
@@ -32,6 +34,8 @@ function serializeUser(user: {
     role: user.role,
     status: user.status,
     playerId: user.playerId,
+    mustChangePassword: user.mustChangePassword,
+    sessionVersion: user.sessionVersion,
   };
 }
 
@@ -134,8 +138,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return false;
       }
 
-      if (dbUser.status === UserStatus.REJECTED) {
-        return "/entrar?erro=rejeitado";
+      if (dbUser.status === UserStatus.DISABLED) {
+        return "/entrar?erro=removido";
+      }
+
+      if (dbUser.mustChangePassword && account?.provider === "credentials") {
+        return "/redefinir-senha?modo=obrigatorio";
       }
 
       if (isSocialProvider) {
@@ -169,7 +177,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
 
       if (!dbUser) {
-        return token;
+        return {
+          ...token,
+          sub: undefined,
+          role: undefined,
+          status: undefined,
+          playerId: undefined,
+          email: undefined,
+          name: undefined,
+          picture: undefined,
+          mustChangePassword: undefined,
+          sessionVersion: undefined,
+        };
+      }
+
+      if (typeof token.sessionVersion === "number" && token.sessionVersion !== dbUser.sessionVersion) {
+        return {
+          ...token,
+          sub: undefined,
+          role: undefined,
+          status: undefined,
+          playerId: undefined,
+          email: undefined,
+          name: undefined,
+          picture: undefined,
+          mustChangePassword: undefined,
+          sessionVersion: undefined,
+        };
       }
 
       token.sub = dbUser.id;
@@ -179,6 +213,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.email = dbUser.email;
       token.name = dbUser.name;
       token.picture = dbUser.image ?? undefined;
+      token.mustChangePassword = dbUser.mustChangePassword;
+      token.sessionVersion = dbUser.sessionVersion;
 
       return token;
     },
@@ -188,6 +224,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.role = (token.role as UserRole | undefined) ?? UserRole.PLAYER;
         session.user.status = (token.status as UserStatus | undefined) ?? UserStatus.PENDING_VERIFICATION;
         session.user.playerId = typeof token.playerId === "string" ? token.playerId : null;
+        session.user.mustChangePassword = token.mustChangePassword === true;
       }
 
       return session;

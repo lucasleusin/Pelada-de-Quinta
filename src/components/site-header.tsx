@@ -4,9 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PwaInstallMenu } from "@/components/pwa-install-menu";
 import { PublicAuthButton } from "@/components/public-auth-button";
+import { usePublicAuthState } from "@/components/use-public-auth-state";
 import { useSiteSettings } from "@/components/site-settings-provider";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+const protectedHrefs = new Set(["/partidas-passadas", "/votacao", "/meu-perfil"]);
 
 const publicLinks = [
   { href: "/", label: "Home" },
@@ -22,10 +25,19 @@ function isActivePath(pathname: string, href: string) {
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const { isAuthenticated } = usePublicAuthState();
   const siteSettings = useSiteSettings();
   const logoUrl = siteSettings.logoUrl ?? undefined;
   const hasLogo = Boolean(logoUrl);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  function resolveHref(href: string) {
+    if (isAuthenticated || !protectedHrefs.has(href)) {
+      return href;
+    }
+
+    return `/entrar?callbackUrl=${encodeURIComponent(href)}`;
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-emerald-200/70 bg-white/85 backdrop-blur-lg">
@@ -90,7 +102,7 @@ export function SiteHeader() {
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                href={resolveHref(link.href)}
                 className={cn(
                   buttonVariants({ variant: active ? "default" : "outline", size: "sm" }),
                   "rounded-full",

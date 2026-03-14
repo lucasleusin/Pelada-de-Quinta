@@ -33,5 +33,5 @@ export default auth((request) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/partidas-passadas", "/votacao", "/meu-perfil"],
+  matcher: ["/admin/:path*", "/partidas-passadas/:path*", "/votacao/:path*", "/meu-perfil/:path*"],
 };

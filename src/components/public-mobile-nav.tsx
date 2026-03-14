@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { BarChart3, CircleUserRound, House, Medal, ScrollText } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { usePublicAuthState } from "@/components/use-public-auth-state";
 import { cn } from "@/lib/utils";
 
 const mobileLinks = [
@@ -41,9 +42,18 @@ const mobileLinks = [
 
 export function PublicMobileNav() {
   const pathname = usePathname();
+  const { isAuthenticated } = usePublicAuthState();
 
   if (pathname.startsWith("/admin")) {
     return null;
+  }
+
+  function resolveHref(href: string) {
+    if (isAuthenticated || href === "/" || href === "/estatisticas") {
+      return href;
+    }
+
+    return `/entrar?callbackUrl=${encodeURIComponent(href)}`;
   }
 
   return (
@@ -56,7 +66,7 @@ export function PublicMobileNav() {
           return (
             <Link
               key={link.href}
-              href={link.href}
+              href={resolveHref(link.href)}
               className={cn(
                 "flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-semibold transition",
                 active

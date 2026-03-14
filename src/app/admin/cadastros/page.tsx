@@ -26,6 +26,38 @@ function playerLabel(player: Player) {
   return player.nickname ? `${player.nickname} (${player.name})` : player.name;
 }
 
+function extractErrorMessage(payload: unknown, fallback: string) {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload;
+  }
+
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+
+    if (typeof record.error === "string" && record.error.trim()) {
+      return record.error;
+    }
+
+    const fieldErrors = record.error && typeof record.error === "object"
+      ? (record.error as Record<string, unknown>).fieldErrors
+      : null;
+
+    if (fieldErrors && typeof fieldErrors === "object") {
+      for (const value of Object.values(fieldErrors as Record<string, unknown>)) {
+        if (Array.isArray(value)) {
+          const firstMessage = value.find((item) => typeof item === "string" && item.trim());
+
+          if (typeof firstMessage === "string") {
+            return firstMessage;
+          }
+        }
+      }
+    }
+  }
+
+  return fallback;
+}
+
 export default function AdminCadastrosPage() {
   const [users, setUsers] = useState<PendingUser[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -66,26 +98,29 @@ export default function AdminCadastrosPage() {
   async function sendApproval(userId: string, action: "link" | "create" | "reject") {
     setLoadingId(userId);
     setMessage("");
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/approval`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action,
+          playerId: selectedPlayers[userId] || null,
+        }),
+      });
 
-    const response = await fetch(`/api/admin/users/${userId}/approval`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action,
-        playerId: selectedPlayers[userId] || null,
-      }),
-    });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: "Nao foi possivel atualizar o cadastro." }));
+        setMessage(extractErrorMessage(payload, "Nao foi possivel atualizar o cadastro."));
+        return;
+      }
 
-    setLoadingId(null);
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "Nao foi possivel atualizar o cadastro." }));
-      setMessage(payload.error ?? "Nao foi possivel atualizar o cadastro.");
-      return;
+      setMessage("Cadastro atualizado.");
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel atualizar o cadastro.");
+    } finally {
+      setLoadingId(null);
     }
-
-    setMessage("Cadastro atualizado.");
-    await loadData();
   }
 
   return (

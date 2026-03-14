@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PwaInstallMenu } from "@/components/pwa-install-menu";
+import { PublicAuthButton } from "@/components/public-auth-button";
 import { useSiteSettings } from "@/components/site-settings-provider";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -61,7 +62,7 @@ export function SiteHeader() {
               </p>
             ) : null}
 
-            <div className="md:hidden">
+            <div className="flex items-center gap-2 md:hidden">
               {isAdminPath ? (
                 <Link
                   href="/"
@@ -73,7 +74,10 @@ export function SiteHeader() {
                   Inicio
                 </Link>
               ) : (
-                <PwaInstallMenu />
+                <>
+                  <PwaInstallMenu />
+                  <PublicAuthButton />
+                </>
               )}
             </div>
           </div>
@@ -111,6 +115,8 @@ export function SiteHeader() {
           >
             Admin
           </Link>
+
+          {!isAdminPath ? <PublicAuthButton className="ml-auto" /> : null}
         </nav>
       </div>
     </header>

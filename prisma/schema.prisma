@@ -81,6 +81,9 @@ model Player {
   photoUrl              String?
   photoPath             String?
   isActive              Boolean            @default(true)
+  mergedIntoPlayerId    String?
+  mergedAt              DateTime?
+  mergedByUserId        String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   participants          MatchParticipant[]
@@ -89,8 +92,12 @@ model Player {
   statsUpdatedEntries   MatchParticipant[] @relation("StatsUpdatedBy")
   whatsAppMessages      WhatsAppMessageLog[]
   user                  User?
+  mergedIntoPlayer      Player?            @relation("MergedPlayers", fields: [mergedIntoPlayerId], references: [id], onDelete: SetNull)
+  mergedPlayers         Player[]           @relation("MergedPlayers")
+  mergedByUser          User?              @relation("PlayersMergedByUser", fields: [mergedByUserId], references: [id], onDelete: SetNull)
 
   @@index([name])
+  @@index([mergedIntoPlayerId])
   @@map("players")
 }
 
@@ -191,13 +198,22 @@ model User {
   position              Position?
   shirtNumberPreference Int?
   whatsApp              String?
+  mergedIntoUserId      String?
+  mergedAt              DateTime?
+  mergedByUserId        String?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   accounts              Account[]
   sessions              Session[]
   player                Player?      @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  mergedIntoUser        User?        @relation("MergedUsers", fields: [mergedIntoUserId], references: [id], onDelete: SetNull)
+  mergedUsers           User[]       @relation("MergedUsers")
+  mergedByUser          User?        @relation("UsersMergedByUser", fields: [mergedByUserId], references: [id], onDelete: SetNull)
+  playersMerged         Player[]     @relation("PlayersMergedByUser")
+  usersMerged           User[]       @relation("UsersMergedByUser")
 
   @@index([role, status])
+  @@index([mergedIntoUserId])
   @@map("users")
 }
 

@@ -61,14 +61,22 @@ const providers: Provider[] = [
       const fallbackPassword = process.env.ADMIN_LOGIN_PASSWORD ?? process.env.ADMIN_SEED_PASSWORD ?? "admin123";
 
       if (identifier === fallbackEmail && password === fallbackPassword) {
-        const fallbackUser = user ?? (await prisma.user.findFirst({ where: { role: UserRole.ADMIN }, orderBy: { createdAt: "asc" } }));
+        const fallbackUser =
+          (user && !user.mergedIntoUserId ? user : null) ??
+          (await prisma.user.findFirst({
+            where: {
+              role: UserRole.ADMIN,
+              mergedIntoUserId: null,
+            },
+            orderBy: { createdAt: "asc" },
+          }));
 
         if (fallbackUser) {
           return serializeUser(fallbackUser);
         }
       }
 
-      if (!user?.passwordHash) {
+      if (!user?.passwordHash || user.mergedIntoUserId) {
         return null;
       }
 
@@ -119,7 +127,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const email = normalizeEmail(user.email);
       const isSocialProvider = Boolean(account?.provider && account.provider !== "credentials");
-      let dbUser = await prisma.user.findUnique({ where: { email } });
+      let dbUser =
+        typeof user.id === "string"
+          ? await prisma.user.findUnique({ where: { id: user.id } })
+          : null;
+
+      if (!dbUser) {
+        dbUser = await prisma.user.findUnique({ where: { email } });
+      }
 
       if (!dbUser && isSocialProvider) {
         dbUser = await prisma.user.create({
@@ -136,6 +151,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (!dbUser) {
         return false;
+      }
+
+      if (dbUser.mergedIntoUserId) {
+        return "/entrar?erro=removido";
       }
 
       if (dbUser.status === UserStatus.DISABLED) {
@@ -177,6 +196,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
 
       if (!dbUser) {
+        return {
+          ...token,
+          sub: undefined,
+          role: undefined,
+          status: undefined,
+          playerId: undefined,
+          email: undefined,
+          name: undefined,
+          picture: undefined,
+          mustChangePassword: undefined,
+          sessionVersion: undefined,
+        };
+      }
+
+      if (dbUser.mergedIntoUserId) {
         return {
           ...token,
           sub: undefined,

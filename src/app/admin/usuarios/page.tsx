@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 type UserRole = "ADMIN" | "PLAYER";
 type UserStatus = "PENDING_VERIFICATION" | "PENDING_APPROVAL" | "ACTIVE" | "DISABLED" | "REJECTED";
@@ -308,11 +309,18 @@ export default function AdminUsuariosPage() {
   return (
     <div className="space-y-4">
       <HeroBlock className="p-5 sm:p-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Acesso</p>
-        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Usuarios</h2>
-        <p className="text-sm text-emerald-800">
-          Gerencie aprovacoes, niveis de acesso, redefinicao de senha e vinculo com os atletas cadastrados.
-        </p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Acesso</p>
+            <h2 className="mt-1 text-3xl font-bold text-emerald-950">Usuarios</h2>
+            <p className="text-sm text-emerald-800">
+              Gerencie aprovacoes, niveis de acesso, redefinicao de senha e vinculo com os atletas cadastrados.
+            </p>
+          </div>
+          <Link className={buttonVariants({ variant: "outline", className: "rounded-full" })} href="/admin/usuarios/unificar">
+            Unificar Jogadores/Usuarios
+          </Link>
+        </div>
       </HeroBlock>
 
       <SectionShell className="p-4">

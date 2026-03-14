@@ -59,6 +59,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     where: {
       id: requestedId,
       isActive: true,
+      mergedIntoPlayerId: null,
     },
     select: {
       id: true,

@@ -12,6 +12,7 @@ export async function GET() {
   const users = await db().user.findMany({
     where: {
       role: "PLAYER",
+      mergedIntoUserId: null,
       status: {
         in: [UserStatus.PENDING_APPROVAL, UserStatus.PENDING_VERIFICATION],
       },

@@ -9,9 +9,12 @@ export async function GET(request: Request) {
   const players = await prisma.player.findMany({
     where:
       active === null
-        ? undefined
+        ? {
+            mergedIntoPlayerId: null,
+          }
         : {
             isActive: active === "true",
+            mergedIntoPlayerId: null,
           },
     orderBy: { name: "asc" },
   });

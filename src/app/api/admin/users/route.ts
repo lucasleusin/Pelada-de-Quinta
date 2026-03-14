@@ -11,6 +11,9 @@ export async function GET() {
 
   const [users, players] = await Promise.all([
     db().user.findMany({
+      where: {
+        mergedIntoUserId: null,
+      },
       orderBy: [{ createdAt: "asc" }],
       include: {
         player: {
@@ -23,7 +26,10 @@ export async function GET() {
       },
     }),
     db().player.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        mergedIntoPlayerId: null,
+      },
       orderBy: { name: "asc" },
       select: {
         id: true,

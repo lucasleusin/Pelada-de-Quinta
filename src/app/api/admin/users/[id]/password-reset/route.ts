@@ -28,10 +28,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       id: true,
       email: true,
       status: true,
+      mergedIntoUserId: true,
     },
   });
 
-  if (!user) {
+  if (!user || user.mergedIntoUserId) {
     return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
   }
 

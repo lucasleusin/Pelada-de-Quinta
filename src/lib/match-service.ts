@@ -995,7 +995,12 @@ export async function getAttendanceReport() {
   const eligibleMatchIds = finishedMatches.map((match) => match.id);
   const eligibleMatches = eligibleMatchIds.length;
 
-  const players = await db().player.findMany({ orderBy: { name: "asc" } });
+  const players = await db().player.findMany({
+    where: {
+      mergedIntoPlayerId: null,
+    },
+    orderBy: { name: "asc" },
+  });
   const confirmedByPlayer = await db().matchParticipant.groupBy({
     by: ["playerId"],
     where: {

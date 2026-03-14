@@ -46,6 +46,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const prisma = getPrismaClient();
+
+  const existingPlayer = await prisma.player.findFirst({
+    where: {
+      id,
+      mergedIntoPlayerId: null,
+    },
+    select: { id: true },
+  });
+
+  if (!existingPlayer) {
+    return NextResponse.json({ error: "Jogador nao encontrado." }, { status: 404 });
+  }
+
   try {
     const player = await prisma.player.update({
       where: { id },

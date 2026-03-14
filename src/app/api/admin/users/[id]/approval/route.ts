@@ -19,7 +19,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const user = await db().user.findUnique({ where: { id } });
+  const user = await db().user.findFirst({
+    where: {
+      id,
+      mergedIntoUserId: null,
+    },
+  });
 
   if (!user) {
     return NextResponse.json({ error: "Cadastro nao encontrado." }, { status: 404 });
@@ -58,7 +63,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ ok: true, playerId: player.id });
   }
 
-  const player = await db().player.findUnique({ where: { id: parsed.data.playerId! } });
+  const player = await db().player.findFirst({
+    where: {
+      id: parsed.data.playerId!,
+      mergedIntoPlayerId: null,
+    },
+  });
 
   if (!player) {
     return NextResponse.json({ error: "Jogador nao encontrado." }, { status: 404 });
@@ -68,6 +78,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     where: {
       playerId: player.id,
       id: { not: id },
+      mergedIntoUserId: null,
     },
     select: { id: true },
   });

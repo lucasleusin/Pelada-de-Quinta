@@ -62,6 +62,15 @@ const siteOptionalTextSchema = (max: number, message: string) =>
     z.string().max(max, message),
   );
 
+const optionalIdentifierSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  },
+  z.string().min(1, "Identificador invalido.").nullable().optional(),
+);
+
 export const playerCreateSchema = z.object({
   name: z.string().trim().min(2, "Nome obrigatorio."),
   nickname: optionalNicknameSchema,
@@ -159,6 +168,59 @@ export const userStatusUpdateSchema = z.object({
 export const adminPasswordResetSchema = z.object({
   mode: z.enum(["email", "temporary"]),
 });
+
+export const mergeEntitiesSchema = z
+  .object({
+    action: z.enum(["preview", "execute"]),
+    primaryUserId: optionalIdentifierSchema,
+    secondaryUserId: optionalIdentifierSchema,
+    primaryPlayerId: optionalIdentifierSchema,
+    secondaryPlayerId: optionalIdentifierSchema,
+  })
+  .superRefine((data, ctx) => {
+    const hasUserPair = Boolean(data.primaryUserId || data.secondaryUserId);
+    const hasPlayerPair = Boolean(data.primaryPlayerId || data.secondaryPlayerId);
+
+    if (hasUserPair && (!data.primaryUserId || !data.secondaryUserId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["primaryUserId"],
+        message: "Selecione usuario principal e secundario para unificar contas.",
+      });
+    }
+
+    if (hasPlayerPair && (!data.primaryPlayerId || !data.secondaryPlayerId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["primaryPlayerId"],
+        message: "Selecione jogador principal e secundario para unificar historicos.",
+      });
+    }
+
+    if (!hasUserPair && !hasPlayerPair) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["primaryUserId"],
+        message: "Selecione ao menos um par de usuarios ou jogadores para unificar.",
+      });
+    }
+
+    if (data.primaryUserId && data.secondaryUserId && data.primaryUserId === data.secondaryUserId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["secondaryUserId"],
+        message: "Usuario principal e secundario precisam ser diferentes.",
+      });
+    }
+
+    if (data.primaryPlayerId && data.secondaryPlayerId && data.primaryPlayerId === data.secondaryPlayerId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["secondaryPlayerId"],
+        message: "Jogador principal e secundario precisam ser diferentes.",
+      });
+    }
+  });
 
 export const accountStatusSchema = z.object({
   status: z.nativeEnum(UserStatus),

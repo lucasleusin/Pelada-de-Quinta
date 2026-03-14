@@ -3,6 +3,7 @@ import {
   adminPasswordResetSchema,
   changePasswordSchema,
   accountProfileUpdateSchema,
+  mergeEntitiesSchema,
   playerCreateSchema,
   playerProfileUpdateSchema,
   ratingsBatchSchema,
@@ -123,5 +124,23 @@ describe("validators", () => {
     expect(adminPasswordResetSchema.safeParse({ mode: "email" }).success).toBe(true);
     expect(adminPasswordResetSchema.safeParse({ mode: "temporary" }).success).toBe(true);
     expect(changePasswordSchema.safeParse({ password: "NovaSenha123!" }).success).toBe(true);
+  });
+
+  it("requires a full pair when merging users or players", () => {
+    expect(
+      mergeEntitiesSchema.safeParse({
+        action: "preview",
+        primaryUserId: "user-1",
+        secondaryUserId: "",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      mergeEntitiesSchema.safeParse({
+        action: "preview",
+        primaryUserId: "user-1",
+        secondaryUserId: "user-2",
+      }).success,
+    ).toBe(true);
   });
 });

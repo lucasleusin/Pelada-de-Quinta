@@ -10,6 +10,7 @@ async function hasAnotherActiveAdmin(excludedUserId: string) {
   const total = await db().user.count({
     where: {
       id: { not: excludedUserId },
+      mergedIntoUserId: null,
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
     },
@@ -37,10 +38,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       role: true,
       status: true,
       playerId: true,
+      mergedIntoUserId: true,
     },
   });
 
-  if (!user) {
+  if (!user || user.mergedIntoUserId) {
     return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
   }
 

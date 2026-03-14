@@ -169,6 +169,10 @@ export const adminPasswordResetSchema = z.object({
   mode: z.enum(["email", "temporary"]),
 });
 
+export const adminSetPasswordSchema = z.object({
+  password: z.string().min(8, "Senha deve ter ao menos 8 caracteres."),
+});
+
 export const mergeEntitiesSchema = z
   .object({
     action: z.enum(["preview", "execute"]),

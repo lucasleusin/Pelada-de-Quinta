@@ -1,14 +1,41 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSiteSettingsController } from "@/components/site-settings-provider";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
+import { Button } from "@/components/ui/button";
 import { getSiteAssetAccept, type SiteAssetKind } from "@/lib/site-asset";
 import type { SiteSettingsPublic } from "@/lib/site-settings-contract";
 
 type Notice = {
   tone: "neutral" | "success" | "error";
   text: string;
+};
+
+type UserRole = "ADMIN" | "PLAYER";
+
+type ManagedUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  role: UserRole;
+  playerId: string | null;
+  player: {
+    id: string;
+    name: string;
+    nickname: string | null;
+  } | null;
+};
+
+type UsersPayload = {
+  pendingUsers: ManagedUser[];
+  activeUsers: ManagedUser[];
+  removedUsers: ManagedUser[];
+  players: Array<{
+    id: string;
+    name: string;
+    nickname: string | null;
+  }>;
 };
 
 type SiteSettingsFormState = {
@@ -100,6 +127,12 @@ function toFormState(settings: SiteSettingsPublic): SiteSettingsFormState {
   };
 }
 
+function userLabel(user: ManagedUser) {
+  return user.player?.nickname
+    ? `${user.player.nickname} (${user.player.name})`
+    : user.player?.name ?? user.name?.trim() ?? user.email;
+}
+
 export default function AdminSiteSetupPage() {
   const { settings, setSettings } = useSiteSettingsController();
   const [formState, setFormState] = useState<SiteSettingsFormState>(() => toFormState(settings));
@@ -115,11 +148,48 @@ export default function AdminSiteSetupPage() {
     favicon: "",
     shareImage: "",
   });
+  const [activeUsers, setActiveUsers] = useState<ManagedUser[]>([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [roleLoadingId, setRoleLoadingId] = useState<string | null>(null);
+
+  const eligibleAdminUsers = useMemo(
+    () =>
+      [...activeUsers]
+        .filter((user) => Boolean(user.playerId && user.player))
+        .sort((left, right) => userLabel(left).localeCompare(userLabel(right))),
+    [activeUsers],
+  );
 
   function applySettings(nextSettings: SiteSettingsPublic) {
     setSettings(nextSettings);
     setFormState(toFormState(nextSettings));
   }
+
+  async function loadAdminUsers() {
+    setAdminsLoading(true);
+
+    try {
+      const response = await fetch("/api/admin/users", { cache: "no-store" });
+
+      if (!response.ok) {
+        throw new Error(await parseError(response, "Falha ao carregar usuarios admin."));
+      }
+
+      const payload = (await response.json()) as UsersPayload;
+      setActiveUsers(payload.activeUsers);
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Falha ao carregar usuarios admin.",
+      });
+    } finally {
+      setAdminsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadAdminUsers();
+  }, []);
 
   async function saveBranding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,7 +217,37 @@ export default function AdminSiteSetupPage() {
 
     const payload = (await response.json()) as SiteSettingsPublic;
     applySettings(payload);
-    setNotice({ tone: "success", text: "Configuracao do site atualizada." });
+    setNotice({ tone: "success", text: "Configuracoes atualizadas." });
+  }
+
+  async function updateAdminRole(user: ManagedUser, nextRole: UserRole) {
+    setRoleLoadingId(user.id);
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/role`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ role: nextRole }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await parseError(response, "Falha ao atualizar permissao de admin."));
+      }
+
+      await loadAdminUsers();
+      setNotice({
+        tone: "success",
+        text: nextRole === "ADMIN" ? "Permissao de admin adicionada." : "Permissao de admin removida.",
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Falha ao atualizar permissao de admin.",
+      });
+    } finally {
+      setRoleLoadingId(null);
+    }
   }
 
   async function uploadAsset(kind: SiteAssetKind, routeSegment: string) {
@@ -220,66 +320,111 @@ export default function AdminSiteSetupPage() {
     <div className="space-y-4">
       <HeroBlock className="p-5 sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Configuracao do produto</p>
-        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Site Setup</h2>
+        <h2 className="mt-1 text-3xl font-bold text-emerald-950">Configuracoes</h2>
         <p className="text-sm text-emerald-800">
-          Atualize o branding principal do site, incluindo logo, favicon e imagem de compartilhamento.
+          Atualize o branding principal do site e gerencie quem pode acessar a area administrativa.
         </p>
       </HeroBlock>
 
-      <SectionShell className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xl font-semibold text-emerald-950">Branding</h3>
-            <p className="text-sm text-emerald-800">Esses campos alimentam o cabecalho, os metadados e os cards dos jogadores.</p>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)]">
+        <SectionShell className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-semibold text-emerald-950">Branding</h3>
+              <p className="text-sm text-emerald-800">Esses campos alimentam o cabecalho, os metadados e os cards dos jogadores.</p>
+            </div>
           </div>
-        </div>
 
-        <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={saveBranding}>
-          <label>
-            <span className="field-label">Nome do site</span>
-            <input
-              className="field-input"
-              value={formState.siteName}
-              onChange={(event) => {
-                const { value } = event.currentTarget;
-                setFormState((current) => ({ ...current, siteName: value }));
-              }}
-              required
-            />
-          </label>
+          <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={saveBranding}>
+            <label>
+              <span className="field-label">Nome do site</span>
+              <input
+                className="field-input"
+                value={formState.siteName}
+                onChange={(event) => {
+                  const { value } = event.currentTarget;
+                  setFormState((current) => ({ ...current, siteName: value }));
+                }}
+                required
+              />
+            </label>
 
-          <label className="md:col-span-2">
-            <span className="field-label">Descricao</span>
-            <textarea
-              className="field-input min-h-24"
-              value={formState.siteDescription}
-              onChange={(event) => {
-                const { value } = event.currentTarget;
-                setFormState((current) => ({ ...current, siteDescription: value }));
-              }}
-            />
-          </label>
+            <label className="md:col-span-2">
+              <span className="field-label">Descricao</span>
+              <textarea
+                className="field-input min-h-24"
+                value={formState.siteDescription}
+                onChange={(event) => {
+                  const { value } = event.currentTarget;
+                  setFormState((current) => ({ ...current, siteDescription: value }));
+                }}
+              />
+            </label>
 
-          <label>
-            <span className="field-label">Badge do topo</span>
-            <input
-              className="field-input"
-              value={formState.headerBadge}
-              onChange={(event) => {
-                const { value } = event.currentTarget;
-                setFormState((current) => ({ ...current, headerBadge: value }));
-              }}
-              placeholder="Gestao Semanal"
-            />
-          </label>
+            <label>
+              <span className="field-label">Badge do topo</span>
+              <input
+                className="field-input"
+                value={formState.headerBadge}
+                onChange={(event) => {
+                  const { value } = event.currentTarget;
+                  setFormState((current) => ({ ...current, headerBadge: value }));
+                }}
+                placeholder="Gestao Semanal"
+              />
+            </label>
 
-          <div className="md:col-span-2">
-            <button className="btn btn-primary" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar branding"}
-            </button>
+            <div className="md:col-span-2">
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                {saving ? "Salvando..." : "Salvar branding"}
+              </button>
+            </div>
+          </form>
+        </SectionShell>
+
+        <SectionShell className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-semibold text-emerald-950">Usuario Admin</h3>
+              <p className="text-sm text-emerald-800">Adicione ou remova a permissao administrativa dos usuarios ativos vinculados a jogadores.</p>
+            </div>
+            <Button className="rounded-full" type="button" variant="outline" onClick={() => void loadAdminUsers()}>
+              Atualizar
+            </Button>
           </div>
-        </form>
-      </SectionShell>
+
+          {adminsLoading ? (
+            <p className="mt-4 text-sm text-emerald-800">Carregando usuarios...</p>
+          ) : eligibleAdminUsers.length === 0 ? (
+            <p className="mt-4 text-sm text-emerald-800">Nao ha usuarios elegiveis para administrar o sistema.</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {eligibleAdminUsers.map((user) => (
+                <li key={user.id} className="rounded-xl border border-emerald-100 bg-white p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-emerald-950">{userLabel(user)}</p>
+                      <p className="text-sm text-emerald-800">{user.email}</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">
+                        {user.role === "ADMIN" ? "Admin ativo" : "Atleta"}
+                      </p>
+                    </div>
+                    <Button
+                      className="rounded-full"
+                      type="button"
+                      variant={user.role === "ADMIN" ? "outline" : "default"}
+                      disabled={roleLoadingId === user.id}
+                      onClick={() => updateAdminRole(user, user.role === "ADMIN" ? "PLAYER" : "ADMIN")}
+                    >
+                      {user.role === "ADMIN" ? "Remover admin" : "Adicionar admin"}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionShell>
+      </section>
 
       <SectionShell className="p-4">
         <div>

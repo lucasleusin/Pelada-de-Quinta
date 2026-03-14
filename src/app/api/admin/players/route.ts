@@ -33,6 +33,38 @@ function uniqueConstraintMessage(error: PrismaUniqueErrorLike) {
   return "Dados duplicados.";
 }
 
+export async function GET() {
+  const adminCheck = await requireAdminApi();
+  if (!adminCheck.ok) return adminCheck.response;
+
+  const prisma = getPrismaClient();
+  const players = await prisma.player.findMany({
+    where: {
+      mergedIntoPlayerId: null,
+    },
+    orderBy: { name: "asc" },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          mustChangePassword: true,
+          mergedIntoUserId: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(
+    players.map((player) => ({
+      ...player,
+      user: player.user?.mergedIntoUserId ? null : player.user,
+    })),
+  );
+}
+
 export async function POST(request: Request) {
   const adminCheck = await requireAdminApi();
   if (!adminCheck.ok) return adminCheck.response;

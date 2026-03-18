@@ -773,7 +773,7 @@ export default function HomePage() {
         </ActionBar>
       ) : null}
 
-      {(isGuestHome || isAuthenticatedAdminHome) && selectedMatch ? (
+      {isAuthenticatedAdminHome && selectedMatch ? (
         <section className="section-shell p-4 sm:p-5">
           <label>
             <span className="field-label">Buscar jogador</span>
@@ -793,7 +793,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {(isGuestHome || isAuthenticatedAdminHome) && selectedMatch ? (
+      {isAuthenticatedAdminHome && selectedMatch ? (
         <ActionBar className="sticky sticky-app-offset z-10 p-1.5 sm:p-2">
           <div className="flex flex-wrap gap-2">
             <Button
@@ -857,7 +857,25 @@ export default function HomePage() {
         <StatusNote tone="success">{actionMessage}</StatusNote>
       ) : null}
 
-      {(isGuestHome || isAuthenticatedAdminHome) && selectedMatch ? (
+      {isGuestHome && selectedMatch ? (
+        <section className="card p-4">
+          <h4 className="text-lg font-semibold text-emerald-900">Confirmados ({confirmed.length})</h4>
+          <ul className="mt-2 space-y-2 text-sm">
+            {confirmed.length === 0 ? (
+              <li className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">
+                Nenhum jogador confirmado ainda.
+              </li>
+            ) : null}
+            {confirmed.map((item) => (
+              <li key={item.playerId} className="rounded-lg bg-emerald-50 px-3 py-2 font-medium text-emerald-950">
+                {formatPlayerLabel(item.player)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {isAuthenticatedAdminHome && selectedMatch ? (
         <section className={`grid gap-4 ${listViewFilter === "ALL" ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
           {showPending ? (
             <div className="card p-4">

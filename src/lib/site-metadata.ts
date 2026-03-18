@@ -26,6 +26,11 @@ export function buildSiteMetadata(
     description: settings.siteDescription || undefined,
     applicationName: settings.siteName,
     manifest: "/manifest.webmanifest",
+    alternates: {
+      languages: {
+        "pt-BR": "/",
+      },
+    },
     icons: {
       icon: [
         { url: faviconHref },
@@ -45,6 +50,7 @@ export function buildSiteMetadata(
       title: settings.siteName,
       description: settings.siteDescription || undefined,
       siteName: settings.siteName,
+      locale: "pt_BR",
       images: shareImages,
     },
     twitter: {
@@ -52,6 +58,11 @@ export function buildSiteMetadata(
       title: settings.siteName,
       description: settings.siteDescription || undefined,
       images: shareImages,
+    },
+    other: {
+      language: "pt-BR",
+      "content-language": "pt-BR",
+      google: "notranslate",
     },
   };
 }

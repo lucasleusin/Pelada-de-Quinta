@@ -42,7 +42,7 @@ export default async function RootLayout({
   const siteSettings = await getCachedSiteSettings();
 
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" translate="no">
       <body className={`${heading.variable} ${body.variable} bg-canvas text-ink antialiased`}>
         <PwaRegistration />
         <SiteSettingsProvider initialSettings={siteSettings}>

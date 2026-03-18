@@ -279,7 +279,7 @@ export default function HomePage() {
   const showConfirmed = listViewFilter === "ALL" || listViewFilter === "CONFIRMED";
   const showCanceled = listViewFilter === "ALL" || listViewFilter === "CANCELED";
 
-  async function loadPublicData() {
+  async function loadGuestData() {
     const [playersRes, matchesRes] = await Promise.all([
       fetch("/api/players?active=true&publicSelectable=true", { cache: "no-store" }),
       fetch(`/api/matches?from=${getTodayIsoDate()}`, { cache: "no-store" }),
@@ -317,6 +317,31 @@ export default function HomePage() {
     });
   }
 
+  async function loadAdminData() {
+    const [playersRes, matchesRes] = await Promise.all([
+      fetch("/api/players?active=true", { cache: "no-store" }),
+      fetch(`/api/matches?from=${getTodayIsoDate()}`, { cache: "no-store" }),
+    ]);
+
+    const players = ((await playersRes.json()) as Player[]).sort((a, b) =>
+      playerDisplayName(a).localeCompare(playerDisplayName(b)),
+    );
+    const upcomingMatches = (await matchesRes.json()) as Match[];
+    const sortedMatches = upcomingMatches.sort(
+      (a, b) => getDateSortValue(a.matchDate) - getDateSortValue(b.matchDate),
+    );
+
+    setAllPlayers(players);
+    setMatches(sortedMatches);
+    setSelectedMatchId((currentSelection) => {
+      if (sortedMatches.length === 0) return null;
+      if (currentSelection && sortedMatches.some((match) => match.id === currentSelection)) {
+        return currentSelection;
+      }
+      return sortedMatches[0].id;
+    });
+  }
+
   useEffect(() => {
     if (!authLoading && authState?.id && !isAccountReadyForPlayerArea(authState)) {
       router.replace(resolveAuthenticatedLandingPath(authState));
@@ -341,10 +366,6 @@ export default function HomePage() {
       });
     }
 
-    async function loadAuthenticatedAdminData() {
-      await loadPublicData();
-    }
-
     async function synchronizeHomeData() {
       setIsLoadingData(true);
       setMessage("");
@@ -352,10 +373,10 @@ export default function HomePage() {
       try {
         const loader =
           !authLoading && isAuthenticatedAdminHome
-            ? loadAuthenticatedAdminData
+            ? loadAdminData
             : !authLoading && isAuthenticatedPlayerHome
               ? loadAuthenticatedPlayerData
-              : loadPublicData;
+              : loadGuestData;
         await loader();
       } catch {
         setMessage("Falha ao carregar dados da home.");
@@ -448,7 +469,7 @@ export default function HomePage() {
       setActionMessage("Jogador voltou para pendentes.");
     }
 
-    await loadPublicData();
+    await loadGuestData();
   }
 
   async function setAuthenticatedPresence(presenceStatus: "CONFIRMED" | "CANCELED") {
@@ -472,7 +493,7 @@ export default function HomePage() {
     );
 
     if (isAuthenticatedAdminHome) {
-      await loadPublicData();
+      await loadAdminData();
       return;
     }
 

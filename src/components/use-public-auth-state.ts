@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type AuthState = {
@@ -13,6 +14,7 @@ type AuthState = {
 };
 
 export function usePublicAuthState(enabled = true) {
+  const pathname = usePathname();
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,15 +26,19 @@ export function usePublicAuthState(enabled = true) {
     }
 
     let active = true;
+    let requestId = 0;
 
     async function loadUser() {
+      const currentRequestId = ++requestId;
+      setLoading(true);
+
       try {
         const response = await fetch("/api/auth/me", {
           credentials: "include",
           cache: "no-store",
         });
 
-        if (!active) {
+        if (!active || currentRequestId !== requestId) {
           return;
         }
 
@@ -44,11 +50,11 @@ export function usePublicAuthState(enabled = true) {
         const data = (await response.json()) as AuthState;
         setAuthState(data);
       } catch {
-        if (active) {
+        if (active && currentRequestId === requestId) {
           setAuthState(null);
         }
       } finally {
-        if (active) {
+        if (active && currentRequestId === requestId) {
           setLoading(false);
         }
       }
@@ -56,10 +62,19 @@ export function usePublicAuthState(enabled = true) {
 
     void loadUser();
 
+    function handleAuthStateChange() {
+      void loadUser();
+    }
+
+    window.addEventListener("focus", handleAuthStateChange);
+    window.addEventListener("auth-state-changed", handleAuthStateChange);
+
     return () => {
       active = false;
+      window.removeEventListener("focus", handleAuthStateChange);
+      window.removeEventListener("auth-state-changed", handleAuthStateChange);
     };
-  }, [enabled]);
+  }, [enabled, pathname]);
 
   return {
     authState,

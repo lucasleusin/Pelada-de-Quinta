@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { Button, buttonVariants } from "@/components/ui/button";
 
@@ -164,6 +165,7 @@ function StatsComparisonCard({
 }
 
 export default function AdminJogadoresUnificarPage() {
+  const router = useRouter();
   const [candidates, setCandidates] = useState<MergeCandidatesPayload>({ players: [] });
   const [primaryPlayerId, setPrimaryPlayerId] = useState("");
   const [secondaryPlayerId, setSecondaryPlayerId] = useState("");
@@ -276,6 +278,9 @@ export default function AdminJogadoresUnificarPage() {
       setAcknowledged(false);
       setMessage("Unificacao concluida com sucesso.");
       setMessageTone("success");
+      window.dispatchEvent(new Event("auth-state-changed"));
+      router.refresh();
+      window.location.assign("/admin/jogadores");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel concluir a unificacao.");
       setMessageTone("error");

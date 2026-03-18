@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { usePublicAuthState } from "@/components/use-public-auth-state";
@@ -12,6 +13,7 @@ type PublicAuthButtonProps = {
 };
 
 export function PublicAuthButton({ className }: PublicAuthButtonProps) {
+  const router = useRouter();
   const { authState, loading } = usePublicAuthState();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -35,8 +37,19 @@ export function PublicAuthButton({ className }: PublicAuthButtonProps) {
       className={cn("rounded-full bg-white", className)}
       disabled={signingOut}
       onClick={async () => {
-        setSigningOut(true);
-        await signOut({ redirectTo: "/entrar" });
+        try {
+          setSigningOut(true);
+          const result = await signOut({
+            redirect: false,
+            callbackUrl: "/entrar",
+          });
+
+          window.dispatchEvent(new Event("auth-state-changed"));
+          router.refresh();
+          window.location.assign(result?.url ?? "/entrar");
+        } finally {
+          setSigningOut(false);
+        }
       }}
     >
       {signingOut ? "Saindo..." : "Sair"}

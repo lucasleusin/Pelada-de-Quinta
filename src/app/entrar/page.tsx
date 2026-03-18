@@ -70,7 +70,7 @@ export default function EntrarPage() {
       identifier,
       password,
       redirect: false,
-      redirectTo: callbackUrl,
+      callbackUrl,
     });
 
     setLoading(false);
@@ -80,13 +80,14 @@ export default function EntrarPage() {
       return;
     }
 
-    router.push(result.url || callbackUrl);
+    window.dispatchEvent(new Event("auth-state-changed"));
     router.refresh();
+    window.location.assign(result.url || callbackUrl);
   }
 
   async function handleSocialSignIn(provider: "google" | "microsoft-entra-id") {
     setLoading(true);
-    await signIn(provider, { redirectTo: callbackUrl });
+    await signIn(provider, { callbackUrl });
   }
 
   return (

@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { HeroBlock, PageShell, SectionShell, StatusNote } from "@/components/layout/primitives";
-import { StarRating } from "@/components/star-rating";
-import { Button } from "@/components/ui/button";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 import { hasTeam, type TeamCode, type TeamSplitStats } from "@/lib/team-utils";
 
@@ -47,15 +45,8 @@ type Participant = {
   teamBGoalsConceded: number;
 };
 
-type MatchRating = {
-  raterPlayerId: string;
-  ratedPlayerId: string;
-  rating: number;
-};
-
 type MatchDetails = MatchSummary & {
   participants: Participant[];
-  ratings: MatchRating[];
   canEdit: boolean;
   editReason: MatchEditReason;
 };
@@ -64,6 +55,8 @@ type ScoreState = {
   teamAScore: string;
   teamBScore: string;
 };
+
+type NoticeTone = "success" | "error" | "warning";
 
 function getTodayIsoDate() {
   const today = new Date();
@@ -139,16 +132,16 @@ export default function PartidasPassadasPage() {
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [match, setMatch] = useState<MatchDetails | null>(null);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<NoticeTone>("warning");
   const [scoreState, setScoreState] = useState<ScoreState>({ teamAScore: "", teamBScore: "" });
   const [statsState, setStatsState] = useState<Record<string, TeamSplitStats>>({});
-  const [ratingsState, setRatingsState] = useState<Record<string, number>>({});
+  const [scoreDirty, setScoreDirty] = useState(false);
+  const [statsDirty, setStatsDirty] = useState(false);
   const [scoreSaving, setScoreSaving] = useState(false);
   const [statsSaving, setStatsSaving] = useState(false);
-  const [ratingsSaving, setRatingsSaving] = useState(false);
 
   const isActiveUser = currentUser?.status === "ACTIVE" && !currentUser.mustChangePassword;
   const isAdmin = currentUser?.role === "ADMIN" && isActiveUser;
-  const currentRaterPlayerId = currentUser?.playerId ?? null;
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -160,7 +153,10 @@ export default function PartidasPassadasPage() {
         const payload = (await response.json()) as CurrentUser;
         setCurrentUser(payload);
       })
-      .catch((error) => setMessage(error instanceof Error ? error.message : "Falha ao carregar sua sessao."));
+      .catch((error) => {
+        setMessage(error instanceof Error ? error.message : "Falha ao carregar sua sessao.");
+        setMessageTone("error");
+      });
   }, []);
 
   useEffect(() => {
@@ -188,7 +184,10 @@ export default function PartidasPassadasPage() {
             : sorted[0]?.id ?? "",
         );
       })
-      .catch((error) => setMessage(error instanceof Error ? error.message : "Falha ao carregar partidas."));
+      .catch((error) => {
+        setMessage(error instanceof Error ? error.message : "Falha ao carregar partidas.");
+        setMessageTone("error");
+      });
   }, [currentUser, isActiveUser, isAdmin, requestedMatchId]);
 
   useEffect(() => {
@@ -207,6 +206,7 @@ export default function PartidasPassadasPage() {
           teamAScore: payload.teamAScore === null ? "" : String(payload.teamAScore),
           teamBScore: payload.teamBScore === null ? "" : String(payload.teamBScore),
         });
+        setScoreDirty(false);
 
         const initialStats: Record<string, TeamSplitStats> = {};
         for (const participant of payload.participants) {
@@ -220,20 +220,14 @@ export default function PartidasPassadasPage() {
           };
         }
         setStatsState(initialStats);
-
-        const initialRatings: Record<string, number> = {};
-        if (currentRaterPlayerId) {
-          for (const rating of payload.ratings) {
-            if (rating.raterPlayerId === currentRaterPlayerId) {
-              initialRatings[rating.ratedPlayerId] = rating.rating;
-            }
-          }
-        }
-        setRatingsState(initialRatings);
+        setStatsDirty(false);
         setMessage("");
       })
-      .catch((error) => setMessage(error instanceof Error ? error.message : "Falha ao carregar os dados da partida."));
-  }, [currentRaterPlayerId, isActiveUser, selectedMatchId]);
+      .catch((error) => {
+        setMessage(error instanceof Error ? error.message : "Falha ao carregar os dados da partida.");
+        setMessageTone("error");
+      });
+  }, [isActiveUser, selectedMatchId]);
 
   const teamA = useMemo(
     () => sortByPositionAndName((match?.participants ?? []).filter((participant) => hasTeam(participant.teams, "A"))),
@@ -243,32 +237,6 @@ export default function PartidasPassadasPage() {
     () => sortByPositionAndName((match?.participants ?? []).filter((participant) => hasTeam(participant.teams, "B"))),
     [match],
   );
-
-  const voteSummaryByPlayerId = useMemo(() => {
-    if (!match) return {};
-
-    const grouped = new Map<string, { total: number; count: number }>();
-
-    for (const rating of match.ratings) {
-      const current = grouped.get(rating.ratedPlayerId) ?? { total: 0, count: 0 };
-      grouped.set(rating.ratedPlayerId, {
-        total: current.total + rating.rating,
-        count: current.count + 1,
-      });
-    }
-
-    const summaries: Record<string, { average: string; count: number }> = {};
-
-    for (const [playerId, value] of grouped.entries()) {
-      const rounded = Math.round((value.total / value.count) * 10) / 10;
-      summaries[playerId] = {
-        average: Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1),
-        count: value.count,
-      };
-    }
-
-    return summaries;
-  }, [match]);
 
   function getTeamFieldNames(team: TeamCode) {
     if (team === "A") {
@@ -299,9 +267,10 @@ export default function PartidasPassadasPage() {
         [field]: Number.isNaN(value) ? 0 : Math.max(0, value),
       },
     }));
+    setStatsDirty(true);
   }
 
-  async function saveScore() {
+  const saveScore = useCallback(async (notify = true) => {
     if (!match || !match.canEdit) return;
     setScoreSaving(true);
     try {
@@ -317,10 +286,14 @@ export default function PartidasPassadasPage() {
       if (!response.ok) {
         const payloadError = await response.json().catch(() => ({ error: "Erro ao salvar placar." }));
         setMessage(payloadError.error ?? "Erro ao salvar placar.");
+        setMessageTone("error");
         return;
       }
 
-      setMessage("Placar salvo.");
+      if (notify) {
+        setMessage("Placar salvo.");
+        setMessageTone("success");
+      }
       setMatch((current) =>
         current
           ? {
@@ -330,12 +303,13 @@ export default function PartidasPassadasPage() {
             }
           : current,
       );
+      setScoreDirty(false);
     } finally {
       setScoreSaving(false);
     }
-  }
+  }, [match, scoreState.teamAScore, scoreState.teamBScore]);
 
-  async function saveStats() {
+  const saveStats = useCallback(async (notify = true) => {
     if (!match || !match.canEdit) return;
     setStatsSaving(true);
     try {
@@ -359,10 +333,14 @@ export default function PartidasPassadasPage() {
       if (!response.ok) {
         const payloadError = await response.json().catch(() => ({ error: "Erro ao salvar estatisticas." }));
         setMessage(payloadError.error ?? "Erro ao salvar estatisticas.");
+        setMessageTone("error");
         return;
       }
 
-      setMessage("Estatisticas salvas.");
+      if (notify) {
+        setMessage("Estatisticas salvas.");
+        setMessageTone("success");
+      }
       setMatch((current) =>
         current
           ? {
@@ -374,67 +352,38 @@ export default function PartidasPassadasPage() {
             }
           : current,
       );
+      setStatsDirty(false);
     } finally {
       setStatsSaving(false);
     }
-  }
+  }, [currentUser?.playerId, match, statsState]);
 
-  async function saveRatings() {
-    if (!match || !match.canEdit || !currentRaterPlayerId) {
-      setMessage("Nao foi possivel identificar o jogador avaliador.");
+  useEffect(() => {
+    if (!match?.canEdit || !scoreDirty) {
       return;
     }
 
-    const payload = {
-      ratings: Object.entries(ratingsState).map(([ratedPlayerId, rating]) => ({
-        ratedPlayerId,
-        rating,
-      })),
-    };
+    const timeout = setTimeout(() => {
+      void saveScore(false);
+    }, 700);
 
-    if (payload.ratings.length === 0) {
-      setMessage("Preencha ao menos uma nota.");
+    return () => clearTimeout(timeout);
+  }, [match?.canEdit, saveScore, scoreDirty]);
+
+  useEffect(() => {
+    if (!match?.canEdit || !statsDirty) {
       return;
     }
 
-    setRatingsSaving(true);
-    try {
-      const response = await fetch(`/api/matches/${match.id}/ratings`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    const timeout = setTimeout(() => {
+      void saveStats(false);
+    }, 700);
 
-      if (!response.ok) {
-        const payloadError = await response.json().catch(() => ({ error: "Erro ao salvar avaliacoes." }));
-        setMessage(payloadError.error ?? "Erro ao salvar avaliacoes.");
-        return;
-      }
-
-      setMessage("Avaliacoes salvas.");
-      setMatch((current) => {
-        if (!current) return current;
-
-        const persistedRatings = current.ratings.filter((rating) => rating.raterPlayerId !== currentRaterPlayerId);
-        const nextRatings = Object.entries(ratingsState).map(([ratedPlayerId, rating]) => ({
-          raterPlayerId: currentRaterPlayerId,
-          ratedPlayerId,
-          rating,
-        }));
-
-        return {
-          ...current,
-          ratings: [...persistedRatings, ...nextRatings],
-        };
-      });
-    } finally {
-      setRatingsSaving(false);
-    }
-  }
+    return () => clearTimeout(timeout);
+  }, [match?.canEdit, saveStats, statsDirty]);
 
   function renderTeamGrid(title: string, team: TeamCode, participants: Participant[]) {
-    const gridColumnsClass =
-      "grid-cols-[minmax(0,1fr)_48px_48px_56px_52px_52px] sm:grid-cols-[minmax(0,1fr)_72px_72px_96px_88px_88px]";
+    const gridColumnsClass = "grid-cols-[minmax(0,1fr)_48px_48px_56px] sm:grid-cols-[minmax(0,1fr)_72px_72px_96px]";
 
     return (
       <SectionShell className="p-4">
@@ -448,14 +397,11 @@ export default function PartidasPassadasPage() {
               <span className="text-center">G</span>
               <span className="text-center">A</span>
               <span className="text-center">GS</span>
-              <span className="text-center">Nota</span>
-              <span className="text-center">Votos</span>
             </div>
 
             <ul className="mt-2 space-y-2">
               {participants.map((participant) => {
                 const fields = getTeamFieldNames(team);
-                const note = voteSummaryByPlayerId[participant.playerId];
 
                 return (
                   <li key={`${participant.playerId}-${team}`} className={`grid ${gridColumnsClass} items-center gap-1 rounded-lg border border-emerald-100 bg-white px-2 py-2 sm:gap-2 sm:px-3`}>
@@ -473,8 +419,6 @@ export default function PartidasPassadasPage() {
                         <span className="text-center text-xs text-emerald-900 sm:text-sm">{statsState[participant.playerId]?.[fields.goalsConceded] ?? 0}</span>
                       </>
                     )}
-                    <span className="text-center text-xs font-semibold text-emerald-900 sm:text-sm">{note?.average ?? "-"}</span>
-                    <span className="text-center text-xs font-semibold text-emerald-900 sm:text-sm">{note?.count ?? 0}</span>
                   </li>
                 );
               })}
@@ -486,7 +430,6 @@ export default function PartidasPassadasPage() {
   }
 
   const editStatus = match ? getEditStatus(match.editReason) : null;
-  const editableRatingsParticipants = (match?.participants ?? []).filter((participant) => participant.playerId !== currentRaterPlayerId);
 
   return (
     <PageShell>
@@ -540,16 +483,22 @@ export default function PartidasPassadasPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label>
                   <span className="field-label">Placar {match.teamAName}</span>
-                  <input className="field-input mt-2" type="number" min={0} value={scoreState.teamAScore} onChange={(event) => setScoreState((current) => ({ ...current, teamAScore: event.currentTarget.value }))} disabled={!match.canEdit} />
+                  <input className="field-input mt-2" type="number" min={0} value={scoreState.teamAScore} onChange={(event) => {
+                    setScoreState((current) => ({ ...current, teamAScore: event.currentTarget.value }));
+                    setScoreDirty(true);
+                  }} disabled={!match.canEdit} />
                 </label>
                 <label>
                   <span className="field-label">Placar {match.teamBName}</span>
-                  <input className="field-input mt-2" type="number" min={0} value={scoreState.teamBScore} onChange={(event) => setScoreState((current) => ({ ...current, teamBScore: event.currentTarget.value }))} disabled={!match.canEdit} />
+                  <input className="field-input mt-2" type="number" min={0} value={scoreState.teamBScore} onChange={(event) => {
+                    setScoreState((current) => ({ ...current, teamBScore: event.currentTarget.value }));
+                    setScoreDirty(true);
+                  }} disabled={!match.canEdit} />
                 </label>
               </div>
-              <Button className="rounded-full" type="button" onClick={saveScore} disabled={!match.canEdit || scoreSaving}>
-                {scoreSaving ? "Salvando placar..." : "Salvar placar"}
-              </Button>
+              {match.canEdit ? (
+                <p className="text-sm font-medium text-emerald-800">{scoreSaving ? "Salvando placar..." : scoreDirty ? "Alteracoes de placar pendentes..." : "Placar salvo automaticamente."}</p>
+              ) : null}
             </div>
           </SectionShell>
 
@@ -564,56 +513,15 @@ export default function PartidasPassadasPage() {
                 <h3 className="text-2xl font-bold text-emerald-950">Estatisticas</h3>
                 <p className="text-sm text-emerald-800">Edite gols, assistencias e gols sofridos apenas quando a partida estiver liberada.</p>
               </div>
-              <Button className="rounded-full" type="button" onClick={saveStats} disabled={!match.canEdit || statsSaving}>
-                {statsSaving ? "Salvando estatisticas..." : "Salvar estatisticas"}
-              </Button>
+              {match.canEdit ? (
+                <p className="text-sm font-medium text-emerald-800">{statsSaving ? "Salvando estatisticas..." : statsDirty ? "Alteracoes de estatisticas pendentes..." : "Estatisticas salvas automaticamente."}</p>
+              ) : null}
             </div>
-          </SectionShell>
-
-          <SectionShell className="p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-2xl font-bold text-emerald-950">Notas do jogo</h3>
-                <p className="text-sm text-emerald-800">Registre ou ajuste as avaliacoes da partida quando permitido.</p>
-              </div>
-              <Button className="rounded-full" type="button" variant="outline" onClick={saveRatings} disabled={!match.canEdit || !currentRaterPlayerId || ratingsSaving}>
-                {ratingsSaving ? "Salvando notas..." : "Salvar notas"}
-              </Button>
-            </div>
-
-            {editableRatingsParticipants.length === 0 ? (
-              <p className="mt-4 text-sm text-emerald-800">Nenhum jogador disponivel para avaliacao nesta partida.</p>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {editableRatingsParticipants.map((participant) => (
-                  <div
-                    key={participant.playerId}
-                    className="flex flex-col gap-2 rounded-xl border border-emerald-100 bg-white p-3 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div>
-                      <span className="font-medium text-emerald-900">{formatPlayerLabel(participant.player)}</span>
-                      <p className="text-xs text-emerald-700">Media atual: {voteSummaryByPlayerId[participant.playerId]?.average ?? "-"} ({voteSummaryByPlayerId[participant.playerId]?.count ?? 0} votos)</p>
-                    </div>
-                    <StarRating
-                      value={ratingsState[participant.playerId] ?? 0}
-                      onChange={(value) => {
-                        if (!match?.canEdit) return;
-
-                        setRatingsState((prev) => ({
-                          ...prev,
-                          [participant.playerId]: value,
-                        }));
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
           </SectionShell>
         </>
       ) : null}
 
-      {message ? <StatusNote tone="error">{message}</StatusNote> : null}
+      {message ? <StatusNote tone={messageTone}>{message}</StatusNote> : null}
     </PageShell>
   );
 }

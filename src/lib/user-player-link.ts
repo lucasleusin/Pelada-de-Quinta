@@ -190,7 +190,11 @@ export async function backfillLegacyPendingApprovalUsers(client: DbLike) {
   });
 
   for (const user of users) {
-    await reconcileLegacyUserState(client, user.id);
+    try {
+      await reconcileLegacyUserState(client, user.id);
+    } catch (error) {
+      console.error(`Falha ao reconciliar conta legada ${user.id}.`, error);
+    }
   }
 }
 

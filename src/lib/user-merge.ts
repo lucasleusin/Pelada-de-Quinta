@@ -1,4 +1,4 @@
-import { PresenceStatus, Prisma, Team, UserRole, UserStatus } from "@prisma/client";
+import { MatchStatus, PresenceStatus, Prisma, Team, UserRole, UserStatus } from "@prisma/client";
 import { getPrimaryTeam, normalizeTeams, sumTeamSplitStats } from "@/lib/team-utils";
 
 export type MergeEntitiesInput = {
@@ -61,12 +61,17 @@ type SelectionContext = {
   secondaryPlayer: LoadedPlayer;
 };
 
+type PlayerPreviewStats = {
+  matches: number;
+  goals: number;
+  assists: number;
+  goalsConceded: number;
+  averageRating: number;
+};
+
 type PlayerMergeSummary = {
-  participants: number;
-  overlappingMatches: number;
-  ratingsGiven: number;
-  ratingsReceived: number;
-  whatsAppMessages: number;
+  primary: PlayerPreviewStats;
+  secondary: PlayerPreviewStats;
 };
 
 export type MergePreview = {
@@ -121,6 +126,26 @@ function playerLabel(player: Pick<LoadedPlayer, "name" | "nickname">) {
 
 function strongerPresenceStatus(primaryStatus: PresenceStatus, secondaryStatus: PresenceStatus) {
   return presenceStatusRank[primaryStatus] >= presenceStatusRank[secondaryStatus] ? primaryStatus : secondaryStatus;
+}
+
+function finishedMatchWhereClause() {
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  return {
+    status: { not: MatchStatus.ARCHIVED },
+    matchDate: { lt: tomorrow },
+    OR: [
+      { status: MatchStatus.FINISHED },
+      {
+        AND: [
+          { teamAScore: { not: null } },
+          { teamBScore: { not: null } },
+        ],
+      },
+    ],
+  };
 }
 
 export function resolveMergeAccountOutcome(primaryHasUser: boolean, secondaryHasUser: boolean): MergeAccountOutcome {
@@ -289,39 +314,52 @@ async function loadSelectionContext(
   };
 }
 
-async function getPlayerMergeSummary(client: TxClient, primaryPlayerId: string, secondaryPlayerId: string): Promise<PlayerMergeSummary> {
-  const [primaryParticipants, secondaryParticipants, ratingsGiven, ratingsReceived, whatsAppMessages] = await Promise.all([
-    client.matchParticipant.findMany({
-      where: { playerId: primaryPlayerId },
-      select: { matchId: true },
-    }),
-    client.matchParticipant.findMany({
-      where: { playerId: secondaryPlayerId },
-      select: { matchId: true },
-    }),
-    client.matchRating.count({
-      where: { raterPlayerId: secondaryPlayerId },
-    }),
-    client.matchRating.count({
-      where: { ratedPlayerId: secondaryPlayerId },
-    }),
-    client.whatsAppMessageLog.count({
-      where: { playerId: secondaryPlayerId },
-    }),
-  ]);
+async function getPlayerPreviewStats(client: TxClient, playerId: string): Promise<PlayerPreviewStats> {
+  const history = await client.matchParticipant.findMany({
+    where: {
+      playerId,
+      presenceStatus: PresenceStatus.CONFIRMED,
+      teams: { isEmpty: false },
+      match: finishedMatchWhereClause(),
+    },
+    select: {
+      matchId: true,
+      goals: true,
+      assists: true,
+      goalsConceded: true,
+    },
+  });
 
-  const primaryMatchIds = new Set(primaryParticipants.map((participant) => participant.matchId));
-  const overlappingMatches = secondaryParticipants.reduce(
-    (total, participant) => total + (primaryMatchIds.has(participant.matchId) ? 1 : 0),
-    0,
-  );
+  const matchIds = history.map((item) => item.matchId);
+  const ratings =
+    matchIds.length > 0
+      ? await client.matchRating.aggregate({
+          where: {
+            ratedPlayerId: playerId,
+            matchId: { in: matchIds },
+          },
+          _avg: { rating: true },
+        })
+      : { _avg: { rating: null } };
 
   return {
-    participants: secondaryParticipants.length,
-    overlappingMatches,
-    ratingsGiven,
-    ratingsReceived,
-    whatsAppMessages,
+    matches: history.length,
+    goals: history.reduce((total, item) => total + item.goals, 0),
+    assists: history.reduce((total, item) => total + item.assists, 0),
+    goalsConceded: history.reduce((total, item) => total + item.goalsConceded, 0),
+    averageRating: Number(ratings._avg.rating?.toFixed(2) ?? 0),
+  };
+}
+
+async function getPlayerMergeSummary(client: TxClient, primaryPlayerId: string, secondaryPlayerId: string): Promise<PlayerMergeSummary> {
+  const [primary, secondary] = await Promise.all([
+    getPlayerPreviewStats(client, primaryPlayerId),
+    getPlayerPreviewStats(client, secondaryPlayerId),
+  ]);
+
+  return {
+    primary,
+    secondary,
   };
 }
 

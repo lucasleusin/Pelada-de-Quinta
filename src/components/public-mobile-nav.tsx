@@ -44,7 +44,7 @@ const mobileLinks = [
 export function PublicMobileNav() {
   const pathname = usePathname();
   const isAdminPath = pathname.startsWith("/admin");
-  const { authState, isAuthenticated } = usePublicAuthState(!isAdminPath);
+  const { authState, loading } = usePublicAuthState(!isAdminPath);
 
   if (isAdminPath) {
     return null;
@@ -55,13 +55,13 @@ export function PublicMobileNav() {
       return href;
     }
 
+    if (loading) {
+      return href;
+    }
+
     if (authState?.id) {
       const landingPath = resolveAuthenticatedLandingPath(authState);
       return landingPath === "/meu-perfil" ? href : landingPath;
-    }
-
-    if (isAuthenticated) {
-      return href;
     }
 
     return `/entrar?callbackUrl=${encodeURIComponent(href)}`;

@@ -30,21 +30,21 @@ export function SiteHeader() {
   const logoUrl = siteSettings.logoUrl ?? undefined;
   const hasLogo = Boolean(logoUrl);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
-  const { authState, isAuthenticated } = usePublicAuthState(!isAdminPath);
-  const shouldShowAdminLink = !authState?.id || authState.role === "ADMIN";
+  const { authState, loading } = usePublicAuthState();
+  const shouldShowAdminLink = authState?.role === "ADMIN";
 
   function resolveHref(href: string) {
     if (!protectedHrefs.has(href)) {
       return href;
     }
 
+    if (loading) {
+      return href;
+    }
+
     if (authState?.id) {
       const landingPath = resolveAuthenticatedLandingPath(authState);
       return landingPath === "/meu-perfil" ? href : landingPath;
-    }
-
-    if (isAuthenticated) {
-      return href;
     }
 
     return `/entrar?callbackUrl=${encodeURIComponent(href)}`;

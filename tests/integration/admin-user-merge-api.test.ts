@@ -72,7 +72,10 @@ describe("admin user merge api", () => {
       playerMerge: {
         primary: { id: "player-1" },
         secondary: { id: "player-2" },
-        summary: { participants: 1, overlappingMatches: 0, ratingsGiven: 0, ratingsReceived: 0, whatsAppMessages: 0 },
+        summary: {
+          primary: { matches: 5, goals: 2, assists: 1, goalsConceded: 3, averageRating: 7.2 },
+          secondary: { matches: 1, goals: 0, assists: 0, goalsConceded: 0, averageRating: 0 },
+        },
         accountOutcome: "keep-primary-account",
       },
       warnings: ["warn"],

@@ -43,11 +43,20 @@ type MergePreview = {
       linkedUserEmail: string | null;
     };
     summary: {
-      participants: number;
-      overlappingMatches: number;
-      ratingsGiven: number;
-      ratingsReceived: number;
-      whatsAppMessages: number;
+      primary: {
+        matches: number;
+        goals: number;
+        assists: number;
+        goalsConceded: number;
+        averageRating: number;
+      };
+      secondary: {
+        matches: number;
+        goals: number;
+        assists: number;
+        goalsConceded: number;
+        averageRating: number;
+      };
     };
     accountOutcome:
       | "keep-primary-account"
@@ -103,6 +112,55 @@ function accountOutcomeSummary(outcome: MergePreview["playerMerge"]["accountOutc
   }
 
   return "Nenhum dos jogadores possui conta vinculada. A unificacao sera apenas esportiva.";
+}
+
+function formatAverageRating(value: number) {
+  return value.toFixed(2).replace(".", ",");
+}
+
+function StatsComparisonCard({
+  title,
+  tone,
+  stats,
+}: {
+  title: string;
+  tone: "primary" | "secondary";
+  stats: MergePreview["playerMerge"]["summary"]["primary"];
+}) {
+  const cardClass =
+    tone === "primary"
+      ? "border-emerald-100 bg-white"
+      : "border-amber-200 bg-amber-50/70";
+  const labelClass = tone === "primary" ? "text-emerald-700" : "text-amber-800";
+  const valueClass = tone === "primary" ? "text-emerald-950" : "text-amber-950";
+
+  return (
+    <div className={`rounded-2xl border p-4 ${cardClass}`}>
+      <p className={`text-sm font-semibold ${valueClass}`}>{title}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div>
+          <p className={`text-xs uppercase tracking-[0.12em] ${labelClass}`}>Jogos</p>
+          <p className={`mt-1 text-2xl font-bold ${valueClass}`}>{stats.matches}</p>
+        </div>
+        <div>
+          <p className={`text-xs uppercase tracking-[0.12em] ${labelClass}`}>Gols</p>
+          <p className={`mt-1 text-2xl font-bold ${valueClass}`}>{stats.goals}</p>
+        </div>
+        <div>
+          <p className={`text-xs uppercase tracking-[0.12em] ${labelClass}`}>Assistencias</p>
+          <p className={`mt-1 text-2xl font-bold ${valueClass}`}>{stats.assists}</p>
+        </div>
+        <div>
+          <p className={`text-xs uppercase tracking-[0.12em] ${labelClass}`}>Gols sofridos</p>
+          <p className={`mt-1 text-2xl font-bold ${valueClass}`}>{stats.goalsConceded}</p>
+        </div>
+        <div>
+          <p className={`text-xs uppercase tracking-[0.12em] ${labelClass}`}>Media de nota</p>
+          <p className={`mt-1 text-2xl font-bold ${valueClass}`}>{formatAverageRating(stats.averageRating)}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminJogadoresUnificarPage() {
@@ -342,27 +400,16 @@ export default function AdminJogadoresUnificarPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-xl border border-emerald-100 bg-white p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">Participacoes</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-950">{preview.playerMerge.summary.participants}</p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-950">Comparacao esportiva</p>
+                <p className="text-sm text-emerald-800">
+                  Confira os numeros historicos de cada registro antes de unificar.
+                </p>
               </div>
-              <div className="rounded-xl border border-emerald-100 bg-white p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">Partidas sobrepostas</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-950">{preview.playerMerge.summary.overlappingMatches}</p>
-              </div>
-              <div className="rounded-xl border border-emerald-100 bg-white p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">Ratings dados</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-950">{preview.playerMerge.summary.ratingsGiven}</p>
-              </div>
-              <div className="rounded-xl border border-emerald-100 bg-white p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">Ratings recebidos</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-950">{preview.playerMerge.summary.ratingsReceived}</p>
-              </div>
-              <div className="rounded-xl border border-emerald-100 bg-white p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">Logs WhatsApp</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-950">{preview.playerMerge.summary.whatsAppMessages}</p>
-              </div>
+
+              <StatsComparisonCard title="Usuario principal" tone="primary" stats={preview.playerMerge.summary.primary} />
+              <StatsComparisonCard title="Usuario secundario" tone="secondary" stats={preview.playerMerge.summary.secondary} />
             </div>
 
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4">

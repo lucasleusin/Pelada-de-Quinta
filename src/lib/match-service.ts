@@ -250,6 +250,7 @@ export async function listMatches(request: Request) {
   const from = parseDateFilter(searchParams.get("from"));
   const to = parseDateFilter(searchParams.get("to"));
   const playerId = searchParams.get("playerId")?.trim() || undefined;
+  const playerScope = searchParams.get("playerScope")?.trim() || undefined;
 
   const where: Prisma.MatchWhereInput = {
     status: { not: MatchStatus.ARCHIVED },
@@ -262,7 +263,7 @@ export async function listMatches(request: Request) {
         : undefined,
   };
 
-  if (playerId) {
+  if (playerId && playerScope !== "self-upcoming") {
     where.participants = {
       some: {
         playerId,

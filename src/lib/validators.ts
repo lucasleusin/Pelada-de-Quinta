@@ -1,4 +1,4 @@
-import { MatchStatus, Position, PresenceStatus, Team, UserRole, UserStatus } from "@prisma/client";
+﻿import { MatchStatus, Position, PresenceStatus, Team, UserRole, UserStatus } from "@prisma/client";
 import { z } from "zod";
 
 const optionalNicknameSchema = z.preprocess(
@@ -176,22 +176,11 @@ export const adminSetPasswordSchema = z.object({
 export const mergeEntitiesSchema = z
   .object({
     action: z.enum(["preview", "execute"]),
-    primaryUserId: optionalIdentifierSchema,
-    secondaryUserId: optionalIdentifierSchema,
     primaryPlayerId: optionalIdentifierSchema,
     secondaryPlayerId: optionalIdentifierSchema,
   })
   .superRefine((data, ctx) => {
-    const hasUserPair = Boolean(data.primaryUserId || data.secondaryUserId);
     const hasPlayerPair = Boolean(data.primaryPlayerId || data.secondaryPlayerId);
-
-    if (hasUserPair && (!data.primaryUserId || !data.secondaryUserId)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["primaryUserId"],
-        message: "Selecione usuario principal e secundario para unificar contas.",
-      });
-    }
 
     if (hasPlayerPair && (!data.primaryPlayerId || !data.secondaryPlayerId)) {
       ctx.addIssue({
@@ -201,19 +190,11 @@ export const mergeEntitiesSchema = z
       });
     }
 
-    if (!hasUserPair && !hasPlayerPair) {
+    if (!hasPlayerPair) {
       ctx.addIssue({
         code: "custom",
-        path: ["primaryUserId"],
-        message: "Selecione ao menos um par de usuarios ou jogadores para unificar.",
-      });
-    }
-
-    if (data.primaryUserId && data.secondaryUserId && data.primaryUserId === data.secondaryUserId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["secondaryUserId"],
-        message: "Usuario principal e secundario precisam ser diferentes.",
+        path: ["primaryPlayerId"],
+        message: "Selecione um par de jogadores para unificar.",
       });
     }
 
@@ -259,6 +240,10 @@ export const confirmPresenceSchema = z.object({
 export const publicPresenceSchema = z.object({
   playerId: z.string().uuid(),
   presenceStatus: z.enum(["CONFIRMED", "WAITLIST", "CANCELED"]),
+});
+
+export const authenticatedPresenceSchema = z.object({
+  presenceStatus: z.enum(["CONFIRMED", "CANCELED"]),
 });
 
 export const participantsPresenceSchema = z.object({
@@ -335,5 +320,6 @@ export const siteSettingsUpdateSchema = z.object({
   locationLabel: siteOptionalTextSchema(80, "Localidade muito longa."),
   headerBadge: siteOptionalTextSchema(40, "Badge muito longo."),
 });
+
 
 

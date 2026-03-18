@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
-import { buttonVariants, Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type UserRole = "ADMIN" | "PLAYER";
@@ -111,6 +111,7 @@ export default function AdminJogadoresPage() {
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");
+  const [showInactive, setShowInactive] = useState(false);
 
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -125,7 +126,12 @@ export default function AdminJogadoresPage() {
   const [photoStatusByPlayerId, setPhotoStatusByPlayerId] = useState<Record<string, string>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  const sortedPlayers = useMemo(() => [...players].sort((left, right) => playerLabel(left).localeCompare(playerLabel(right))), [players]);
+  const sortedPlayers = useMemo(
+    () => [...players].sort((left, right) => playerLabel(left).localeCompare(playerLabel(right))),
+    [players],
+  );
+  const activePlayers = useMemo(() => sortedPlayers.filter((player) => player.isActive), [sortedPlayers]);
+  const inactivePlayers = useMemo(() => sortedPlayers.filter((player) => !player.isActive), [sortedPlayers]);
 
   async function loadPlayers() {
     const response = await fetch("/api/admin/players", { cache: "no-store" });
@@ -354,6 +360,192 @@ export default function AdminJogadoresPage() {
     await loadPlayers();
   }
 
+  function renderPlayerRow(player: ManagedPlayer) {
+    const isEditing = editingPlayerId === player.id;
+
+    return (
+      <li key={player.id} className="rounded-xl border border-emerald-100 p-3">
+        {isEditing ? (
+          <div className="space-y-4">
+            <div className="grid gap-2 md:grid-cols-7 md:items-end">
+              <label>
+                <span className="field-label">Nome</span>
+                <input className="field-input" value={editName} onChange={(event) => setEditName(event.currentTarget.value)} />
+              </label>
+              <label>
+                <span className="field-label">Apelido</span>
+                <input className="field-input" value={editNickname} onChange={(event) => setEditNickname(event.currentTarget.value)} />
+              </label>
+              <label>
+                <span className="field-label">Posicao</span>
+                <select className="field-input" value={editPosition} onChange={(event) => setEditPosition(event.currentTarget.value as ManagedPlayer["position"])}>
+                  <option value="GOLEIRO">Goleiro</option>
+                  <option value="ZAGUEIRO">Zagueiro</option>
+                  <option value="MEIA">Meia</option>
+                  <option value="ATACANTE">Atacante</option>
+                  <option value="OUTRO">Outro</option>
+                </select>
+              </label>
+              <label>
+                <span className="field-label">Numero</span>
+                <input className="field-input" type="number" min={0} max={99} value={editShirtNumber} onChange={(event) => setEditShirtNumber(event.currentTarget.value)} />
+              </label>
+              <label>
+                <span className="field-label">Email do jogador</span>
+                <input className="field-input" type="email" value={editEmail} onChange={(event) => setEditEmail(event.currentTarget.value)} />
+              </label>
+              <label>
+                <span className="field-label">Whatsapp</span>
+                <input className="field-input" type="tel" value={editPhone} onChange={(event) => setEditPhone(event.currentTarget.value)} />
+              </label>
+              <div className="flex gap-2 md:col-span-6">
+                <button className="btn btn-primary" type="button" disabled={loadingId === player.id} onClick={() => saveEdit(player.id)}>
+                  Salvar
+                </button>
+                <button className="btn btn-ghost" type="button" onClick={cancelEdit}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="rounded-lg bg-emerald-50 p-3">
+                <div className="mb-3 flex items-center gap-3">
+                  {player.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={player.photoUrl}
+                      alt={`Foto de ${player.name}`}
+                      className="h-16 w-16 rounded-xl border border-emerald-200 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-sm font-bold text-emerald-900">
+                      {getInitials(player.name)}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-emerald-900">Foto do jogador</p>
+                    <p className="text-xs text-emerald-700">Atualize a imagem esportiva usada nos cards e listagens.</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+                  <label>
+                    <span className="field-label">Arquivo</span>
+                    <input
+                      className="field-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0] ?? null;
+                        setPhotoFilesByPlayerId((prev) => ({ ...prev, [player.id]: file }));
+                      }}
+                    />
+                  </label>
+                  <button className="btn btn-primary" type="button" onClick={() => uploadPhoto(player.id)}>
+                    Enviar foto
+                  </button>
+                  <button className="btn btn-ghost" type="button" disabled={!player.photoUrl} onClick={() => removePhoto(player.id)}>
+                    Remover foto
+                  </button>
+                </div>
+                {photoStatusByPlayerId[player.id] ? (
+                  <p className="mt-2 text-xs font-medium text-emerald-900">{photoStatusByPlayerId[player.id]}</p>
+                ) : null}
+              </div>
+
+              <div className="rounded-lg border border-emerald-100 bg-white p-3">
+                <p className="text-sm font-semibold text-emerald-950">Conta vinculada</p>
+                {player.user ? (
+                  <>
+                    <p className="mt-1 text-sm text-emerald-900">{player.user.email}</p>
+                    <p className="text-xs text-emerald-700">
+                      {roleLabel(player.user.role)} | {statusLabel(player.user.status)}
+                      {player.user.mustChangePassword ? " | Troca de senha pendente" : ""}
+                    </p>
+
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm font-medium text-emerald-900">Definir nova senha:</p>
+                      <input
+                        className="field-input"
+                        type="password"
+                        minLength={8}
+                        value={newPassword}
+                        onChange={(event) => setNewPassword(event.currentTarget.value)}
+                        placeholder="Minimo de 8 caracteres"
+                      />
+                      <Button className="rounded-full" type="button" disabled={loadingId === player.id} onClick={() => setExplicitPassword(player)}>
+                        Redefinir
+                      </Button>
+                      {passwordStatus ? <p className="text-xs font-medium text-emerald-900">{passwordStatus}</p> : null}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-emerald-800">Sem conta vinculada.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex items-center gap-3">
+              {player.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={player.photoUrl}
+                  alt={`Foto de ${player.name}`}
+                  className="h-14 w-14 rounded-xl border border-emerald-200 object-cover"
+                />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-sm font-bold text-emerald-900">
+                  {getInitials(player.name)}
+                </div>
+              )}
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-emerald-950">{playerLabel(player)}</p>
+                  {player.user ? (
+                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]", player.user.status === "ACTIVE" ? "border border-sky-200 bg-sky-50 text-sky-700" : "border border-amber-200 bg-amber-50 text-amber-700")}>
+                      {statusLabel(player.user.status)}
+                    </span>
+                  ) : null}
+                  {player.user ? (
+                    <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-purple-700">
+                      {roleLabel(player.user.role)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">
+                  {positionLabel[player.position]}
+                  {player.shirtNumberPreference !== null ? ` | #${player.shirtNumberPreference}` : ""}
+                </p>
+                <p className="text-xs text-emerald-800">
+                  {player.email ? `Email do jogador: ${player.email}` : "Sem email no jogador"}
+                  {player.phone ? ` | Whatsapp: ${player.phone}` : ""}
+                </p>
+                <p className="text-xs text-emerald-800">
+                  {player.user ? `Conta: ${player.user.email}` : "Sem conta vinculada"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-ghost" type="button" onClick={() => startEdit(player)}>
+                Editar
+              </button>
+              <Link className="btn btn-ghost" href={`/meu-perfil?playerId=${player.id}&modo=admin`} target="_blank" rel="noreferrer">
+                Estatisticas
+              </Link>
+              <button className="btn btn-ghost" type="button" disabled={loadingId === player.id} onClick={() => toggleActive(player)}>
+                {player.isActive ? "Inativar" : "Ativar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </li>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <HeroBlock className="p-5 sm:p-6">
@@ -365,8 +557,11 @@ export default function AdminJogadoresPage() {
               Gerencie atletas, acesso vinculado e a administracao de conta em um unico lugar.
             </p>
           </div>
-          <Link className={buttonVariants({ variant: "outline", className: "rounded-full" })} href="/admin/usuarios/unificar">
-            Unificar Jogadores/Usuarios
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-full bg-zinc-800 px-4 text-sm font-medium text-white transition hover:bg-zinc-900"
+            href="/admin/jogadores/unificar"
+          >
+            Unificar Jogadores
           </Link>
         </div>
 
@@ -437,212 +632,40 @@ export default function AdminJogadoresPage() {
       <SectionShell className="p-4">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h3 className="text-xl font-semibold text-emerald-950">Lista de jogadores</h3>
+            <h3 className="text-xl font-semibold text-emerald-950">Jogadores ativos</h3>
             <p className="text-sm text-emerald-800">Cada linha concentra os dados esportivos do atleta e a conta vinculada, quando existir.</p>
           </div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
-            {sortedPlayers.length} jogador{sortedPlayers.length === 1 ? "" : "es"}
+            {activePlayers.length} jogador{activePlayers.length === 1 ? "" : "es"}
           </p>
         </div>
 
         <ul className="mt-4 space-y-3 text-sm">
-          {sortedPlayers.map((player) => {
-            const isEditing = editingPlayerId === player.id;
-
-            return (
-              <li key={player.id} className="rounded-xl border border-emerald-100 p-3">
-                {isEditing ? (
-                  <div className="space-y-4">
-                    <div className="grid gap-2 md:grid-cols-7 md:items-end">
-                      <label>
-                        <span className="field-label">Nome</span>
-                        <input className="field-input" value={editName} onChange={(event) => setEditName(event.currentTarget.value)} />
-                      </label>
-                      <label>
-                        <span className="field-label">Apelido</span>
-                        <input className="field-input" value={editNickname} onChange={(event) => setEditNickname(event.currentTarget.value)} />
-                      </label>
-                      <label>
-                        <span className="field-label">Posicao</span>
-                        <select className="field-input" value={editPosition} onChange={(event) => setEditPosition(event.currentTarget.value as ManagedPlayer["position"])}>
-                          <option value="GOLEIRO">Goleiro</option>
-                          <option value="ZAGUEIRO">Zagueiro</option>
-                          <option value="MEIA">Meia</option>
-                          <option value="ATACANTE">Atacante</option>
-                          <option value="OUTRO">Outro</option>
-                        </select>
-                      </label>
-                      <label>
-                        <span className="field-label">Numero</span>
-                        <input className="field-input" type="number" min={0} max={99} value={editShirtNumber} onChange={(event) => setEditShirtNumber(event.currentTarget.value)} />
-                      </label>
-                      <label>
-                        <span className="field-label">Email do jogador</span>
-                        <input className="field-input" type="email" value={editEmail} onChange={(event) => setEditEmail(event.currentTarget.value)} />
-                      </label>
-                      <label>
-                        <span className="field-label">Whatsapp</span>
-                        <input className="field-input" type="tel" value={editPhone} onChange={(event) => setEditPhone(event.currentTarget.value)} />
-                      </label>
-                      <div className="flex gap-2 md:col-span-6">
-                        <button className="btn btn-primary" type="button" disabled={loadingId === player.id} onClick={() => saveEdit(player.id)}>
-                          Salvar
-                        </button>
-                        <button className="btn btn-ghost" type="button" onClick={cancelEdit}>
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                      <div className="rounded-lg bg-emerald-50 p-3">
-                        <div className="mb-3 flex items-center gap-3">
-                          {player.photoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={player.photoUrl}
-                              alt={`Foto de ${player.name}`}
-                              className="h-16 w-16 rounded-xl border border-emerald-200 object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-sm font-bold text-emerald-900">
-                              {getInitials(player.name)}
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-sm font-medium text-emerald-900">Foto do jogador</p>
-                            <p className="text-xs text-emerald-700">Atualize a imagem esportiva usada nos cards e listagens.</p>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
-                          <label>
-                            <span className="field-label">Arquivo</span>
-                            <input
-                              className="field-input"
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp"
-                              onChange={(event) => {
-                                const file = event.currentTarget.files?.[0] ?? null;
-                                setPhotoFilesByPlayerId((prev) => ({ ...prev, [player.id]: file }));
-                              }}
-                            />
-                          </label>
-                          <button className="btn btn-primary" type="button" onClick={() => uploadPhoto(player.id)}>
-                            Enviar foto
-                          </button>
-                          <button className="btn btn-ghost" type="button" disabled={!player.photoUrl} onClick={() => removePhoto(player.id)}>
-                            Remover foto
-                          </button>
-                        </div>
-                        {photoStatusByPlayerId[player.id] ? (
-                          <p className="mt-2 text-xs font-medium text-emerald-900">{photoStatusByPlayerId[player.id]}</p>
-                        ) : null}
-                      </div>
-
-                      <div className="rounded-lg border border-emerald-100 bg-white p-3">
-                        <p className="text-sm font-semibold text-emerald-950">Conta vinculada</p>
-                        {player.user ? (
-                          <>
-                            <p className="mt-1 text-sm text-emerald-900">{player.user.email}</p>
-                            <p className="text-xs text-emerald-700">
-                              {roleLabel(player.user.role)} | {statusLabel(player.user.status)}
-                              {player.user.mustChangePassword ? " | Troca de senha pendente" : ""}
-                            </p>
-
-                            <div className="mt-4 space-y-2">
-                              <p className="text-sm font-medium text-emerald-900">Definir nova senha:</p>
-                              <input
-                                className="field-input"
-                                type="password"
-                                minLength={8}
-                                value={newPassword}
-                                onChange={(event) => setNewPassword(event.currentTarget.value)}
-                                placeholder="Minimo de 8 caracteres"
-                              />
-                              <Button className="rounded-full" type="button" disabled={loadingId === player.id} onClick={() => setExplicitPassword(player)}>
-                                Redefinir
-                              </Button>
-                              {passwordStatus ? <p className="text-xs font-medium text-emerald-900">{passwordStatus}</p> : null}
-                            </div>
-                          </>
-                        ) : (
-                          <p className="mt-2 text-sm text-emerald-800">Sem conta vinculada.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      {player.photoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={player.photoUrl}
-                          alt={`Foto de ${player.name}`}
-                          className="h-14 w-14 rounded-xl border border-emerald-200 object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-sm font-bold text-emerald-900">
-                          {getInitials(player.name)}
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-emerald-950">{playerLabel(player)}</p>
-                          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]", player.isActive ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "border border-zinc-200 bg-zinc-50 text-zinc-700")}>
-                            {player.isActive ? "Jogador ativo" : "Jogador inativo"}
-                          </span>
-                          {player.user ? (
-                            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]", player.user.status === "ACTIVE" ? "border border-sky-200 bg-sky-50 text-sky-700" : "border border-amber-200 bg-amber-50 text-amber-700")}>
-                              {statusLabel(player.user.status)}
-                            </span>
-                          ) : null}
-                          {player.user ? (
-                            <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-purple-700">
-                              {roleLabel(player.user.role)}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">
-                          {positionLabel[player.position]}
-                          {player.shirtNumberPreference !== null ? ` | #${player.shirtNumberPreference}` : ""}
-                        </p>
-                        <p className="text-xs text-emerald-800">
-                          {player.email ? `Email do jogador: ${player.email}` : "Sem email no jogador"}
-                          {player.phone ? ` | Whatsapp: ${player.phone}` : ""}
-                        </p>
-                        <p className="text-xs text-emerald-800">
-                          {player.user ? `Conta: ${player.user.email}` : "Sem conta vinculada"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button className="btn btn-ghost" type="button" onClick={() => startEdit(player)}>
-                        Editar
-                      </button>
-                      <Link
-                        className={buttonVariants({ variant: "ghost", className: "rounded-full" })}
-                        href={`/meu-perfil?playerId=${player.id}&modo=admin`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Estatisticas
-                      </Link>
-                      <button className="btn btn-ghost" type="button" disabled={loadingId === player.id} onClick={() => toggleActive(player)}>
-                        {player.isActive ? "Inativar" : "Ativar"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {activePlayers.map(renderPlayerRow)}
         </ul>
+      </SectionShell>
+
+      <SectionShell className="p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-emerald-950">Jogadores inativos</h3>
+            <p className="text-sm text-emerald-800">Historico esportivo preservado, com acesso removido quando houver conta vinculada.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
+              {inactivePlayers.length} jogador{inactivePlayers.length === 1 ? "" : "es"}
+            </p>
+            <button className="btn btn-ghost" type="button" onClick={() => setShowInactive((current) => !current)}>
+              {showInactive ? "Ocultar" : "Mostrar"}
+            </button>
+          </div>
+        </div>
+
+        {showInactive ? <ul className="mt-4 space-y-3 text-sm">{inactivePlayers.map(renderPlayerRow)}</ul> : null}
       </SectionShell>
 
       {message ? <StatusNote tone={messageTone}>{message}</StatusNote> : null}
     </div>
   );
 }
+

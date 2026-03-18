@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "@/app/api/admin/users/merge/route";
 
 const { requireAdminApi, listMergeCandidates, previewEntityMerge, executeEntityMerge } = vi.hoisted(() => ({
@@ -58,7 +58,6 @@ describe("admin user merge api", () => {
 
   it("lists merge candidates", async () => {
     listMergeCandidates.mockResolvedValue({
-      users: [{ id: "user-1" }],
       players: [{ id: "player-1" }],
     });
 
@@ -70,18 +69,19 @@ describe("admin user merge api", () => {
 
   it("returns a preview summary", async () => {
     previewEntityMerge.mockResolvedValue({
-      userMerge: null,
-      playerMerge: null,
+      playerMerge: {
+        primary: { id: "player-1" },
+        secondary: { id: "player-2" },
+        summary: { participants: 1, overlappingMatches: 0, ratingsGiven: 0, ratingsReceived: 0, whatsAppMessages: 0 },
+      },
       warnings: ["warn"],
     });
 
     const response = await POST(
       makeRequest({
         action: "preview",
-        primaryUserId: "user-1",
-        secondaryUserId: "user-2",
-        primaryPlayerId: null,
-        secondaryPlayerId: null,
+        primaryPlayerId: "player-1",
+        secondaryPlayerId: "player-2",
       }),
     );
 
@@ -90,8 +90,8 @@ describe("admin user merge api", () => {
       prismaMock,
       expect.objectContaining({
         action: "preview",
-        primaryUserId: "user-1",
-        secondaryUserId: "user-2",
+        primaryPlayerId: "player-1",
+        secondaryPlayerId: "player-2",
       }),
     );
   });
@@ -102,8 +102,6 @@ describe("admin user merge api", () => {
     const response = await POST(
       makeRequest({
         action: "execute",
-        primaryUserId: "user-1",
-        secondaryUserId: "user-2",
         primaryPlayerId: "player-1",
         secondaryPlayerId: "player-2",
       }),
@@ -119,3 +117,4 @@ describe("admin user merge api", () => {
     );
   });
 });
+

@@ -2,8 +2,6 @@ import { PresenceStatus, Prisma, Team, UserRole, UserStatus } from "@prisma/clie
 import { getPrimaryTeam, normalizeTeams, sumTeamSplitStats } from "@/lib/team-utils";
 
 export type MergeEntitiesInput = {
-  primaryUserId?: string | null;
-  secondaryUserId?: string | null;
   primaryPlayerId?: string | null;
   secondaryPlayerId?: string | null;
 };
@@ -12,24 +10,6 @@ type TxClient = Prisma.TransactionClient;
 type MergeRootClient = {
   $transaction<T>(callback: (tx: TxClient) => Promise<T>): Promise<T>;
 };
-
-type LoadedUser = Prisma.UserGetPayload<{
-  include: {
-    accounts: {
-      select: {
-        provider: true;
-        providerAccountId: true;
-      };
-    };
-    player: {
-      select: {
-        id: true;
-        name: true;
-        nickname: true;
-      };
-    };
-  };
-}>;
 
 type LoadedPlayer = Prisma.PlayerGetPayload<{
   include: {
@@ -41,6 +21,7 @@ type LoadedPlayer = Prisma.PlayerGetPayload<{
         role: true;
         status: true;
         playerId: true;
+        mergedIntoUserId: true;
       };
     };
   };
@@ -71,10 +52,8 @@ type RatingLike = {
 };
 
 type SelectionContext = {
-  primaryUser: LoadedUser | null;
-  secondaryUser: LoadedUser | null;
-  primaryPlayer: LoadedPlayer | null;
-  secondaryPlayer: LoadedPlayer | null;
+  primaryPlayer: LoadedPlayer;
+  secondaryPlayer: LoadedPlayer;
 };
 
 type PlayerMergeSummary = {
@@ -86,41 +65,18 @@ type PlayerMergeSummary = {
 };
 
 export type MergePreview = {
-  userMerge: null | {
-    primary: {
-      id: string;
-      label: string;
-      email: string;
-      role: UserRole;
-      status: UserStatus;
-      playerLabel: string | null;
-    };
-    secondary: {
-      id: string;
-      label: string;
-      email: string;
-      role: UserRole;
-      status: UserStatus;
-      playerLabel: string | null;
-      loginMethods: string[];
-    };
-    result: {
-      role: UserRole;
-      status: UserStatus;
-      passwordAction: "keep-primary" | "move-secondary" | "none";
-      finalEmail: string;
-    };
-  };
-  playerMerge: null | {
+  playerMerge: {
     primary: {
       id: string;
       label: string;
       email: string | null;
+      linkedUserEmail: string | null;
     };
     secondary: {
       id: string;
       label: string;
       email: string | null;
+      linkedUserEmail: string | null;
     };
     summary: PlayerMergeSummary;
   };
@@ -136,14 +92,6 @@ export class MergeValidationError extends Error {
     this.status = status;
   }
 }
-
-const userStatusRank: Record<UserStatus, number> = {
-  ACTIVE: 5,
-  PENDING_APPROVAL: 4,
-  PENDING_VERIFICATION: 3,
-  REJECTED: 2,
-  DISABLED: 1,
-};
 
 const presenceStatusRank: Record<PresenceStatus, number> = {
   CONFIRMED: 3,
@@ -161,60 +109,12 @@ function uniqueValues(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.filter((value): value is string => typeof value === "string" && value.trim().length > 0)));
 }
 
-function userLabel(user: Pick<LoadedUser, "name" | "email">) {
-  return user.name?.trim() ? user.name : user.email;
-}
-
 function playerLabel(player: Pick<LoadedPlayer, "name" | "nickname">) {
   return player.nickname ? `${player.nickname} (${player.name})` : player.name;
 }
 
-function strongerRole(primaryRole: UserRole, secondaryRole: UserRole) {
-  return primaryRole === UserRole.ADMIN || secondaryRole === UserRole.ADMIN ? UserRole.ADMIN : UserRole.PLAYER;
-}
-
-function strongerStatus(primaryStatus: UserStatus, secondaryStatus: UserStatus) {
-  return userStatusRank[primaryStatus] >= userStatusRank[secondaryStatus] ? primaryStatus : secondaryStatus;
-}
-
 function strongerPresenceStatus(primaryStatus: PresenceStatus, secondaryStatus: PresenceStatus) {
   return presenceStatusRank[primaryStatus] >= presenceStatusRank[secondaryStatus] ? primaryStatus : secondaryStatus;
-}
-
-function getPasswordAction(primary: LoadedUser, secondary: LoadedUser) {
-  if (primary.passwordHash) {
-    return "keep-primary" as const;
-  }
-
-  if (secondary.passwordHash) {
-    return "move-secondary" as const;
-  }
-
-  return "none" as const;
-}
-
-function getLoginMethods(user: LoadedUser) {
-  const methods = new Set<string>();
-
-  if (user.passwordHash) {
-    methods.add("email/senha");
-  }
-
-  for (const account of user.accounts) {
-    if (account.provider === "google") {
-      methods.add("Google");
-      continue;
-    }
-
-    if (account.provider === "microsoft-entra-id") {
-      methods.add("Microsoft");
-      continue;
-    }
-
-    methods.add(account.provider);
-  }
-
-  return Array.from(methods);
 }
 
 function pickEarliestDate(values: Array<Date | null | undefined>) {
@@ -252,9 +152,10 @@ export function mergeParticipantRecords(primary: ParticipantLike, secondary: Par
 
   return {
     presenceStatus,
-    confirmedAt: presenceStatus === PresenceStatus.CONFIRMED
-      ? pickEarliestDate([primary.confirmedAt, secondary.confirmedAt])
-      : null,
+    confirmedAt:
+      presenceStatus === PresenceStatus.CONFIRMED
+        ? pickEarliestDate([primary.confirmedAt, secondary.confirmedAt])
+        : null,
     teams,
     primaryTeam: resolveMergedPrimaryTeam(primary, secondary, teams),
     playedAsGoalkeeper: primary.playedAsGoalkeeper || secondary.playedAsGoalkeeper,
@@ -314,66 +215,22 @@ export function planMergedRatings(ratings: RatingLike[], primaryPlayerId: string
 
 function buildWarnings(context: SelectionContext) {
   const warnings = [
-    "A unificacao e definitiva. O registro secundario sera ocultado e bloqueado para uso normal.",
+    "A unificacao e definitiva. O jogador secundario sera ocultado para uso normal.",
+    "Todo o historico esportivo do jogador secundario sera movido para o principal.",
   ];
 
-  if (context.secondaryUser) {
-    warnings.push("Depois da fusao, o login por email/senha da conta secundaria deixara de ser aceito.");
-  }
-
-  if (context.secondaryPlayer) {
-    warnings.push("O historico esportivo do jogador secundario sera movido para o principal e o secundario ficara oculto.");
+  if (context.secondaryPlayer.user) {
+    warnings.push("Se houver conta vinculada no jogador secundario, ela sera bloqueada e a conta do principal sera mantida.");
   }
 
   return warnings;
 }
 
-async function loadSelectionContext(client: Prisma.TransactionClient | { user: TxClient["user"]; player: TxClient["player"] }, input: MergeEntitiesInput) {
-  const explicitUserIds = uniqueValues([input.primaryUserId, input.secondaryUserId]);
-
-  const users = explicitUserIds.length > 0
-    ? await client.user.findMany({
-        where: {
-          id: { in: explicitUserIds },
-          mergedIntoUserId: null,
-        },
-        include: {
-          accounts: {
-            select: {
-              provider: true,
-              providerAccountId: true,
-            },
-          },
-          player: {
-            select: {
-              id: true,
-              name: true,
-              nickname: true,
-            },
-          },
-        },
-      })
-    : [];
-
-  const userById = new Map(users.map((user) => [user.id, user]));
-  const primaryUser = input.primaryUserId ? userById.get(input.primaryUserId) ?? null : null;
-  const secondaryUser = input.secondaryUserId ? userById.get(input.secondaryUserId) ?? null : null;
-
-  if (input.primaryUserId) {
-    ensure(primaryUser, "Usuario principal nao encontrado ou ja foi unificado.", 404);
-  }
-
-  if (input.secondaryUserId) {
-    ensure(secondaryUser, "Usuario secundario nao encontrado ou ja foi unificado.", 404);
-  }
-
-  const explicitPlayerIds = uniqueValues([
-    input.primaryPlayerId,
-    input.secondaryPlayerId,
-    primaryUser?.playerId,
-    secondaryUser?.playerId,
-  ]);
-
+async function loadSelectionContext(
+  client: Prisma.TransactionClient | { player: TxClient["player"] },
+  input: MergeEntitiesInput,
+): Promise<SelectionContext> {
+  const explicitPlayerIds = uniqueValues([input.primaryPlayerId, input.secondaryPlayerId]);
   const players = explicitPlayerIds.length > 0
     ? await client.player.findMany({
         where: {
@@ -389,6 +246,7 @@ async function loadSelectionContext(client: Prisma.TransactionClient | { user: T
               role: true,
               status: true,
               playerId: true,
+              mergedIntoUserId: true,
             },
           },
         },
@@ -399,49 +257,17 @@ async function loadSelectionContext(client: Prisma.TransactionClient | { user: T
   const primaryPlayer = input.primaryPlayerId ? playerById.get(input.primaryPlayerId) ?? null : null;
   const secondaryPlayer = input.secondaryPlayerId ? playerById.get(input.secondaryPlayerId) ?? null : null;
 
-  if (input.primaryPlayerId) {
-    ensure(primaryPlayer, "Jogador principal nao encontrado ou ja foi unificado.", 404);
-  }
+  ensure(primaryPlayer, "Jogador principal nao encontrado ou ja foi unificado.", 404);
+  ensure(secondaryPlayer, "Jogador secundario nao encontrado ou ja foi unificado.", 404);
 
-  if (input.secondaryPlayerId) {
-    ensure(secondaryPlayer, "Jogador secundario nao encontrado ou ja foi unificado.", 404);
-  }
-
-  if (primaryUser?.playerId && primaryPlayer && primaryUser.playerId !== primaryPlayer.id) {
-    throw new MergeValidationError("O usuario principal ja esta vinculado a outro jogador. Ajuste a selecao.", 409);
-  }
-
-  if (secondaryUser?.playerId && secondaryPlayer && secondaryUser.playerId !== secondaryPlayer.id) {
-    throw new MergeValidationError("O usuario secundario ja esta vinculado a outro jogador. Ajuste a selecao.", 409);
-  }
-
-  if (primaryUser && secondaryUser && !primaryPlayer && !secondaryPlayer) {
-    if (primaryUser.playerId && secondaryUser.playerId && primaryUser.playerId !== secondaryUser.playerId) {
-      throw new MergeValidationError("Essas contas estao ligadas a jogadores diferentes. Selecione tambem os jogadores para unificar.", 409);
-    }
-  }
-
-  if (primaryPlayer && secondaryPlayer) {
-    if (!primaryUser && !secondaryUser) {
-      if (primaryPlayer.user && secondaryPlayer.user && primaryPlayer.user.id !== secondaryPlayer.user.id) {
-        throw new MergeValidationError("Os dois jogadores possuem contas diferentes vinculadas. Unifique tambem os usuarios.", 409);
-      }
-    } else {
-      const allowedUserIds = new Set(uniqueValues([primaryUser?.id, secondaryUser?.id]));
-
-      if (primaryPlayer.user && !allowedUserIds.has(primaryPlayer.user.id)) {
-        throw new MergeValidationError("O jogador principal esta vinculado a outro usuario fora desta unificacao.", 409);
-      }
-
-      if (secondaryPlayer.user && !allowedUserIds.has(secondaryPlayer.user.id)) {
-        throw new MergeValidationError("O jogador secundario esta vinculado a outro usuario fora desta unificacao.", 409);
-      }
-    }
+  if (secondaryPlayer.user && !primaryPlayer.user) {
+    throw new MergeValidationError(
+      "O jogador secundario possui conta vinculada. Escolha como principal o jogador que deve manter a conta.",
+      409,
+    );
   }
 
   return {
-    primaryUser,
-    secondaryUser,
     primaryPlayer,
     secondaryPlayer,
   };
@@ -484,63 +310,32 @@ async function getPlayerMergeSummary(client: TxClient, primaryPlayerId: string, 
 }
 
 export async function listMergeCandidates(client: TxClient) {
-  const [users, players] = await Promise.all([
-    client.user.findMany({
-      where: { mergedIntoUserId: null },
-      orderBy: [{ createdAt: "asc" }],
-      include: {
-        accounts: {
-          select: {
-            provider: true,
-            providerAccountId: true,
-          },
-        },
-        player: {
-          select: {
-            id: true,
-            name: true,
-            nickname: true,
-          },
+  const players = await client.player.findMany({
+    where: { mergedIntoPlayerId: null },
+    orderBy: [{ name: "asc" }],
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          status: true,
+          playerId: true,
+          mergedIntoUserId: true,
         },
       },
-    }),
-    client.player.findMany({
-      where: { mergedIntoPlayerId: null },
-      orderBy: [{ name: "asc" }],
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            status: true,
-            playerId: true,
-          },
-        },
-      },
-    }),
-  ]);
+    },
+  });
 
   return {
-    users: users.map((user) => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      playerId: user.playerId,
-      player: user.player,
-      loginMethods: getLoginMethods(user),
-      createdAt: user.createdAt,
-    })),
     players: players.map((player) => ({
       id: player.id,
       name: player.name,
       nickname: player.nickname,
       email: player.email,
       isActive: player.isActive,
-      user: player.user,
+      user: player.user?.mergedIntoUserId ? null : player.user,
     })),
   };
 }
@@ -549,108 +344,57 @@ export async function previewEntityMerge(client: TxClient, input: MergeEntitiesI
   const context = await loadSelectionContext(client, input);
 
   return {
-    userMerge: context.primaryUser && context.secondaryUser
-      ? {
-          primary: {
-            id: context.primaryUser.id,
-            label: userLabel(context.primaryUser),
-            email: context.primaryUser.email,
-            role: context.primaryUser.role,
-            status: context.primaryUser.status,
-            playerLabel: context.primaryUser.player ? playerLabel(context.primaryUser.player) : null,
-          },
-          secondary: {
-            id: context.secondaryUser.id,
-            label: userLabel(context.secondaryUser),
-            email: context.secondaryUser.email,
-            role: context.secondaryUser.role,
-            status: context.secondaryUser.status,
-            playerLabel: context.secondaryUser.player ? playerLabel(context.secondaryUser.player) : null,
-            loginMethods: getLoginMethods(context.secondaryUser),
-          },
-          result: {
-            role: strongerRole(context.primaryUser.role, context.secondaryUser.role),
-            status: strongerStatus(context.primaryUser.status, context.secondaryUser.status),
-            passwordAction: getPasswordAction(context.primaryUser, context.secondaryUser),
-            finalEmail: context.primaryUser.email,
-          },
-        }
-      : null,
-    playerMerge: context.primaryPlayer && context.secondaryPlayer
-      ? {
-          primary: {
-            id: context.primaryPlayer.id,
-            label: playerLabel(context.primaryPlayer),
-            email: context.primaryPlayer.email,
-          },
-          secondary: {
-            id: context.secondaryPlayer.id,
-            label: playerLabel(context.secondaryPlayer),
-            email: context.secondaryPlayer.email,
-          },
-          summary: await getPlayerMergeSummary(client, context.primaryPlayer.id, context.secondaryPlayer.id),
-        }
-      : null,
+    playerMerge: {
+      primary: {
+        id: context.primaryPlayer.id,
+        label: playerLabel(context.primaryPlayer),
+        email: context.primaryPlayer.email,
+        linkedUserEmail: context.primaryPlayer.user?.email ?? null,
+      },
+      secondary: {
+        id: context.secondaryPlayer.id,
+        label: playerLabel(context.secondaryPlayer),
+        email: context.secondaryPlayer.email,
+        linkedUserEmail: context.secondaryPlayer.user?.email ?? null,
+      },
+      summary: await getPlayerMergeSummary(client, context.primaryPlayer.id, context.secondaryPlayer.id),
+    },
     warnings: buildWarnings(context),
   };
 }
 
-function resolvePrimaryUserPlayerId(context: SelectionContext) {
-  if (context.primaryPlayer && context.secondaryPlayer) {
-    return context.primaryPlayer.id;
-  }
+async function disableSecondaryLinkedUser(tx: TxClient, mergedByUserId: string, context: SelectionContext, mergedAt: Date) {
+  const primaryUser = context.primaryPlayer.user;
+  const secondaryUser = context.secondaryPlayer.user;
 
-  return context.primaryUser?.playerId ?? context.secondaryUser?.playerId ?? null;
-}
-
-async function mergeUsers(tx: TxClient, mergedByUserId: string, context: SelectionContext, mergedAt: Date) {
-  const primaryUser = context.primaryUser;
-  const secondaryUser = context.secondaryUser;
-
-  if (!primaryUser || !secondaryUser) {
+  if (!secondaryUser) {
     return null;
   }
 
-  const finalPlayerId = resolvePrimaryUserPlayerId(context);
-  const finalRole = strongerRole(primaryUser.role, secondaryUser.role);
+  ensure(primaryUser, "O jogador principal precisa manter a conta vinculada para esta unificacao.");
 
-  if (finalRole === UserRole.ADMIN) {
-    ensure(finalPlayerId, "O usuario final precisa ficar vinculado a um jogador para manter perfil admin.");
+  if (primaryUser.id === secondaryUser.id) {
+    return null;
   }
 
-  const finalStatus = strongerStatus(primaryUser.status, secondaryUser.status);
-  const passwordAction = getPasswordAction(primaryUser, secondaryUser);
-  const finalPasswordHash = passwordAction === "move-secondary"
-    ? secondaryUser.passwordHash
-    : primaryUser.passwordHash;
-
-  await tx.account.updateMany({
-    where: { userId: secondaryUser.id },
-    data: { userId: primaryUser.id },
-  });
-
-  await tx.user.update({
-    where: { id: primaryUser.id },
-    data: {
-      role: finalRole,
-      status: finalStatus,
-      playerId: finalPlayerId,
-      passwordHash: finalPasswordHash ?? undefined,
-      mustChangePassword: primaryUser.mustChangePassword || secondaryUser.mustChangePassword,
-      emailVerified:
-        primaryUser.emailVerified ?? (primaryUser.email === secondaryUser.email ? secondaryUser.emailVerified : null),
-      sessionVersion: {
-        increment: 1,
+  if (secondaryUser.role === UserRole.ADMIN && secondaryUser.status === UserStatus.ACTIVE) {
+    const remainingActiveAdmins = await tx.user.count({
+      where: {
+        id: { not: secondaryUser.id },
+        mergedIntoUserId: null,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
       },
-    },
-  });
+    });
+
+    ensure(remainingActiveAdmins > 0, "Nao e possivel desativar o ultimo admin ativo.", 409);
+  }
 
   await tx.user.update({
     where: { id: secondaryUser.id },
     data: {
       status: UserStatus.DISABLED,
       playerId: null,
-      passwordHash: null,
       mustChangePassword: false,
       mergedIntoUserId: primaryUser.id,
       mergedAt,
@@ -662,24 +406,18 @@ async function mergeUsers(tx: TxClient, mergedByUserId: string, context: Selecti
   });
 
   await tx.session.deleteMany({
-    where: {
-      userId: { in: [primaryUser.id, secondaryUser.id] },
-    },
+    where: { userId: secondaryUser.id },
   });
 
   return {
-    primaryUserId: primaryUser.id,
-    secondaryUserId: secondaryUser.id,
+    keptUserId: primaryUser.id,
+    disabledUserId: secondaryUser.id,
   };
 }
 
 async function mergePlayers(tx: TxClient, mergedByUserId: string, context: SelectionContext, mergedAt: Date) {
   const primaryPlayer = context.primaryPlayer;
   const secondaryPlayer = context.secondaryPlayer;
-
-  if (!primaryPlayer || !secondaryPlayer) {
-    return null;
-  }
 
   const participantRecords = await tx.matchParticipant.findMany({
     where: {
@@ -756,17 +494,7 @@ async function mergePlayers(tx: TxClient, mergedByUserId: string, context: Selec
     data: { playerId: primaryPlayer.id },
   });
 
-  if (!context.primaryUser && !context.secondaryUser && secondaryPlayer.user && !primaryPlayer.user) {
-    await tx.user.update({
-      where: { id: secondaryPlayer.user.id },
-      data: {
-        playerId: primaryPlayer.id,
-        sessionVersion: {
-          increment: 1,
-        },
-      },
-    });
-  }
+  const mergedUsers = await disableSecondaryLinkedUser(tx, mergedByUserId, context, mergedAt);
 
   await tx.player.update({
     where: { id: secondaryPlayer.id },
@@ -781,6 +509,7 @@ async function mergePlayers(tx: TxClient, mergedByUserId: string, context: Selec
   return {
     primaryPlayerId: primaryPlayer.id,
     secondaryPlayerId: secondaryPlayer.id,
+    mergedUsers,
   };
 }
 
@@ -788,14 +517,12 @@ export async function executeEntityMerge(client: MergeRootClient, mergedByUserId
   return client.$transaction(async (tx) => {
     const context = await loadSelectionContext(tx, input);
     const mergedAt = new Date();
-
-    const mergedUsers = await mergeUsers(tx, mergedByUserId, context, mergedAt);
     const mergedPlayers = await mergePlayers(tx, mergedByUserId, context, mergedAt);
 
     return {
       ok: true,
-      mergedUsers,
       mergedPlayers,
     };
   });
 }
+

@@ -14,15 +14,19 @@ import {
   X,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatDatePtBr, getDateSortValue } from "@/lib/date-format";
 import { ActionBar, PageShell, StatusNote } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
+import { usePublicAuthState } from "@/components/use-public-auth-state";
+import { isAccountReadyForPlayerArea, resolveAuthenticatedLandingPath } from "@/lib/auth-redirect";
 import { cn } from "@/lib/utils";
 import type { IconKey } from "@/lib/weather-icons";
 
 type Player = {
   id: string;
   name: string;
+  nickname?: string | null;
   position: "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 };
 
@@ -69,8 +73,12 @@ function getPositionOrder(position: Player["position"]) {
   return 4;
 }
 
+function playerDisplayName(player: Player) {
+  return player.nickname ?? player.name;
+}
+
 function formatPlayerLabel(player: Player) {
-  return `${player.name} (${getPositionCode(player.position)})`;
+  return `${playerDisplayName(player)} (${getPositionCode(player.position)})`;
 }
 
 function normalizeText(value: string) {
@@ -174,6 +182,8 @@ function WeatherIcon({ iconKey }: { iconKey: IconKey }) {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const { authState, loading: authLoading } = usePublicAuthState();
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -186,7 +196,9 @@ export default function HomePage() {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem("pelada:selectedPlayerId") ?? "";
   });
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
+  const isAuthenticatedPlayerHome = Boolean(authState?.id) && isAccountReadyForPlayerArea(authState ?? {});
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
     [matches, selectedMatchId],
@@ -196,6 +208,9 @@ export default function HomePage() {
     () => selectedMatch?.participants.find((participant) => participant.playerId === quickPlayerId)?.presenceStatus ?? null,
     [quickPlayerId, selectedMatch],
   );
+  const loggedPlayerPresenceStatus = authState?.playerId
+    ? selectedMatch?.participants.find((participant) => participant.playerId === authState.playerId)?.presenceStatus ?? null
+    : null;
 
   const otherMatches = useMemo(
     () => matches.slice(1),
@@ -207,7 +222,7 @@ export default function HomePage() {
       [...(selectedMatch?.participants.filter((item) => item.presenceStatus === "CONFIRMED") ?? [])].sort((a, b) => {
         const byPosition = getPositionOrder(a.player.position) - getPositionOrder(b.player.position);
         if (byPosition !== 0) return byPosition;
-        return a.player.name.localeCompare(b.player.name);
+        return playerDisplayName(a.player).localeCompare(playerDisplayName(b.player));
       }),
     [selectedMatch],
   );
@@ -215,7 +230,7 @@ export default function HomePage() {
   const canceled = useMemo(
     () =>
       [...(selectedMatch?.participants.filter((item) => item.presenceStatus === "CANCELED") ?? [])].sort((a, b) =>
-        a.player.name.localeCompare(b.player.name),
+        playerDisplayName(a.player).localeCompare(playerDisplayName(b.player)),
       ),
     [selectedMatch],
   );
@@ -236,7 +251,7 @@ export default function HomePage() {
   const filteredPending = useMemo(
     () =>
       pending.filter((player) =>
-        normalizedSearchTerm === "" ? true : normalizeText(player.name).includes(normalizedSearchTerm),
+        normalizedSearchTerm === "" ? true : normalizeText(playerDisplayName(player)).includes(normalizedSearchTerm),
       ),
     [normalizedSearchTerm, pending],
   );
@@ -244,7 +259,7 @@ export default function HomePage() {
   const filteredConfirmed = useMemo(
     () =>
       confirmed.filter((item) =>
-        normalizedSearchTerm === "" ? true : normalizeText(item.player.name).includes(normalizedSearchTerm),
+        normalizedSearchTerm === "" ? true : normalizeText(playerDisplayName(item.player)).includes(normalizedSearchTerm),
       ),
     [confirmed, normalizedSearchTerm],
   );
@@ -252,7 +267,7 @@ export default function HomePage() {
   const filteredCanceled = useMemo(
     () =>
       canceled.filter((item) =>
-        normalizedSearchTerm === "" ? true : normalizeText(item.player.name).includes(normalizedSearchTerm),
+        normalizedSearchTerm === "" ? true : normalizeText(playerDisplayName(item.player)).includes(normalizedSearchTerm),
       ),
     [canceled, normalizedSearchTerm],
   );
@@ -261,13 +276,15 @@ export default function HomePage() {
   const showConfirmed = listViewFilter === "ALL" || listViewFilter === "CONFIRMED";
   const showCanceled = listViewFilter === "ALL" || listViewFilter === "CANCELED";
 
-  async function loadData() {
+  async function loadPublicData() {
     const [playersRes, matchesRes] = await Promise.all([
-      fetch("/api/players?active=true"),
-      fetch(`/api/matches?from=${getTodayIsoDate()}`),
+      fetch("/api/players?active=true&publicSelectable=true", { cache: "no-store" }),
+      fetch(`/api/matches?from=${getTodayIsoDate()}`, { cache: "no-store" }),
     ]);
 
-    const players = ((await playersRes.json()) as Player[]).sort((a, b) => a.name.localeCompare(b.name));
+    const players = ((await playersRes.json()) as Player[]).sort((a, b) =>
+      playerDisplayName(a).localeCompare(playerDisplayName(b)),
+    );
     const upcomingMatches = (await matchesRes.json()) as Match[];
     const sortedMatches = upcomingMatches.sort(
       (a, b) => getDateSortValue(a.matchDate) - getDateSortValue(b.matchDate),
@@ -298,12 +315,45 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      loadData().catch(() => setMessage("Falha ao carregar dados da home."));
-    }, 0);
+    if (!authLoading && authState?.id && !isAccountReadyForPlayerArea(authState)) {
+      router.replace(resolveAuthenticatedLandingPath(authState));
+      return;
+    }
 
-    return () => window.clearTimeout(timer);
-  }, []);
+    async function loadAuthenticatedData() {
+      const matchesRes = await fetch(`/api/matches?from=${getTodayIsoDate()}&playerId=me`, { cache: "no-store" });
+      const upcomingMatches = (await matchesRes.json()) as Match[];
+      const sortedMatches = upcomingMatches.sort(
+        (a, b) => getDateSortValue(a.matchDate) - getDateSortValue(b.matchDate),
+      );
+
+      setAllPlayers([]);
+      setMatches(sortedMatches);
+      setSelectedMatchId((currentSelection) => {
+        if (sortedMatches.length === 0) return null;
+        if (currentSelection && sortedMatches.some((match) => match.id === currentSelection)) {
+          return currentSelection;
+        }
+        return sortedMatches[0].id;
+      });
+    }
+
+    async function synchronizeHomeData() {
+      setIsLoadingData(true);
+      setMessage("");
+
+      try {
+        const loader = !authLoading && isAuthenticatedPlayerHome ? loadAuthenticatedData : loadPublicData;
+        await loader();
+      } catch {
+        setMessage("Falha ao carregar dados da home.");
+      } finally {
+        setIsLoadingData(false);
+      }
+    }
+
+    void synchronizeHomeData();
+  }, [authLoading, authState, isAuthenticatedPlayerHome, router]);
 
   useEffect(() => {
     if (!actionMessage) return;
@@ -362,7 +412,7 @@ export default function HomePage() {
     window.localStorage.removeItem("pelada:selectedPlayerId");
   }
 
-  async function setPresence(playerId: string, presenceStatus: PresenceStatus) {
+  async function setPublicPresence(playerId: string, presenceStatus: PresenceStatus) {
     if (!selectedMatch) return;
 
     const response = await fetch(`/api/matches/${selectedMatch.id}/presence`, {
@@ -372,8 +422,8 @@ export default function HomePage() {
     });
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presença." }));
-      setMessage(payload.error ?? "Falha ao atualizar presença.");
+      const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presenca." }));
+      setMessage(payload.error ?? "Falha ao atualizar presenca.");
       return;
     }
 
@@ -386,15 +436,54 @@ export default function HomePage() {
       setActionMessage("Jogador voltou para pendentes.");
     }
 
-    await loadData();
+    await loadPublicData();
   }
+
+  async function setAuthenticatedPresence(presenceStatus: "CONFIRMED" | "CANCELED") {
+    if (!selectedMatch || !isAuthenticatedPlayerHome) return;
+
+    const response = await fetch(`/api/matches/${selectedMatch.id}/presence/me`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ presenceStatus }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "Falha ao atualizar presenca." }));
+      setMessage(payload.error ?? "Falha ao atualizar presenca.");
+      return;
+    }
+
+    setMessage("");
+    setActionMessage(
+      presenceStatus === "CONFIRMED" ? "Sua presenca foi confirmada." : "Sua presenca foi desconfirmada.",
+    );
+
+    const matchesRes = await fetch(`/api/matches?from=${getTodayIsoDate()}&playerId=me`, { cache: "no-store" });
+    const upcomingMatches = (await matchesRes.json()) as Match[];
+    const sortedMatches = upcomingMatches.sort(
+      (a, b) => getDateSortValue(a.matchDate) - getDateSortValue(b.matchDate),
+    );
+    setMatches(sortedMatches);
+    setSelectedMatchId((currentSelection) => {
+      if (sortedMatches.length === 0) return null;
+      if (currentSelection && sortedMatches.some((match) => match.id === currentSelection)) {
+        return currentSelection;
+      }
+      return sortedMatches[0].id;
+    });
+  }
+
+  const welcomeName = authState?.nickname ?? authState?.name ?? "Atleta";
 
   return (
     <PageShell>
       <section className="hero-block p-4 sm:p-6">
-        {matches.length === 0 || !primaryMatch ? (
+        {isLoadingData ? (
+          <p className="text-sm text-emerald-900">Carregando dados da home...</p>
+        ) : matches.length === 0 || !primaryMatch ? (
           <>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Próximas Partidas</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proximas Partidas</p>
             <p className="mt-2 text-sm text-emerald-900">Nenhuma partida em aberto cadastrada.</p>
           </>
         ) : (
@@ -402,16 +491,16 @@ export default function HomePage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:hidden">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Próxima Partida</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
                   {nextMatchWeather ? (
                     <span
                       className="inline-flex items-center gap-1"
-                      aria-label={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
+                      aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}°C
+                        {nextMatchWeather.temperatureC}C
                       </span>
                     </span>
                   ) : null}
@@ -446,16 +535,16 @@ export default function HomePage() {
             <div className="hidden gap-4 md:grid xl:grid-cols-[minmax(280px,0.5fr)_minmax(0,1fr)]">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Próxima Partida</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700">Proxima Partida</p>
                   {nextMatchWeather ? (
                     <span
                       className="inline-flex items-center gap-1"
-                      aria-label={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
-                      title={`Previsão do tempo da partida: ${nextMatchWeather.temperatureC}°C`}
+                      aria-label={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC} graus`}
+                      title={`Previsao do tempo da partida: ${nextMatchWeather.temperatureC}C`}
                     >
                       <WeatherIcon iconKey={nextMatchWeather.iconKey} />
                       <span className="text-[10px] font-semibold leading-none text-emerald-800">
-                        {nextMatchWeather.temperatureC}°C
+                        {nextMatchWeather.temperatureC}C
                       </span>
                     </span>
                   ) : null}
@@ -502,77 +591,127 @@ export default function HomePage() {
           </>
         )}
       </section>
-      <ActionBar className="space-y-3 p-3 sm:p-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmação rápida</p>
-          <p className="text-sm text-emerald-900">{quickSelectedPresenceStatus === "CONFIRMED" ? "Você já está confirmado." : quickSelectedPresenceStatus === "CANCELED" ? "Você está desconfirmado." : "Escolha o jogador e confirme com um toque."}</p>
-        </div>
+      {isAuthenticatedPlayerHome ? (
+        <ActionBar className="space-y-3 p-3 sm:p-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
+            <p className="text-sm text-emerald-900">Bem-vindo {welcomeName}, voce ira jogar o proximo jogo?</p>
+            <p className="mt-1 text-sm text-emerald-800">
+              {loggedPlayerPresenceStatus === "CONFIRMED"
+                ? "Voce ja confirmou sua presenca nesta partida."
+                : loggedPlayerPresenceStatus === "CANCELED"
+                  ? "Voce esta desconfirmado nesta partida."
+                  : "Selecione a partida e escolha se voce vai jogar."}
+            </p>
+          </div>
 
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end">
-          <label className="w-full min-w-0 sm:w-[60%] sm:min-w-[240px] sm:max-w-md sm:flex-1">
-            <span className="field-label">Jogador</span>
-            <select
-              className="field-input"
-              value={quickPlayerId}
-              onChange={(event) => handleQuickPlayerSelect(event.currentTarget.value)}
-              aria-label="Selecionar jogador para confirmação rápida"
-            >
-              <option value="">Selecione...</option>
-              {allPlayers.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {quickPlayerId ? (
-            quickSelectedPresenceStatus === "CONFIRMED" ? (
-              <Button
-                type="button"
-                className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
-                disabled={!selectedMatch}
-                onClick={() => setPresence(quickPlayerId, "CANCELED")}
-                aria-label="Desconfirmar jogador selecionado"
-              >
-                <X size={16} className="sm:hidden" />
-                <span className="hidden sm:inline">Desconfirmar</span>
-              </Button>
-            ) : (
-              <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+          {selectedMatch ? (
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Partida selecionada</p>
+              <p className="mt-2 text-lg font-semibold text-emerald-950">
+                {formatDatePtBr(selectedMatch.matchDate)} - {selectedMatch.startTime}
+              </p>
+              <p className="text-sm text-emerald-800">{selectedMatch.location ?? "Local a definir"}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  className="h-10 w-10 shrink-0 rounded-full bg-emerald-600 p-0 text-white hover:bg-emerald-700 sm:w-auto sm:px-4"
-                  disabled={!selectedMatch}
-                  onClick={() => setPresence(quickPlayerId, "CONFIRMED")}
-                  aria-label="Confirmar presença do jogador selecionado"
+                  className="rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => setAuthenticatedPresence("CONFIRMED")}
                 >
-                  <Check size={16} className="sm:hidden" />
-                  <span className="hidden sm:inline">Confirmar</span>
+                  Confirmar
                 </Button>
-                {quickSelectedPresenceStatus !== "CANCELED" ? (
+                <Button
+                  type="button"
+                  className="rounded-full bg-red-600 text-white hover:bg-red-700"
+                  onClick={() => setAuthenticatedPresence("CANCELED")}
+                >
+                  Desconfirmar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenca.</p>
+          )}
+        </ActionBar>
+      ) : (
+        <ActionBar className="space-y-3 p-3 sm:p-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
+            <p className="text-sm text-emerald-900">
+              {quickSelectedPresenceStatus === "CONFIRMED"
+                ? "Voce ja esta confirmado."
+                : quickSelectedPresenceStatus === "CANCELED"
+                  ? "Voce esta desconfirmado."
+                  : "Escolha o jogador e confirme com um toque."}
+            </p>
+          </div>
+
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end">
+            <label className="w-full min-w-0 sm:w-[60%] sm:min-w-[240px] sm:max-w-md sm:flex-1">
+              <span className="field-label">Jogador</span>
+              <select
+                className="field-input"
+                value={quickPlayerId}
+                onChange={(event) => handleQuickPlayerSelect(event.currentTarget.value)}
+                aria-label="Selecionar jogador para confirmacao rapida"
+              >
+                <option value="">Selecione...</option>
+                {allPlayers.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {playerDisplayName(player)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {quickPlayerId ? (
+              quickSelectedPresenceStatus === "CONFIRMED" ? (
+                <Button
+                  type="button"
+                  className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
+                  disabled={!selectedMatch}
+                  onClick={() => setPublicPresence(quickPlayerId, "CANCELED")}
+                  aria-label="Desconfirmar jogador selecionado"
+                >
+                  <X size={16} className="sm:hidden" />
+                  <span className="hidden sm:inline">Desconfirmar</span>
+                </Button>
+              ) : (
+                <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                   <Button
                     type="button"
-                    className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
+                    className="h-10 w-10 shrink-0 rounded-full bg-emerald-600 p-0 text-white hover:bg-emerald-700 sm:w-auto sm:px-4"
                     disabled={!selectedMatch}
-                    onClick={() => setPresence(quickPlayerId, "CANCELED")}
-                    aria-label="Marcar jogador selecionado como não vou"
+                    onClick={() => setPublicPresence(quickPlayerId, "CONFIRMED")}
+                    aria-label="Confirmar presenca do jogador selecionado"
                   >
-                    <X size={16} className="sm:hidden" />
-                    <span className="hidden sm:inline">Não vou</span>
+                    <Check size={16} className="sm:hidden" />
+                    <span className="hidden sm:inline">Confirmar</span>
                   </Button>
-                ) : null}
-              </div>
-            )
+                  {quickSelectedPresenceStatus !== "CANCELED" ? (
+                    <Button
+                      type="button"
+                      className="h-10 w-10 shrink-0 rounded-full bg-red-600 p-0 text-white hover:bg-red-700 sm:w-auto sm:px-4"
+                      disabled={!selectedMatch}
+                      onClick={() => setPublicPresence(quickPlayerId, "CANCELED")}
+                      aria-label="Marcar jogador selecionado como nao vou"
+                    >
+                      <X size={16} className="sm:hidden" />
+                      <span className="hidden sm:inline">Nao vou</span>
+                    </Button>
+                  ) : null}
+                </div>
+              )
+            ) : null}
+          </div>
+
+          {!selectedMatch ? (
+            <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenca.</p>
           ) : null}
-        </div>
+        </ActionBar>
+      )}
 
-        {!selectedMatch ? (
-          <p className="text-sm text-amber-700">Selecione uma partida para confirmar presença.</p>
-        ) : null}
-      </ActionBar>
-
-      {selectedMatch ? (
+      {!isAuthenticatedPlayerHome && selectedMatch ? (
         <section className="section-shell p-4 sm:p-5">
           <label>
             <span className="field-label">Buscar jogador</span>
@@ -592,7 +731,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {selectedMatch ? (
+      {!isAuthenticatedPlayerHome && selectedMatch ? (
         <ActionBar className="sticky sticky-app-offset z-10 p-1.5 sm:p-2">
           <div className="flex flex-wrap gap-2">
             <Button
@@ -656,7 +795,7 @@ export default function HomePage() {
         <StatusNote tone="success">{actionMessage}</StatusNote>
       ) : null}
 
-      {selectedMatch ? (
+      {!isAuthenticatedPlayerHome && selectedMatch ? (
         <section className={`grid gap-4 ${listViewFilter === "ALL" ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
           {showPending ? (
             <div className="card p-4">
@@ -677,14 +816,14 @@ export default function HomePage() {
                       <ActionButton
                         label="Confirmar jogador"
                         tone="green"
-                        onClick={() => setPresence(player.id, "CONFIRMED")}
+                        onClick={() => setPublicPresence(player.id, "CONFIRMED")}
                       >
                         <Check size={16} />
                       </ActionButton>
                       <ActionButton
                         label="Desconfirmar jogador"
                         tone="red"
-                        onClick={() => setPresence(player.id, "CANCELED")}
+                        onClick={() => setPublicPresence(player.id, "CANCELED")}
                       >
                         <X size={16} />
                       </ActionButton>
@@ -714,14 +853,14 @@ export default function HomePage() {
                       <ActionButton
                         label="Voltar jogador para pendentes"
                         tone="yellow"
-                        onClick={() => setPresence(item.playerId, "WAITLIST")}
+                        onClick={() => setPublicPresence(item.playerId, "WAITLIST")}
                       >
                         <RotateCcw size={16} />
                       </ActionButton>
                       <ActionButton
                         label="Desconfirmar jogador"
                         tone="red"
-                        onClick={() => setPresence(item.playerId, "CANCELED")}
+                        onClick={() => setPublicPresence(item.playerId, "CANCELED")}
                       >
                         <X size={16} />
                       </ActionButton>
@@ -751,14 +890,14 @@ export default function HomePage() {
                       <ActionButton
                         label="Confirmar jogador"
                         tone="green"
-                        onClick={() => setPresence(item.playerId, "CONFIRMED")}
+                        onClick={() => setPublicPresence(item.playerId, "CONFIRMED")}
                       >
                         <Check size={16} />
                       </ActionButton>
                       <ActionButton
                         label="Voltar jogador para pendentes"
                         tone="yellow"
-                        onClick={() => setPresence(item.playerId, "WAITLIST")}
+                        onClick={() => setPublicPresence(item.playerId, "WAITLIST")}
                       >
                         <RotateCcw size={16} />
                       </ActionButton>
@@ -775,6 +914,8 @@ export default function HomePage() {
     </PageShell>
   );
 }
+
+
 
 
 

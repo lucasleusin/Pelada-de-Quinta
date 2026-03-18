@@ -16,7 +16,7 @@ export default function PlayerIdentityPage() {
   );
 
   useEffect(() => {
-    fetch("/api/players?active=true")
+    fetch("/api/players?active=true&publicSelectable=true")
       .then((res) => res.json())
       .then((data) => setPlayers(data))
       .catch(() => setPlayers([]));

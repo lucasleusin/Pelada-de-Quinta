@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import {
   adminPasswordResetSchema,
   changePasswordSchema,
@@ -126,21 +126,22 @@ describe("validators", () => {
     expect(changePasswordSchema.safeParse({ password: "NovaSenha123!" }).success).toBe(true);
   });
 
-  it("requires a full pair when merging users or players", () => {
+  it("requires a full pair when merging players", () => {
     expect(
       mergeEntitiesSchema.safeParse({
         action: "preview",
-        primaryUserId: "user-1",
-        secondaryUserId: "",
+        primaryPlayerId: "player-1",
+        secondaryPlayerId: "",
       }).success,
     ).toBe(false);
 
     expect(
       mergeEntitiesSchema.safeParse({
         action: "preview",
-        primaryUserId: "user-1",
-        secondaryUserId: "user-2",
+        primaryPlayerId: "player-1",
+        secondaryPlayerId: "player-2",
       }).success,
     ).toBe(true);
   });
 });
+

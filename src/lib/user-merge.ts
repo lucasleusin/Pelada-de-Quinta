@@ -160,6 +160,33 @@ export function resolveMergeAccountOutcome(primaryHasUser: boolean, secondaryHas
   return "no-account";
 }
 
+export function resolveMergedPlayerPhoto(
+  primary: { photoPath: string | null; photoUrl: string | null },
+  secondary: { photoPath: string | null; photoUrl: string | null },
+) {
+  if (primary.photoPath || primary.photoUrl) {
+    return {
+      nextPrimaryPhotoPath: primary.photoPath,
+      nextPrimaryPhotoUrl: primary.photoUrl,
+      clearSecondaryPhoto: false,
+    };
+  }
+
+  if (secondary.photoPath || secondary.photoUrl) {
+    return {
+      nextPrimaryPhotoPath: secondary.photoPath,
+      nextPrimaryPhotoUrl: secondary.photoUrl,
+      clearSecondaryPhoto: true,
+    };
+  }
+
+  return {
+    nextPrimaryPhotoPath: null,
+    nextPrimaryPhotoUrl: null,
+    clearSecondaryPhoto: false,
+  };
+}
+
 function pickEarliestDate(values: Array<Date | null | undefined>) {
   const validDates = values.filter((value): value is Date => value instanceof Date);
   if (validDates.length === 0) return null;
@@ -505,6 +532,7 @@ async function reconcileLinkedUsersAfterPlayerMerge(tx: TxClient, mergedByUserId
 async function mergePlayers(tx: TxClient, mergedByUserId: string, context: SelectionContext, mergedAt: Date) {
   const primaryPlayer = context.primaryPlayer;
   const secondaryPlayer = context.secondaryPlayer;
+  const mergedPhoto = resolveMergedPlayerPhoto(primaryPlayer, secondaryPlayer);
 
   const participantRecords = await tx.matchParticipant.findMany({
     where: {
@@ -583,10 +611,25 @@ async function mergePlayers(tx: TxClient, mergedByUserId: string, context: Selec
 
   const mergedUsers = await reconcileLinkedUsersAfterPlayerMerge(tx, mergedByUserId, context, mergedAt);
 
+  if (
+    mergedPhoto.nextPrimaryPhotoPath !== primaryPlayer.photoPath ||
+    mergedPhoto.nextPrimaryPhotoUrl !== primaryPlayer.photoUrl
+  ) {
+    await tx.player.update({
+      where: { id: primaryPlayer.id },
+      data: {
+        photoPath: mergedPhoto.nextPrimaryPhotoPath,
+        photoUrl: mergedPhoto.nextPrimaryPhotoUrl,
+      },
+    });
+  }
+
   await tx.player.update({
     where: { id: secondaryPlayer.id },
     data: {
       isActive: false,
+      photoPath: mergedPhoto.clearSecondaryPhoto ? null : secondaryPlayer.photoPath,
+      photoUrl: mergedPhoto.clearSecondaryPhoto ? null : secondaryPlayer.photoUrl,
       mergedIntoPlayerId: primaryPlayer.id,
       mergedAt,
       mergedByUserId,

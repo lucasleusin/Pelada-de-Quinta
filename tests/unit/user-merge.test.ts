@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { mergeParticipantRecords, planMergedRatings, resolveMergeAccountOutcome } from "@/lib/user-merge";
+import {
+  mergeParticipantRecords,
+  planMergedRatings,
+  resolveMergeAccountOutcome,
+  resolveMergedPlayerPhoto,
+} from "@/lib/user-merge";
 
 describe("user merge helpers", () => {
   it("sums stats when both duplicated players were on the same team", () => {
@@ -153,5 +158,31 @@ describe("user merge helpers", () => {
 
   it("reports no account when neither player has a linked user", () => {
     expect(resolveMergeAccountOutcome(false, false)).toBe("no-account");
+  });
+
+  it("moves the secondary player photo when the principal does not have one", () => {
+    expect(
+      resolveMergedPlayerPhoto(
+        { photoPath: null, photoUrl: null },
+        { photoPath: "players/secondary/photo.webp", photoUrl: "/uploads/players/secondary/photo.webp" },
+      ),
+    ).toEqual({
+      nextPrimaryPhotoPath: "players/secondary/photo.webp",
+      nextPrimaryPhotoUrl: "/uploads/players/secondary/photo.webp",
+      clearSecondaryPhoto: true,
+    });
+  });
+
+  it("keeps the primary player photo when it already exists", () => {
+    expect(
+      resolveMergedPlayerPhoto(
+        { photoPath: "players/primary/photo.webp", photoUrl: "/uploads/players/primary/photo.webp" },
+        { photoPath: "players/secondary/photo.webp", photoUrl: "/uploads/players/secondary/photo.webp" },
+      ),
+    ).toEqual({
+      nextPrimaryPhotoPath: "players/primary/photo.webp",
+      nextPrimaryPhotoUrl: "/uploads/players/primary/photo.webp",
+      clearSecondaryPhoto: false,
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { MatchStatus, Position, PresenceStatus, Prisma, Team } from "@prisma/client";
+import { MatchStatus, Position, PresenceStatus, Prisma, Team, UserRole, UserStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import {
   isMatchOnOrBeforeToday,
@@ -18,6 +18,7 @@ import {
   teamsSchema,
 } from "@/lib/validators";
 import { requireAdminApi } from "@/lib/admin";
+import { resolveMatchEditAccess, type MatchEditUser } from "@/lib/match-edit-access";
 import {
   emptyTeamSplitStats,
   getPrimaryTeam,
@@ -65,6 +66,45 @@ function finishedMatchWhereClause() {
       },
     ],
   };
+}
+
+async function getLatestHistoricalMatchId() {
+  const latestMatch = await db().match.findFirst({
+    where: finishedMatchWhereClause(),
+    select: { id: true },
+    orderBy: [{ matchDate: "desc" }, { startTime: "desc" }, { id: "desc" }],
+  });
+
+  return latestMatch?.id ?? null;
+}
+
+async function getMatchEditAccess(matchId: string, currentUser: MatchEditUser | null) {
+  const latestHistoricalMatchId =
+    currentUser?.role === UserRole.ADMIN && currentUser.status === UserStatus.ACTIVE && !currentUser.mustChangePassword
+      ? null
+      : await getLatestHistoricalMatchId();
+
+  const didPlayTargetMatch =
+    currentUser?.playerId && currentUser.status === UserStatus.ACTIVE
+      ? Boolean(
+          await db().matchParticipant.findFirst({
+            where: {
+              matchId,
+              playerId: currentUser.playerId,
+              presenceStatus: PresenceStatus.CONFIRMED,
+              teams: { isEmpty: false },
+            },
+            select: { id: true },
+          }),
+        )
+      : false;
+
+  return resolveMatchEditAccess({
+    user: currentUser,
+    latestHistoricalMatchId,
+    targetMatchId: matchId,
+    didPlayTargetMatch,
+  });
 }
 
 function sumGoalsByTeam(
@@ -306,8 +346,8 @@ export async function getNextMatch() {
   });
 }
 
-export async function getMatchById(id: string) {
-  return db().match.findFirst({
+export async function getMatchById(id: string, currentUser: MatchEditUser | null = null) {
+  const match = await db().match.findFirst({
     where: {
       id,
       status: { not: MatchStatus.ARCHIVED },
@@ -324,6 +364,18 @@ export async function getMatchById(id: string) {
       ratings: true,
     },
   });
+
+  if (!match) {
+    return null;
+  }
+
+  const editAccess = await getMatchEditAccess(id, currentUser);
+
+  return {
+    ...match,
+    canEdit: editAccess.canEdit,
+    editReason: editAccess.editReason,
+  };
 }
 
 export async function confirmPresence(matchId: string, playerId: string) {
@@ -433,7 +485,7 @@ export async function setPresenceStatus(
   return NextResponse.json(participant);
 }
 
-export async function saveStats(matchId: string, body: unknown, adminMode = false) {
+export async function saveStats(matchId: string, body: unknown, adminMode = false, currentUser: MatchEditUser | null = null) {
   const parsed = statsBatchSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -449,6 +501,14 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
+  }
+
+  if (!adminMode) {
+    const access = await getMatchEditAccess(matchId, currentUser);
+
+    if (!access.canEdit) {
+      return NextResponse.json({ error: "Edicao indisponivel para esta partida." }, { status: 403 });
+    }
   }
 
   if (!adminMode && !isMatchOnOrBeforeToday(match.matchDate)) {
@@ -530,7 +590,13 @@ export async function saveStats(matchId: string, body: unknown, adminMode = fals
   return NextResponse.json({ ok: true, updated: parsed.data.stats.length });
 }
 
-export async function saveRatings(matchId: string, body: unknown, currentRaterPlayerId?: string | null) {
+export async function saveRatings(
+  matchId: string,
+  body: unknown,
+  currentRaterPlayerId?: string | null,
+  currentUser: MatchEditUser | null = null,
+  adminMode = false,
+) {
   const parsed = ratingsBatchSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -546,6 +612,14 @@ export async function saveRatings(matchId: string, body: unknown, currentRaterPl
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
+  }
+
+  if (!adminMode) {
+    const access = await getMatchEditAccess(matchId, currentUser);
+
+    if (!access.canEdit) {
+      return NextResponse.json({ error: "Edicao indisponivel para esta partida." }, { status: 403 });
+    }
   }
 
   if (!isMatchOnOrBeforeToday(match.matchDate)) {
@@ -580,9 +654,12 @@ export async function saveRatings(matchId: string, body: unknown, currentRaterPl
   });
   const eligiblePlayerIds = new Set(eligibleParticipants.map((participant) => participant.playerId));
 
-  const hasInvalidRatingTarget = normalizedRatings.some(
-    (item) => !eligiblePlayerIds.has(item.raterPlayerId) || !eligiblePlayerIds.has(item.ratedPlayerId),
-  );
+  const hasInvalidRatingTarget = normalizedRatings.some((item) => {
+    const invalidRatedPlayer = !eligiblePlayerIds.has(item.ratedPlayerId);
+    const invalidRaterPlayer = !adminMode && !eligiblePlayerIds.has(item.raterPlayerId);
+
+    return invalidRatedPlayer || invalidRaterPlayer;
+  });
 
   if (hasInvalidRatingTarget) {
     return NextResponse.json(
@@ -714,7 +791,7 @@ export async function updateMatchStatus(matchId: string, body: unknown) {
   return NextResponse.json(match);
 }
 
-export async function updateMatchScore(matchId: string, body: unknown, adminMode = false) {
+export async function updateMatchScore(matchId: string, body: unknown, adminMode = false, currentUser: MatchEditUser | null = null) {
   const parsed = matchScoreSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -734,6 +811,14 @@ export async function updateMatchScore(matchId: string, body: unknown, adminMode
 
   if (!match) {
     return NextResponse.json({ error: "Partida nao encontrada." }, { status: 404 });
+  }
+
+  if (!adminMode) {
+    const access = await getMatchEditAccess(matchId, currentUser);
+
+    if (!access.canEdit) {
+      return NextResponse.json({ error: "Edicao indisponivel para esta partida." }, { status: 403 });
+    }
   }
 
   if (!adminMode && !isMatchOnOrBeforeToday(match.matchDate)) {

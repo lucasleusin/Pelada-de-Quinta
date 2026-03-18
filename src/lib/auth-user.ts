@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole, UserStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/db";
+import { reconcileLegacyUserState } from "@/lib/user-player-link";
 
 const db = () => getPrismaClient();
 
@@ -14,6 +15,8 @@ export async function getCurrentUser() {
   if (!userId) {
     return null;
   }
+
+  await reconcileLegacyUserState(db(), userId);
 
   return db().user.findUnique({
     where: { id: userId },
@@ -70,7 +73,7 @@ export async function requireActivePlayerApi() {
   if (authCheck.user.status !== UserStatus.ACTIVE || !authCheck.user.playerId) {
     return {
       ok: false as const,
-      response: NextResponse.json({ error: "Cadastro pendente de aprovacao." }, { status: 403 }),
+      response: NextResponse.json({ error: "Conta indisponivel para as areas do atleta." }, { status: 403 }),
     };
   }
 

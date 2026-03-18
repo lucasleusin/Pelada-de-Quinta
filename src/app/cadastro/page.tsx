@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { HeroBlock, PageShell, StatusNote } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +17,7 @@ const positions = [
 ] as const;
 
 export default function CadastroPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,7 +57,15 @@ export default function CadastroPage() {
       return;
     }
 
-    setMessage("Cadastro criado. Verifique seu email para continuar.");
+    await signIn("credentials", {
+      identifier: email,
+      password,
+      redirect: false,
+      callbackUrl: "/conta",
+    });
+
+    router.refresh();
+    setMessage("Cadastro criado. Verifique seu email para liberar o acesso e completar seu perfil.");
     setName("");
     setEmail("");
     setPassword("");
@@ -69,7 +80,7 @@ export default function CadastroPage() {
       <HeroBlock className="mx-auto w-full max-w-3xl p-6 sm:p-7">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Conta</p>
         <h2 className="mt-1 text-3xl font-bold text-emerald-950">Cadastro do atleta</h2>
-        <p className="text-sm text-emerald-800">Crie sua conta e aguarde a aprovacao do administrador.</p>
+        <p className="text-sm text-emerald-800">Crie sua conta, confirme seu email e depois finalize seu perfil.</p>
 
         <form className="mt-5 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
           <label className="md:col-span-2">

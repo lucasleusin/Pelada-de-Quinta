@@ -7,6 +7,7 @@ import Google from "next-auth/providers/google";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { UserRole, UserStatus } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db";
+import { activateUserWithLinkedPlayer, reconcileLegacyUserState } from "@/lib/user-player-link";
 import { loginSchema } from "@/lib/validators";
 
 const prisma = getPrismaClient();
@@ -86,7 +87,23 @@ const providers: Provider[] = [
         return null;
       }
 
-      return serializeUser(user);
+      let repairedUser = null;
+
+      try {
+        repairedUser = await reconcileLegacyUserState(prisma, user.id);
+      } catch {
+        return null;
+      }
+
+      if (!repairedUser) {
+        return null;
+      }
+
+      return serializeUser({
+        ...user,
+        playerId: repairedUser.playerId,
+        status: repairedUser.status,
+      });
     },
   }),
 ];
@@ -144,7 +161,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             image: user.image ?? null,
             emailVerified: new Date(),
             role: UserRole.PLAYER,
-            status: UserStatus.PENDING_APPROVAL,
+            status: UserStatus.ACTIVE,
           },
         });
       }
@@ -172,14 +189,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: dbUser.name ?? user.name ?? null,
             image: user.image ?? dbUser.image ?? null,
             emailVerified: dbUser.emailVerified ?? new Date(),
-            status:
-              dbUser.role === UserRole.ADMIN
-                ? dbUser.status
-                : dbUser.status === UserStatus.PENDING_VERIFICATION
-                  ? UserStatus.PENDING_APPROVAL
-                  : dbUser.status,
+            status: dbUser.role === UserRole.ADMIN || dbUser.status === UserStatus.REJECTED ? dbUser.status : UserStatus.ACTIVE,
           },
         });
+
+        try {
+          await activateUserWithLinkedPlayer(prisma, dbUser.id);
+          dbUser = await prisma.user.findUnique({ where: { id: dbUser.id } });
+        } catch {
+          return "/entrar?erro=vinculo";
+        }
       }
 
       return true;

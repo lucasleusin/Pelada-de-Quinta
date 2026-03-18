@@ -85,7 +85,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Somente usuarios removidos podem ser reativados." }, { status: 409 });
     }
 
-    const nextStatus = getDisabledReactivationStatus(user);
+    const nextStatus = getDisabledReactivationStatus();
 
     const updatedUser = await db().user.update({
       where: { id: user.id },

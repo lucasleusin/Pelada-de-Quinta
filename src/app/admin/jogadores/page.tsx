@@ -91,7 +91,7 @@ function roleLabel(role: UserRole) {
 
 function statusLabel(status: UserStatus) {
   if (status === "PENDING_VERIFICATION") return "Confirmacao de email";
-  if (status === "PENDING_APPROVAL") return "Aguardando aprovacao";
+  if (status === "PENDING_APPROVAL") return "Atualizando legado";
   if (status === "ACTIVE") return "Acesso ativo";
   if (status === "DISABLED") return "Acesso removido";
   return "Cadastro rejeitado";
@@ -130,8 +130,24 @@ export default function AdminJogadoresPage() {
     () => [...players].sort((left, right) => playerLabel(left).localeCompare(playerLabel(right))),
     [players],
   );
-  const activePlayers = useMemo(() => sortedPlayers.filter((player) => player.isActive), [sortedPlayers]);
-  const inactivePlayers = useMemo(() => sortedPlayers.filter((player) => !player.isActive), [sortedPlayers]);
+  const pendingVerificationPlayers = useMemo(
+    () => sortedPlayers.filter((player) => player.user?.status === "PENDING_VERIFICATION"),
+    [sortedPlayers],
+  );
+  const activePlayers = useMemo(
+    () =>
+      sortedPlayers.filter(
+        (player) => player.isActive && player.user?.status !== "PENDING_VERIFICATION",
+      ),
+    [sortedPlayers],
+  );
+  const inactivePlayers = useMemo(
+    () =>
+      sortedPlayers.filter(
+        (player) => !player.isActive && player.user?.status !== "PENDING_VERIFICATION",
+      ),
+    [sortedPlayers],
+  );
 
   async function loadPlayers() {
     const response = await fetch("/api/admin/players", { cache: "no-store" });
@@ -642,6 +658,22 @@ export default function AdminJogadoresPage() {
 
         <ul className="mt-4 space-y-3 text-sm">
           {activePlayers.map(renderPlayerRow)}
+        </ul>
+      </SectionShell>
+
+      <SectionShell className="p-4">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-emerald-950">Aguardando confirmacao de email</h3>
+            <p className="text-sm text-emerald-800">Atletas ja vinculados, aguardando apenas a confirmacao do email para liberar o acesso completo.</p>
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
+            {pendingVerificationPlayers.length} jogador{pendingVerificationPlayers.length === 1 ? "" : "es"}
+          </p>
+        </div>
+
+        <ul className="mt-4 space-y-3 text-sm">
+          {pendingVerificationPlayers.map(renderPlayerRow)}
         </ul>
       </SectionShell>
 

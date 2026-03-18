@@ -63,7 +63,7 @@ function getTodayIsoDate() {
 
 function pendingMessage(status: CurrentUser["status"]) {
   if (status === "PENDING_VERIFICATION") return "Confirme seu email para liberar sua conta.";
-  if (status === "PENDING_APPROVAL") return "Seu cadastro esta aguardando aprovacao do administrador.";
+  if (status === "PENDING_APPROVAL") return "Sua conta esta sendo atualizada para o novo fluxo.";
   if (status === "REJECTED") return "Seu cadastro foi rejeitado. Fale com o administrador.";
   if (status === "DISABLED") return "Seu acesso foi removido. Fale com o administrador.";
   return "Sua conta ainda nao esta pronta para uso.";

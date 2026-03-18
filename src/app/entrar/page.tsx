@@ -54,6 +54,7 @@ export default function EntrarPage() {
   const callbackUrl = useMemo(() => searchParams.get("callbackUrl") || "/meu-perfil", [searchParams]);
   const rejected = searchParams.get("erro") === "rejeitado";
   const removed = searchParams.get("erro") === "removido";
+  const linkingError = searchParams.get("erro") === "vinculo";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -182,6 +183,7 @@ export default function EntrarPage() {
 
           {rejected ? <StatusNote className="mt-4" tone="error">Seu cadastro foi rejeitado. Fale com o administrador.</StatusNote> : null}
           {removed ? <StatusNote className="mt-4" tone="error">Seu acesso foi removido. Fale com o administrador.</StatusNote> : null}
+          {linkingError ? <StatusNote className="mt-4" tone="error">Nao foi possivel vincular sua conta a um jogador. Fale com o administrador.</StatusNote> : null}
           {error ? <StatusNote className="mt-4" tone="error">{error}</StatusNote> : null}
         </div>
       </HeroBlock>

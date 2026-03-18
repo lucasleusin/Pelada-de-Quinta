@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { HeroBlock, PageShell, StatusNote } from "@/components/layout/primitives";
 
 export default function VerificarEmailPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = useMemo(() => searchParams.get("token") || "", [searchParams]);
   const [status, setStatus] = useState<"loading" | "success" | "error">(token ? "loading" : "error");
@@ -30,13 +31,15 @@ export default function VerificarEmailPage() {
         }
 
         setStatus("success");
-        setMessage("Email confirmado. Agora seu cadastro aguarda aprovacao do administrador.");
+        setMessage("Email confirmado. Redirecionando para o seu perfil...");
+        window.dispatchEvent(new Event("auth-state-changed"));
+        router.replace("/meu-perfil");
       } catch (error) {
         setStatus("error");
         setMessage(error instanceof Error ? error.message : "Nao foi possivel validar o token.");
       }
     })();
-  }, [token]);
+  }, [router, token]);
 
   return (
     <PageShell>
@@ -46,9 +49,11 @@ export default function VerificarEmailPage() {
         <StatusNote className="mt-4" tone={status === "success" ? "success" : status === "error" ? "error" : "warning"}>
           {message}
         </StatusNote>
-        <div className="mt-4 text-sm font-semibold text-emerald-700">
-          <Link href="/entrar">Voltar para entrar</Link>
-        </div>
+        {status !== "success" ? (
+          <div className="mt-4 text-sm font-semibold text-emerald-700">
+            <Link href="/entrar">Voltar para entrar</Link>
+          </div>
+        ) : null}
       </HeroBlock>
     </PageShell>
   );

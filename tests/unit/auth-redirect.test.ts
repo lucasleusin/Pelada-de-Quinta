@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { canAccessAdminArea, isAccountReadyForPlayerArea, resolveAuthenticatedLandingPath } from "@/lib/auth-redirect";
 
 describe("auth redirect helpers", () => {
-  it("sends pending accounts to onboarding", () => {
+  it("sends unverified accounts to onboarding", () => {
     expect(
       resolveAuthenticatedLandingPath({
         role: "PLAYER",
-        status: "PENDING_APPROVAL",
-        playerId: null,
+        status: "PENDING_VERIFICATION",
+        playerId: "player-1",
         mustChangePassword: false,
       }),
     ).toBe("/conta");

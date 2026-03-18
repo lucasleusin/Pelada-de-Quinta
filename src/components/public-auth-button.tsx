@@ -16,6 +16,7 @@ export function PublicAuthButton({ className }: PublicAuthButtonProps) {
   const router = useRouter();
   const { authState, loading } = usePublicAuthState();
   const [signingOut, setSigningOut] = useState(false);
+  const displayName = authState?.nickname?.trim() || authState?.name?.trim() || "atleta";
 
   if (loading) {
     return null;
@@ -30,29 +31,32 @@ export function PublicAuthButton({ className }: PublicAuthButtonProps) {
   }
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      className={cn("rounded-full bg-white", className)}
-      disabled={signingOut}
-      onClick={async () => {
-        try {
-          setSigningOut(true);
-          const result = await signOut({
-            redirect: false,
-            callbackUrl: "/entrar",
-          });
+    <div className={cn("flex items-center gap-2", className)}>
+      <span className="text-sm font-medium text-emerald-900">Bem-vindo {displayName}</span>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="rounded-full bg-white"
+        disabled={signingOut}
+        onClick={async () => {
+          try {
+            setSigningOut(true);
+            const result = await signOut({
+              redirect: false,
+              callbackUrl: "/entrar",
+            });
 
-          window.dispatchEvent(new Event("auth-state-changed"));
-          router.refresh();
-          window.location.assign(result?.url ?? "/entrar");
-        } finally {
-          setSigningOut(false);
-        }
-      }}
-    >
-      {signingOut ? "Saindo..." : "Sair"}
-    </Button>
+            window.dispatchEvent(new Event("auth-state-changed"));
+            router.refresh();
+            window.location.assign(result?.url ?? "/entrar");
+          } finally {
+            setSigningOut(false);
+          }
+        }}
+      >
+        {signingOut ? "Saindo..." : "Sair"}
+      </Button>
+    </div>
   );
 }

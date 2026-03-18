@@ -93,11 +93,11 @@ function getStatusHeadline(profile: AccountProfile | null) {
   }
 
   if (profile.status === "PENDING_VERIFICATION") {
-    return "Confirme seu email para liberar a proxima etapa.";
+    return "Confirme seu email para liberar o acesso completo.";
   }
 
   if (profile.status === "PENDING_APPROVAL") {
-    return "Seu cadastro esta aguardando aprovacao do administrador.";
+    return "Sua conta esta sendo atualizada para o novo fluxo.";
   }
 
   if (profile.status === "REJECTED") {
@@ -109,7 +109,7 @@ function getStatusHeadline(profile: AccountProfile | null) {
   }
 
   if (!profile.playerId) {
-    return "Sua conta esta pronta, mas ainda falta vincular um atleta.";
+    return "Sua conta esta pronta, mas o vinculo com o atleta ainda esta sendo finalizado.";
   }
 
   return "Conta pronta.";
@@ -246,7 +246,7 @@ export default function ContaPage() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Conta</p>
         <h2 className="mt-1 text-3xl font-bold text-emerald-950">Finalize seu cadastro</h2>
         <p className="mt-1 text-sm text-emerald-800">
-          Complete seus dados e acompanhe o status da sua aprovacao antes de entrar nas areas do atleta.
+          Complete seus dados e acompanhe o status da sua conta enquanto finalizamos o acesso ao perfil.
         </p>
       </HeroBlock>
 
@@ -259,7 +259,7 @@ export default function ContaPage() {
             <div>
               <h3 className="text-xl font-semibold text-emerald-950">Dados da conta</h3>
               <p className="text-sm text-emerald-800">
-                Nome completo e email sao obrigatorios. O restante ajuda a adiantar sua aprovacao.
+                Nome completo e email sao obrigatorios. O restante ajuda a deixar seu perfil completo.
               </p>
             </div>
             <div className="text-sm font-medium text-emerald-800">

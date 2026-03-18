@@ -10,5 +10,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     id,
     body,
     currentUser?.status === "ACTIVE" && currentUser.playerId ? currentUser.playerId : null,
+    currentUser,
+    currentUser?.role === "ADMIN" && currentUser.status === "ACTIVE",
   );
 }

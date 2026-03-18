@@ -91,7 +91,7 @@ describe("admin users api", () => {
     expect(payload.error).toContain("ultimo admin");
   });
 
-  it("moves a disabled user back to pending approval when no player is linked", async () => {
+  it("moves a disabled user back to active", async () => {
     prismaMock.user.findUnique.mockResolvedValue({
       id: "user-2",
       role: "PLAYER",
@@ -101,7 +101,7 @@ describe("admin users api", () => {
     });
     prismaMock.user.update.mockResolvedValue({
       id: "user-2",
-      status: "PENDING_APPROVAL",
+      status: "ACTIVE",
     });
 
     const response = await updateStatus(
@@ -113,7 +113,7 @@ describe("admin users api", () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: "PENDING_APPROVAL",
+          status: "ACTIVE",
         }),
       }),
     );

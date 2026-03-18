@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { consumeUserActionToken } from "@/lib/auth-tokens";
 import { getPrismaClient } from "@/lib/db";
+import { activateUserWithLinkedPlayer } from "@/lib/user-player-link";
 import { verificationTokenSchema } from "@/lib/validators";
 
 const db = () => getPrismaClient();
@@ -30,15 +31,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Conta nao encontrada." }, { status: 404 });
   }
 
-  await db().user.update({
-    where: { id: token.userId },
-    data: {
-      emailVerified: new Date(),
-      status:
-        user.status === "REJECTED" || user.status === "DISABLED"
-          ? user.status
-          : "PENDING_APPROVAL",
-    },
+  await db().$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: token.userId },
+      data: {
+        emailVerified: new Date(),
+      },
+    });
+
+    if (user.status !== "REJECTED" && user.status !== "DISABLED") {
+      await activateUserWithLinkedPlayer(tx, token.userId);
+    }
   });
 
   return NextResponse.json({ ok: true });

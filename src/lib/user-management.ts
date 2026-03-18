@@ -23,12 +23,12 @@ export function buildPlayerPatchFromUserSnapshot(user: UserSnapshot) {
   return patch;
 }
 
-export function getDisabledReactivationStatus(user: { playerId: string | null }) {
-  return user.playerId ? UserStatus.ACTIVE : UserStatus.PENDING_APPROVAL;
+export function getDisabledReactivationStatus() {
+  return UserStatus.ACTIVE;
 }
 
 export function getRejectedReopenStatus(user: { emailVerified: Date | null }) {
-  return user.emailVerified ? UserStatus.PENDING_APPROVAL : UserStatus.PENDING_VERIFICATION;
+  return user.emailVerified ? UserStatus.ACTIVE : UserStatus.PENDING_VERIFICATION;
 }
 
 export function generateTemporaryPassword(length = 14) {

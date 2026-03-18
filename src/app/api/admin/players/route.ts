@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/db";
 import { requireAdminApi } from "@/lib/admin";
+import { backfillLegacyPendingApprovalUsers } from "@/lib/user-player-link";
 import { playerCreateSchema } from "@/lib/validators";
 
 type PrismaUniqueErrorLike = {
@@ -38,6 +39,7 @@ export async function GET() {
   if (!adminCheck.ok) return adminCheck.response;
 
   const prisma = getPrismaClient();
+  await backfillLegacyPendingApprovalUsers(prisma);
   const players = await prisma.player.findMany({
     where: {
       mergedIntoPlayerId: null,

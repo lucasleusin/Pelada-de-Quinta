@@ -487,9 +487,9 @@ export default function PartidasPassadasPage() {
             <div className="space-y-3">
               <div className="grid items-center gap-4 xl:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)]">
                 <div className="flex items-center justify-end gap-3">
-                  <span className="text-base font-semibold text-emerald-950 sm:text-lg">{match.teamAName || "Time A"}</span>
+                  <span className="whitespace-nowrap text-base font-semibold text-emerald-950 sm:text-lg">{match.teamAName || "Time A"}</span>
                   <input
-                    className="field-input h-12 w-16 px-2 text-center text-lg font-bold tabular-nums sm:w-20"
+                    className="field-input h-12 w-[4ch] min-w-[4ch] px-1 text-center text-lg font-bold tabular-nums sm:w-[4.5ch] sm:min-w-[4.5ch]"
                     inputMode="numeric"
                     value={scoreState.teamAScore}
                     onChange={(event) => {
@@ -502,7 +502,7 @@ export default function PartidasPassadasPage() {
                 <div className="flex items-center justify-center text-2xl font-black text-emerald-950">X</div>
                 <div className="flex items-center gap-3">
                   <input
-                    className="field-input h-12 w-16 px-2 text-center text-lg font-bold tabular-nums sm:w-20"
+                    className="field-input h-12 w-[4ch] min-w-[4ch] px-1 text-center text-lg font-bold tabular-nums sm:w-[4.5ch] sm:min-w-[4.5ch]"
                     inputMode="numeric"
                     value={scoreState.teamBScore}
                     onChange={(event) => {
@@ -511,7 +511,7 @@ export default function PartidasPassadasPage() {
                     }}
                     disabled={!match.canEdit}
                   />
-                  <span className="text-base font-semibold text-emerald-950 sm:text-lg">{match.teamBName || "Time B"}</span>
+                  <span className="whitespace-nowrap text-base font-semibold text-emerald-950 sm:text-lg">{match.teamBName || "Time B"}</span>
                 </div>
               </div>
               {match.canEdit ? (

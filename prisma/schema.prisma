@@ -72,7 +72,7 @@ enum UserStatus {
 
 model Player {
   id                    String             @id @default(uuid())
-  name                  String             @unique
+  name                  String
   nickname              String?
   position              Position           @default(OUTRO)
   shirtNumberPreference Int?

@@ -44,20 +44,33 @@ async function main() {
   const password = process.env.ADMIN_SEED_PASSWORD ?? "sop";
   const passwordHash = await hash(password, 10);
   const adminPlayerName = "Administrador";
-
-  const adminPlayer = await prisma.player.upsert({
-    where: { name: adminPlayerName },
-    update: {
-      email,
-      isActive: true,
-    },
-    create: {
-      name: adminPlayerName,
-      position: Position.OUTRO,
-      email,
-      isActive: true,
+  const existingAdminPlayer = await prisma.player.findFirst({
+    where: {
+      OR: [
+        { email },
+        { name: adminPlayerName, user: { is: null } },
+      ],
     },
   });
+
+  const adminPlayer = existingAdminPlayer
+    ? await prisma.player.update({
+        where: { id: existingAdminPlayer.id },
+        data: {
+          name: adminPlayerName,
+          email,
+          position: Position.OUTRO,
+          isActive: true,
+        },
+      })
+    : await prisma.player.create({
+        data: {
+          name: adminPlayerName,
+          position: Position.OUTRO,
+          email,
+          isActive: true,
+        },
+      });
 
   await prisma.adminUser.upsert({
     where: { email },
@@ -87,10 +100,25 @@ async function main() {
   });
 
   for (const [name, position, shirtNumberPreference] of players) {
-    await prisma.player.upsert({
-      where: { name },
-      update: { position, shirtNumberPreference, isActive: true },
-      create: { name, position, shirtNumberPreference, isActive: true },
+    const existingPlayer = await prisma.player.findFirst({
+      where: {
+        name,
+        email: null,
+        user: { is: null },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (existingPlayer) {
+      await prisma.player.update({
+        where: { id: existingPlayer.id },
+        data: { position, shirtNumberPreference, isActive: true },
+      });
+      continue;
+    }
+
+    await prisma.player.create({
+      data: { name, position, shirtNumberPreference, isActive: true },
     });
   }
 

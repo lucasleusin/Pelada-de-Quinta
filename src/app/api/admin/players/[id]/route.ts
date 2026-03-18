@@ -26,10 +26,6 @@ function uniqueConstraintMessage(error: PrismaUniqueErrorLike) {
     return "Email ja esta em uso por outro jogador.";
   }
 
-  if (target.includes("name")) {
-    return "Nome ja esta em uso por outro jogador.";
-  }
-
   return "Dados duplicados.";
 }
 

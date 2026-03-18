@@ -18,8 +18,7 @@ export function buildSiteMetadata(
   appBaseUrl = process.env.APP_BASE_URL?.trim(),
 ): Metadata {
   const shareImages = settings.shareImageUrl ? [settings.shareImageUrl] : undefined;
-  const fallbackFaviconHref = `/default-favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`;
-  const faviconHref = settings.faviconUrl || fallbackFaviconHref;
+  const faviconHref = settings.faviconUrl || `/favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`;
 
   return {
     metadataBase: getMetadataBase(appBaseUrl),
@@ -34,7 +33,7 @@ export function buildSiteMetadata(
         { url: "/pwa/icon-512", sizes: "512x512", type: "image/png" },
       ],
       shortcut: faviconHref,
-      apple: faviconHref,
+      apple: [{ url: faviconHref }],
     },
     appleWebApp: {
       capable: true,

@@ -65,10 +65,6 @@ function getUniqueConstraintMessage(error: Prisma.PrismaClientKnownRequestError)
     return "Ja existe um jogador com este email vinculado a outra conta.";
   }
 
-  if (targets.includes("name")) {
-    return "Ja existe um jogador com este nome. Fale com o administrador para revisar o vinculo.";
-  }
-
   return "Nao foi possivel vincular sua conta a um jogador.";
 }
 

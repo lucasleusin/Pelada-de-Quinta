@@ -27,7 +27,7 @@ describe("site metadata", () => {
         { url: "/pwa/icon-512", sizes: "512x512", type: "image/png" },
       ],
       shortcut: "/uploads/site/favicon/brand.ico?v=123",
-      apple: "/uploads/site/favicon/brand.ico?v=123",
+      apple: [{ url: "/uploads/site/favicon/brand.ico?v=123" }],
     });
     expect(metadata.appleWebApp).toEqual({
       capable: true,

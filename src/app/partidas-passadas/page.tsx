@@ -84,6 +84,11 @@ function getPositionCode(position: Position) {
   return "O";
 }
 
+function sanitizeTwoDigitValue(value: string) {
+  const digitsOnly = value.replace(/\D+/g, "").slice(0, 2);
+  return digitsOnly;
+}
+
 function formatPlayerLabel(player: Participant["player"]) {
   return `${playerLabel(player)} (${getPositionCode(player.position)})`;
 }
@@ -106,7 +111,7 @@ function pendingMessage(status: CurrentUser["status"]) {
 
 function getEditStatus(toneReason: MatchEditReason) {
   if (toneReason === "ADMIN") {
-    return { tone: "success" as const, message: "Editavel por admin." };
+    return null;
   }
 
   if (toneReason === "LAST_MATCH_PLAYER") {
@@ -383,7 +388,7 @@ export default function PartidasPassadasPage() {
   }, [match?.canEdit, saveStats, statsDirty]);
 
   function renderTeamGrid(title: string, team: TeamCode, participants: Participant[]) {
-    const gridColumnsClass = "grid-cols-[minmax(0,1fr)_48px_48px_56px] sm:grid-cols-[minmax(0,1fr)_72px_72px_96px]";
+    const gridColumnsClass = "grid-cols-[minmax(0,1fr)_52px_52px_52px] sm:grid-cols-[minmax(0,1fr)_64px_64px_64px]";
 
     return (
       <SectionShell className="p-4">
@@ -408,9 +413,9 @@ export default function PartidasPassadasPage() {
                     <span className="pr-1 text-xs font-medium leading-tight text-emerald-950 sm:text-sm">{formatPlayerLabel(participant.player)}</span>
                     {match?.canEdit ? (
                       <>
-                        <input className="field-input h-9 px-2 text-center" type="number" min={0} value={statsState[participant.playerId]?.[fields.goals] ?? 0} onChange={(event) => updateStat(participant.playerId, fields.goals, Number(event.currentTarget.value))} />
-                        <input className="field-input h-9 px-2 text-center" type="number" min={0} value={statsState[participant.playerId]?.[fields.assists] ?? 0} onChange={(event) => updateStat(participant.playerId, fields.assists, Number(event.currentTarget.value))} />
-                        <input className="field-input h-9 px-2 text-center" type="number" min={0} value={statsState[participant.playerId]?.[fields.goalsConceded] ?? 0} onChange={(event) => updateStat(participant.playerId, fields.goalsConceded, Number(event.currentTarget.value))} />
+                        <input className="field-input h-9 px-2 text-center tabular-nums" inputMode="numeric" value={String(statsState[participant.playerId]?.[fields.goals] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.goals, Number(sanitizeTwoDigitValue(event.currentTarget.value) || "0"))} />
+                        <input className="field-input h-9 px-2 text-center tabular-nums" inputMode="numeric" value={String(statsState[participant.playerId]?.[fields.assists] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.assists, Number(sanitizeTwoDigitValue(event.currentTarget.value) || "0"))} />
+                        <input className="field-input h-9 px-2 text-center tabular-nums" inputMode="numeric" value={String(statsState[participant.playerId]?.[fields.goalsConceded] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.goalsConceded, Number(sanitizeTwoDigitValue(event.currentTarget.value) || "0"))} />
                       </>
                     ) : (
                       <>
@@ -470,7 +475,7 @@ export default function PartidasPassadasPage() {
         <>
           <SectionShell className="space-y-4 p-4">
             <div>
-              <h3 className="text-2xl font-bold text-emerald-950">Resumo da partida</h3>
+              <h3 className="text-2xl font-bold text-emerald-950">Resultado do Jogo</h3>
               <p className="mt-2 text-sm text-emerald-800">
                 {formatDatePtBr(match.matchDate)} - {match.teamAName} {match.teamAScore ?? "-"} x {match.teamBScore ?? "-"} {match.teamBName}
               </p>
@@ -479,25 +484,44 @@ export default function PartidasPassadasPage() {
 
             {editStatus ? <StatusNote tone={editStatus.tone}>{editStatus.message}</StatusNote> : null}
 
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label>
-                  <span className="field-label">Placar {match.teamAName}</span>
-                  <input className="field-input mt-2" type="number" min={0} value={scoreState.teamAScore} onChange={(event) => {
-                    setScoreState((current) => ({ ...current, teamAScore: event.currentTarget.value }));
-                    setScoreDirty(true);
-                  }} disabled={!match.canEdit} />
-                </label>
-                <label>
-                  <span className="field-label">Placar {match.teamBName}</span>
-                  <input className="field-input mt-2" type="number" min={0} value={scoreState.teamBScore} onChange={(event) => {
-                    setScoreState((current) => ({ ...current, teamBScore: event.currentTarget.value }));
-                    setScoreDirty(true);
-                  }} disabled={!match.canEdit} />
-                </label>
+            <div className="space-y-3">
+              <div className="grid items-center gap-4 xl:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)]">
+                <div className="flex items-center justify-end gap-3">
+                  <span className="text-base font-semibold text-emerald-950 sm:text-lg">{match.teamAName || "Time A"}</span>
+                  <input
+                    className="field-input h-12 w-16 px-2 text-center text-lg font-bold tabular-nums sm:w-20"
+                    inputMode="numeric"
+                    value={scoreState.teamAScore}
+                    onChange={(event) => {
+                      setScoreState((current) => ({ ...current, teamAScore: sanitizeTwoDigitValue(event.currentTarget.value) }));
+                      setScoreDirty(true);
+                    }}
+                    disabled={!match.canEdit}
+                  />
+                </div>
+                <div className="flex items-center justify-center text-2xl font-black text-emerald-950">X</div>
+                <div className="flex items-center gap-3">
+                  <input
+                    className="field-input h-12 w-16 px-2 text-center text-lg font-bold tabular-nums sm:w-20"
+                    inputMode="numeric"
+                    value={scoreState.teamBScore}
+                    onChange={(event) => {
+                      setScoreState((current) => ({ ...current, teamBScore: sanitizeTwoDigitValue(event.currentTarget.value) }));
+                      setScoreDirty(true);
+                    }}
+                    disabled={!match.canEdit}
+                  />
+                  <span className="text-base font-semibold text-emerald-950 sm:text-lg">{match.teamBName || "Time B"}</span>
+                </div>
               </div>
               {match.canEdit ? (
-                <p className="text-sm font-medium text-emerald-800">{scoreSaving ? "Salvando placar..." : scoreDirty ? "Alteracoes de placar pendentes..." : "Placar salvo automaticamente."}</p>
+                <p className="text-sm font-medium text-emerald-800">
+                  {scoreSaving || statsSaving
+                    ? "Salvando alteracoes..."
+                    : scoreDirty || statsDirty
+                    ? "Alteracoes pendentes..."
+                    : "Alteracoes salvas automaticamente."}
+                </p>
               ) : null}
             </div>
           </SectionShell>
@@ -506,18 +530,6 @@ export default function PartidasPassadasPage() {
             {renderTeamGrid(match.teamAName || "Time A", "A", teamA)}
             {renderTeamGrid(match.teamBName || "Time B", "B", teamB)}
           </section>
-
-          <SectionShell className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-2xl font-bold text-emerald-950">Estatisticas</h3>
-                <p className="text-sm text-emerald-800">Edite gols, assistencias e gols sofridos apenas quando a partida estiver liberada.</p>
-              </div>
-              {match.canEdit ? (
-                <p className="text-sm font-medium text-emerald-800">{statsSaving ? "Salvando estatisticas..." : statsDirty ? "Alteracoes de estatisticas pendentes..." : "Estatisticas salvas automaticamente."}</p>
-              ) : null}
-            </div>
-          </SectionShell>
         </>
       ) : null}
 

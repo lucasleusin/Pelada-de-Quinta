@@ -525,7 +525,7 @@ export default function AdminJogadoresPage() {
                       {statusLabel(player.user.status)}
                     </span>
                   ) : null}
-                  {player.user ? (
+                  {player.user?.role === "ADMIN" ? (
                     <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-purple-700">
                       {roleLabel(player.user.role)}
                     </span>

@@ -233,29 +233,16 @@ export default function VotacaoPage() {
     return () => clearTimeout(timeout);
   }, [activePlayerId, dirtyVoteIds, match, selectedMatchId, votes]);
 
-  const alreadyRatedIds = useMemo(() => {
-    const ids = new Set<string>();
-
-    for (const [ratedPlayerId, rating] of Object.entries(votes)) {
-      if (rating >= 1 && rating <= 5) {
-        ids.add(ratedPlayerId);
-      }
-    }
-
-    return ids;
-  }, [votes]);
-
   const teamA = useMemo(
     () =>
       sortByName(
         (match?.participants ?? []).filter(
           (participant) =>
             getPrimaryTeam(participant.primaryTeam, participant.teams) === "A" &&
-            participant.playerId !== activePlayerId &&
-            !alreadyRatedIds.has(participant.playerId),
+            participant.playerId !== activePlayerId,
         ),
       ),
-    [activePlayerId, alreadyRatedIds, match],
+    [activePlayerId, match],
   );
   const teamB = useMemo(
     () =>
@@ -263,11 +250,10 @@ export default function VotacaoPage() {
         (match?.participants ?? []).filter(
           (participant) =>
             getPrimaryTeam(participant.primaryTeam, participant.teams) === "B" &&
-            participant.playerId !== activePlayerId &&
-            !alreadyRatedIds.has(participant.playerId),
+            participant.playerId !== activePlayerId,
         ),
       ),
-    [activePlayerId, alreadyRatedIds, match],
+    [activePlayerId, match],
   );
 
   function updateVote(ratedPlayerId: string, rating: number) {

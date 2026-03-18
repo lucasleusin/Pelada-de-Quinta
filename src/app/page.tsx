@@ -474,7 +474,12 @@ export default function HomePage() {
     });
   }
 
-  const welcomeName = authState?.nickname ?? authState?.name ?? "Atleta";
+  const welcomeName =
+    authState?.playerNickname ??
+    authState?.playerName ??
+    authState?.nickname ??
+    authState?.name ??
+    "Atleta";
   const authenticatedPresenceMessage =
     loggedPlayerPresenceStatus === "CONFIRMED"
       ? "Voce esta confirmado para o jogo."

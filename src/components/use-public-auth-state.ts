@@ -9,6 +9,8 @@ type AuthState = {
   status: "PENDING_VERIFICATION" | "PENDING_APPROVAL" | "ACTIVE" | "DISABLED" | "REJECTED";
   name: string | null;
   nickname?: string | null;
+  playerName?: string | null;
+  playerNickname?: string | null;
   playerId?: string | null;
   mustChangePassword?: boolean;
 };

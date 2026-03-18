@@ -71,9 +71,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   try {
-    const player = await prisma.player.update({
-      where: { id: requestedId },
-      data: parsed.data,
+    const player = await prisma.$transaction(async (tx) => {
+      const updatedPlayer = await tx.player.update({
+        where: { id: requestedId },
+        data: parsed.data,
+      });
+
+      await tx.user.update({
+        where: { id: currentUser.id },
+        data: {
+          name: updatedPlayer.name,
+          nickname: updatedPlayer.nickname,
+        },
+      });
+
+      return updatedPlayer;
     });
 
     return NextResponse.json(player);

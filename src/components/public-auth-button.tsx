@@ -16,7 +16,12 @@ export function PublicAuthButton({ className }: PublicAuthButtonProps) {
   const router = useRouter();
   const { authState, loading } = usePublicAuthState();
   const [signingOut, setSigningOut] = useState(false);
-  const displayName = authState?.nickname?.trim() || authState?.name?.trim() || "atleta";
+  const displayName =
+    authState?.playerNickname?.trim() ||
+    authState?.playerName?.trim() ||
+    authState?.nickname?.trim() ||
+    authState?.name?.trim() ||
+    "atleta";
 
   if (loading) {
     return null;

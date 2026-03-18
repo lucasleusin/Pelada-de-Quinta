@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PUT } from "@/app/api/players/[id]/profile/route";
 
 const prismaMock = {
+  $transaction: vi.fn(),
   player: {
     findFirst: vi.fn(),
+    update: vi.fn(),
+  },
+  user: {
     update: vi.fn(),
   },
 };
@@ -31,8 +35,11 @@ function makeRequest(body: unknown) {
 
 describe("profile api route", () => {
   beforeEach(() => {
+    prismaMock.$transaction.mockReset();
     prismaMock.player.findFirst.mockReset();
     prismaMock.player.update.mockReset();
+    prismaMock.user.update.mockReset();
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => callback(prismaMock));
   });
 
   it("updates player profile successfully", async () => {

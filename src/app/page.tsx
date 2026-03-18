@@ -198,7 +198,10 @@ export default function HomePage() {
   });
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  const isAuthenticatedPlayerHome = Boolean(authState?.id) && isAccountReadyForPlayerArea(authState ?? {});
+  const isReadyAuthenticatedHome = Boolean(authState?.id) && isAccountReadyForPlayerArea(authState ?? {});
+  const isAuthenticatedAdminHome = isReadyAuthenticatedHome && authState?.role === "ADMIN";
+  const isAuthenticatedPlayerHome = isReadyAuthenticatedHome && authState?.role !== "ADMIN";
+  const isGuestHome = !authState?.id;
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
     [matches, selectedMatchId],
@@ -320,7 +323,7 @@ export default function HomePage() {
       return;
     }
 
-    async function loadAuthenticatedData() {
+    async function loadAuthenticatedPlayerData() {
       const matchesRes = await fetch(`/api/matches?from=${getTodayIsoDate()}&playerId=me`, { cache: "no-store" });
       const upcomingMatches = (await matchesRes.json()) as Match[];
       const sortedMatches = upcomingMatches.sort(
@@ -338,12 +341,21 @@ export default function HomePage() {
       });
     }
 
+    async function loadAuthenticatedAdminData() {
+      await loadPublicData();
+    }
+
     async function synchronizeHomeData() {
       setIsLoadingData(true);
       setMessage("");
 
       try {
-        const loader = !authLoading && isAuthenticatedPlayerHome ? loadAuthenticatedData : loadPublicData;
+        const loader =
+          !authLoading && isAuthenticatedAdminHome
+            ? loadAuthenticatedAdminData
+            : !authLoading && isAuthenticatedPlayerHome
+              ? loadAuthenticatedPlayerData
+              : loadPublicData;
         await loader();
       } catch {
         setMessage("Falha ao carregar dados da home.");
@@ -353,7 +365,7 @@ export default function HomePage() {
     }
 
     void synchronizeHomeData();
-  }, [authLoading, authState, isAuthenticatedPlayerHome, router]);
+  }, [authLoading, authState, isAuthenticatedAdminHome, isAuthenticatedPlayerHome, router]);
 
   useEffect(() => {
     if (!actionMessage) return;
@@ -440,7 +452,7 @@ export default function HomePage() {
   }
 
   async function setAuthenticatedPresence(presenceStatus: "CONFIRMED" | "CANCELED") {
-    if (!selectedMatch || !isAuthenticatedPlayerHome) return;
+    if (!selectedMatch || !isReadyAuthenticatedHome) return;
 
     const response = await fetch(`/api/matches/${selectedMatch.id}/presence/me`, {
       method: "PUT",
@@ -458,6 +470,11 @@ export default function HomePage() {
     setActionMessage(
       presenceStatus === "CONFIRMED" ? "Sua presenca foi confirmada." : "Sua presenca foi desconfirmada.",
     );
+
+    if (isAuthenticatedAdminHome) {
+      await loadPublicData();
+      return;
+    }
 
     const matchesRes = await fetch(`/api/matches?from=${getTodayIsoDate()}&playerId=me`, { cache: "no-store" });
     const upcomingMatches = (await matchesRes.json()) as Match[];
@@ -604,9 +621,16 @@ export default function HomePage() {
           </>
         )}
       </section>
-      {isAuthenticatedPlayerHome ? (
+      {isReadyAuthenticatedHome ? (
         <ActionBar className="p-3 sm:p-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]">
+          <div
+            className={cn(
+              "grid gap-3",
+              isAuthenticatedPlayerHome
+                ? "md:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]"
+                : "md:grid-cols-1",
+            )}
+          >
             <div className="space-y-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
@@ -647,29 +671,31 @@ export default function HomePage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-emerald-100 bg-white p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Ja confirmados</p>
-              <p className="mt-1 text-sm text-emerald-800">Lista somente para referencia da partida selecionada.</p>
-              <ul className="mt-3 space-y-2 text-sm">
-                {confirmed.length === 0 ? (
-                  <li className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">
-                    Nenhum jogador confirmado ainda.
-                  </li>
-                ) : (
-                  confirmed.map((item) => (
-                    <li
-                      key={item.playerId}
-                      className="rounded-lg bg-emerald-50 px-3 py-2 font-medium text-emerald-950"
-                    >
-                      {formatPlayerLabel(item.player)}
+            {isAuthenticatedPlayerHome ? (
+              <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Ja confirmados</p>
+                <p className="mt-1 text-sm text-emerald-800">Lista somente para referencia da partida selecionada.</p>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {confirmed.length === 0 ? (
+                    <li className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">
+                      Nenhum jogador confirmado ainda.
                     </li>
-                  ))
-                )}
-              </ul>
-            </div>
+                  ) : (
+                    confirmed.map((item) => (
+                      <li
+                        key={item.playerId}
+                        className="rounded-lg bg-emerald-50 px-3 py-2 font-medium text-emerald-950"
+                      >
+                        {formatPlayerLabel(item.player)}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </ActionBar>
-      ) : (
+      ) : isGuestHome ? (
         <ActionBar className="space-y-3 p-3 sm:p-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
@@ -745,9 +771,9 @@ export default function HomePage() {
             <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenca.</p>
           ) : null}
         </ActionBar>
-      )}
+      ) : null}
 
-      {!isAuthenticatedPlayerHome && selectedMatch ? (
+      {(isGuestHome || isAuthenticatedAdminHome) && selectedMatch ? (
         <section className="section-shell p-4 sm:p-5">
           <label>
             <span className="field-label">Buscar jogador</span>
@@ -767,7 +793,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {!isAuthenticatedPlayerHome && selectedMatch ? (
+      {(isGuestHome || isAuthenticatedAdminHome) && selectedMatch ? (
         <ActionBar className="sticky sticky-app-offset z-10 p-1.5 sm:p-2">
           <div className="flex flex-wrap gap-2">
             <Button
@@ -831,7 +857,7 @@ export default function HomePage() {
         <StatusNote tone="success">{actionMessage}</StatusNote>
       ) : null}
 
-      {!isAuthenticatedPlayerHome && selectedMatch ? (
+      {(isGuestHome || isAuthenticatedAdminHome) && selectedMatch ? (
         <section className={`grid gap-4 ${listViewFilter === "ALL" ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
           {showPending ? (
             <div className="card p-4">

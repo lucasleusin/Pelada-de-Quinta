@@ -49,6 +49,10 @@ type MergePreview = {
       ratingsReceived: number;
       whatsAppMessages: number;
     };
+    accountOutcome:
+      | "keep-primary-account"
+      | "move-secondary-account-to-primary-player"
+      | "no-account";
   };
   warnings: string[];
 };
@@ -87,6 +91,18 @@ function extractErrorMessage(payload: unknown, fallback: string) {
 
 function playerLabel(player: { name: string; nickname: string | null }) {
   return player.nickname ? `${player.nickname} (${player.name})` : player.name;
+}
+
+function accountOutcomeSummary(outcome: MergePreview["playerMerge"]["accountOutcome"]) {
+  if (outcome === "keep-primary-account") {
+    return "A conta do jogador principal sera mantida ativa e a conta do secundario sera arquivada.";
+  }
+
+  if (outcome === "move-secondary-account-to-primary-player") {
+    return "A conta vinculada do jogador secundario sera transferida para o jogador principal.";
+  }
+
+  return "Nenhum dos jogadores possui conta vinculada. A unificacao sera apenas esportiva.";
 }
 
 export default function AdminJogadoresUnificarPage() {
@@ -218,7 +234,7 @@ export default function AdminJogadoresUnificarPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Cadastro esportivo</p>
             <h2 className="mt-1 text-3xl font-bold text-emerald-950">Unificar Jogadores</h2>
             <p className="text-sm text-emerald-800">
-              Consolide historicos duplicados em um jogador principal. A conta do principal sempre prevalece.
+              Consolide historicos duplicados em um jogador principal e revise qual conta permanecera ativa ao final.
             </p>
           </div>
           <Link className={buttonVariants({ variant: "outline", className: "rounded-full" })} href="/admin/jogadores">
@@ -303,6 +319,11 @@ export default function AdminJogadoresUnificarPage() {
             <div>
               <h3 className="text-xl font-semibold text-emerald-950">Resumo da unificacao</h3>
               <p className="text-sm text-emerald-800">O jogador principal sobrevivera. O secundario sera ocultado para uso normal.</p>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+              <p className="text-sm font-semibold text-emerald-950">Destino da conta</p>
+              <p className="mt-1 text-sm text-emerald-900">{accountOutcomeSummary(preview.playerMerge.accountOutcome)}</p>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">

@@ -475,6 +475,14 @@ export default function HomePage() {
   }
 
   const welcomeName = authState?.nickname ?? authState?.name ?? "Atleta";
+  const authenticatedPresenceMessage =
+    loggedPlayerPresenceStatus === "CONFIRMED"
+      ? "Voce esta confirmado para o jogo."
+      : loggedPlayerPresenceStatus === "CANCELED"
+        ? "Voce esta desconfirmado para o jogo."
+        : "Selecione a partida e escolha se voce vai jogar.";
+  const showConfirmAction = loggedPlayerPresenceStatus !== "CONFIRMED";
+  const showCancelAction = loggedPlayerPresenceStatus !== "CANCELED";
 
   return (
     <PageShell>
@@ -592,46 +600,69 @@ export default function HomePage() {
         )}
       </section>
       {isAuthenticatedPlayerHome ? (
-        <ActionBar className="space-y-3 p-3 sm:p-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
-            <p className="text-sm text-emerald-900">Bem-vindo {welcomeName}, voce ira jogar o proximo jogo?</p>
-            <p className="mt-1 text-sm text-emerald-800">
-              {loggedPlayerPresenceStatus === "CONFIRMED"
-                ? "Voce ja confirmou sua presenca nesta partida."
-                : loggedPlayerPresenceStatus === "CANCELED"
-                  ? "Voce esta desconfirmado nesta partida."
-                  : "Selecione a partida e escolha se voce vai jogar."}
-            </p>
-          </div>
-
-          {selectedMatch ? (
-            <div className="rounded-2xl border border-emerald-100 bg-white p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Partida selecionada</p>
-              <p className="mt-2 text-lg font-semibold text-emerald-950">
-                {formatDatePtBr(selectedMatch.matchDate)} - {selectedMatch.startTime}
-              </p>
-              <p className="text-sm text-emerald-800">{selectedMatch.location ?? "Local a definir"}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  className="rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
-                  onClick={() => setAuthenticatedPresence("CONFIRMED")}
-                >
-                  Confirmar
-                </Button>
-                <Button
-                  type="button"
-                  className="rounded-full bg-red-600 text-white hover:bg-red-700"
-                  onClick={() => setAuthenticatedPresence("CANCELED")}
-                >
-                  Desconfirmar
-                </Button>
+        <ActionBar className="p-3 sm:p-4">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]">
+            <div className="space-y-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Confirmacao rapida</p>
+                <p className="text-sm text-emerald-900">Bem-vindo {welcomeName}, voce ira jogar o proximo jogo?</p>
+                <p className="mt-1 text-sm text-emerald-800">{authenticatedPresenceMessage}</p>
               </div>
+
+              {selectedMatch ? (
+                <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Partida selecionada</p>
+                  <p className="mt-2 text-lg font-semibold text-emerald-950">
+                    {formatDatePtBr(selectedMatch.matchDate)} - {selectedMatch.startTime}
+                  </p>
+                  <p className="text-sm text-emerald-800">{selectedMatch.location ?? "Local a definir"}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {showConfirmAction ? (
+                      <Button
+                        type="button"
+                        className="rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+                        onClick={() => setAuthenticatedPresence("CONFIRMED")}
+                      >
+                        Confirmar
+                      </Button>
+                    ) : null}
+                    {showCancelAction ? (
+                      <Button
+                        type="button"
+                        className="rounded-full bg-red-600 text-white hover:bg-red-700"
+                        onClick={() => setAuthenticatedPresence("CANCELED")}
+                      >
+                        Desconfirmar
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenca.</p>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-amber-700">Selecione uma partida para confirmar presenca.</p>
-          )}
+
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Ja confirmados</p>
+              <p className="mt-1 text-sm text-emerald-800">Lista somente para referencia da partida selecionada.</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {confirmed.length === 0 ? (
+                  <li className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">
+                    Nenhum jogador confirmado ainda.
+                  </li>
+                ) : (
+                  confirmed.map((item) => (
+                    <li
+                      key={item.playerId}
+                      className="rounded-lg bg-emerald-50 px-3 py-2 font-medium text-emerald-950"
+                    >
+                      {formatPlayerLabel(item.player)}
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+          </div>
         </ActionBar>
       ) : (
         <ActionBar className="space-y-3 p-3 sm:p-4">

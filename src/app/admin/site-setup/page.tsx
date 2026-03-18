@@ -151,11 +151,21 @@ export default function AdminSiteSetupPage() {
   const [activeUsers, setActiveUsers] = useState<ManagedUser[]>([]);
   const [adminsLoading, setAdminsLoading] = useState(false);
   const [roleLoadingId, setRoleLoadingId] = useState<string | null>(null);
+  const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [selectedAdminCandidateId, setSelectedAdminCandidateId] = useState("");
 
-  const eligibleAdminUsers = useMemo(
+  const adminUsers = useMemo(
     () =>
       [...activeUsers]
-        .filter((user) => Boolean(user.playerId && user.player))
+        .filter((user) => user.role === "ADMIN" && Boolean(user.playerId && user.player))
+        .sort((left, right) => userLabel(left).localeCompare(userLabel(right))),
+    [activeUsers],
+  );
+
+  const adminCandidates = useMemo(
+    () =>
+      [...activeUsers]
+        .filter((user) => user.role !== "ADMIN" && Boolean(user.playerId && user.player))
         .sort((left, right) => userLabel(left).localeCompare(userLabel(right))),
     [activeUsers],
   );
@@ -248,6 +258,19 @@ export default function AdminSiteSetupPage() {
     } finally {
       setRoleLoadingId(null);
     }
+  }
+
+  function openAddAdminModal() {
+    if (adminCandidates.length === 0) {
+      setNotice({
+        tone: "error",
+        text: "Nao ha usuarios elegiveis para adicionar como admin.",
+      });
+      return;
+    }
+
+    setSelectedAdminCandidateId(adminCandidates[0]?.id ?? "");
+    setShowAddAdminModal(true);
   }
 
   async function uploadAsset(kind: SiteAssetKind, routeSegment: string) {
@@ -386,37 +409,47 @@ export default function AdminSiteSetupPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-xl font-semibold text-emerald-950">Usuario Admin</h3>
-              <p className="text-sm text-emerald-800">Adicione ou remova a permissao administrativa dos usuarios ativos vinculados a jogadores.</p>
+              <p className="text-sm text-emerald-800">Gerencie somente os usuarios que ja possuem permissao administrativa.</p>
             </div>
-            <Button className="rounded-full" type="button" variant="outline" onClick={() => void loadAdminUsers()}>
-              Atualizar
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="rounded-full"
+                type="button"
+                disabled={adminCandidates.length === 0}
+                onClick={openAddAdminModal}
+              >
+                Adicionar
+              </Button>
+              <Button className="rounded-full" type="button" variant="outline" onClick={() => void loadAdminUsers()}>
+                Atualizar
+              </Button>
+            </div>
           </div>
 
           {adminsLoading ? (
             <p className="mt-4 text-sm text-emerald-800">Carregando usuarios...</p>
-          ) : eligibleAdminUsers.length === 0 ? (
-            <p className="mt-4 text-sm text-emerald-800">Nao ha usuarios elegiveis para administrar o sistema.</p>
+          ) : adminUsers.length === 0 ? (
+            <p className="mt-4 text-sm text-emerald-800">Nao ha usuarios admin cadastrados no momento.</p>
           ) : (
             <ul className="mt-4 space-y-3">
-              {eligibleAdminUsers.map((user) => (
+              {adminUsers.map((user) => (
                 <li key={user.id} className="rounded-xl border border-emerald-100 bg-white p-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-semibold text-emerald-950">{userLabel(user)}</p>
                       <p className="text-sm text-emerald-800">{user.email}</p>
                       <p className="text-xs uppercase tracking-[0.12em] text-emerald-700">
-                        {user.role === "ADMIN" ? "Admin ativo" : "Atleta"}
+                        Admin ativo
                       </p>
                     </div>
                     <Button
                       className="rounded-full"
                       type="button"
-                      variant={user.role === "ADMIN" ? "outline" : "default"}
+                      variant="outline"
                       disabled={roleLoadingId === user.id}
-                      onClick={() => updateAdminRole(user, user.role === "ADMIN" ? "PLAYER" : "ADMIN")}
+                      onClick={() => updateAdminRole(user, "PLAYER")}
                     >
-                      {user.role === "ADMIN" ? "Remover admin" : "Adicionar admin"}
+                      Remover admin
                     </Button>
                   </div>
                 </li>
@@ -425,6 +458,81 @@ export default function AdminSiteSetupPage() {
           )}
         </SectionShell>
       </section>
+
+      {showAddAdminModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/40 px-4 py-6">
+          <div className="w-full max-w-md rounded-3xl border border-emerald-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold text-emerald-950">Adicionar admin</h3>
+                <p className="text-sm text-emerald-800">
+                  Escolha um usuario ativo vinculado a jogador para receber permissao administrativa.
+                </p>
+              </div>
+              <Button
+                className="rounded-full"
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowAddAdminModal(false);
+                  setSelectedAdminCandidateId("");
+                }}
+              >
+                Fechar
+              </Button>
+            </div>
+
+            {adminCandidates.length === 0 ? (
+              <p className="mt-4 text-sm text-emerald-800">Nao ha usuarios elegiveis para adicionar como admin.</p>
+            ) : (
+              <>
+                <label className="mt-4 block">
+                  <span className="field-label">Usuario</span>
+                  <select
+                    className="field-input mt-2"
+                    value={selectedAdminCandidateId}
+                    onChange={(event) => setSelectedAdminCandidateId(event.currentTarget.value)}
+                  >
+                    {adminCandidates.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {userLabel(user)} - {user.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <Button
+                    className="rounded-full"
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowAddAdminModal(false);
+                      setSelectedAdminCandidateId("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="rounded-full"
+                    type="button"
+                    disabled={!selectedAdminCandidateId || roleLoadingId !== null}
+                    onClick={async () => {
+                      const selectedUser = adminCandidates.find((user) => user.id === selectedAdminCandidateId);
+                      if (!selectedUser) return;
+                      await updateAdminRole(selectedUser, "ADMIN");
+                      setShowAddAdminModal(false);
+                      setSelectedAdminCandidateId("");
+                    }}
+                  >
+                    Confirmar
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <SectionShell className="p-4">
         <div>

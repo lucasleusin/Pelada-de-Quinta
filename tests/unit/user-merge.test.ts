@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeParticipantRecords, planMergedRatings } from "@/lib/user-merge";
+import { mergeParticipantRecords, planMergedRatings, resolveMergeAccountOutcome } from "@/lib/user-merge";
 
 describe("user merge helpers", () => {
   it("sums stats when both duplicated players were on the same team", () => {
@@ -140,5 +140,18 @@ describe("user merge helpers", () => {
         ratedPlayerId: "player-primary",
       },
     ]);
+  });
+
+  it("keeps the primary account when the principal already has a linked user", () => {
+    expect(resolveMergeAccountOutcome(true, true)).toBe("keep-primary-account");
+    expect(resolveMergeAccountOutcome(true, false)).toBe("keep-primary-account");
+  });
+
+  it("moves the secondary account when only the secondary player has a linked user", () => {
+    expect(resolveMergeAccountOutcome(false, true)).toBe("move-secondary-account-to-primary-player");
+  });
+
+  it("reports no account when neither player has a linked user", () => {
+    expect(resolveMergeAccountOutcome(false, false)).toBe("no-account");
   });
 });

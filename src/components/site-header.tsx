@@ -31,6 +31,7 @@ export function SiteHeader() {
   const hasLogo = Boolean(logoUrl);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
   const { authState, isAuthenticated } = usePublicAuthState(!isAdminPath);
+  const shouldShowAdminLink = !authState?.id || authState.role === "ADMIN";
 
   function resolveHref(href: string) {
     if (!protectedHrefs.has(href)) {
@@ -125,19 +126,21 @@ export function SiteHeader() {
             );
           })}
 
-          <Link
-            href="/admin"
-            className={cn(
-              buttonVariants({
-                variant: pathname === "/admin" || pathname.startsWith("/admin/") ? "default" : "outline",
-                size: "sm",
-              }),
-              "rounded-full",
-              pathname === "/admin" || pathname.startsWith("/admin/") ? "shadow-sm" : "bg-white",
-            )}
-          >
-            Admin
-          </Link>
+          {shouldShowAdminLink ? (
+            <Link
+              href="/admin"
+              className={cn(
+                buttonVariants({
+                  variant: pathname === "/admin" || pathname.startsWith("/admin/") ? "default" : "outline",
+                  size: "sm",
+                }),
+                "rounded-full",
+                pathname === "/admin" || pathname.startsWith("/admin/") ? "shadow-sm" : "bg-white",
+              )}
+            >
+              Admin
+            </Link>
+          ) : null}
 
           {!isAdminPath ? <PublicAuthButton className="ml-auto" /> : null}
         </nav>

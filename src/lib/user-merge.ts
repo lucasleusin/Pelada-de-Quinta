@@ -6,6 +6,11 @@ export type MergeEntitiesInput = {
   secondaryPlayerId?: string | null;
 };
 
+export type MergeAccountOutcome =
+  | "keep-primary-account"
+  | "move-secondary-account-to-primary-player"
+  | "no-account";
+
 type TxClient = Prisma.TransactionClient;
 type MergeRootClient = {
   $transaction<T>(callback: (tx: TxClient) => Promise<T>): Promise<T>;
@@ -79,6 +84,7 @@ export type MergePreview = {
       linkedUserEmail: string | null;
     };
     summary: PlayerMergeSummary;
+    accountOutcome: MergeAccountOutcome;
   };
   warnings: string[];
 };
@@ -115,6 +121,18 @@ function playerLabel(player: Pick<LoadedPlayer, "name" | "nickname">) {
 
 function strongerPresenceStatus(primaryStatus: PresenceStatus, secondaryStatus: PresenceStatus) {
   return presenceStatusRank[primaryStatus] >= presenceStatusRank[secondaryStatus] ? primaryStatus : secondaryStatus;
+}
+
+export function resolveMergeAccountOutcome(primaryHasUser: boolean, secondaryHasUser: boolean): MergeAccountOutcome {
+  if (primaryHasUser) {
+    return "keep-primary-account";
+  }
+
+  if (secondaryHasUser) {
+    return "move-secondary-account-to-primary-player";
+  }
+
+  return "no-account";
 }
 
 function pickEarliestDate(values: Array<Date | null | undefined>) {
@@ -214,13 +232,18 @@ export function planMergedRatings(ratings: RatingLike[], primaryPlayerId: string
 }
 
 function buildWarnings(context: SelectionContext) {
+  const accountOutcome = resolveMergeAccountOutcome(Boolean(context.primaryPlayer.user), Boolean(context.secondaryPlayer.user));
   const warnings = [
     "A unificacao e definitiva. O jogador secundario sera ocultado para uso normal.",
     "Todo o historico esportivo do jogador secundario sera movido para o principal.",
   ];
 
-  if (context.secondaryPlayer.user) {
+  if (accountOutcome === "keep-primary-account" && context.secondaryPlayer.user) {
     warnings.push("Se houver conta vinculada no jogador secundario, ela sera bloqueada e a conta do principal sera mantida.");
+  }
+
+  if (accountOutcome === "move-secondary-account-to-primary-player" && context.secondaryPlayer.user) {
+    warnings.push("A conta vinculada do jogador secundario sera transferida para o jogador principal.");
   }
 
   return warnings;
@@ -259,13 +282,6 @@ async function loadSelectionContext(
 
   ensure(primaryPlayer, "Jogador principal nao encontrado ou ja foi unificado.", 404);
   ensure(secondaryPlayer, "Jogador secundario nao encontrado ou ja foi unificado.", 404);
-
-  if (secondaryPlayer.user && !primaryPlayer.user) {
-    throw new MergeValidationError(
-      "O jogador secundario possui conta vinculada. Escolha como principal o jogador que deve manter a conta.",
-      409,
-    );
-  }
 
   return {
     primaryPlayer,
@@ -342,6 +358,7 @@ export async function listMergeCandidates(client: TxClient) {
 
 export async function previewEntityMerge(client: TxClient, input: MergeEntitiesInput): Promise<MergePreview> {
   const context = await loadSelectionContext(client, input);
+  const accountOutcome = resolveMergeAccountOutcome(Boolean(context.primaryPlayer.user), Boolean(context.secondaryPlayer.user));
 
   return {
     playerMerge: {
@@ -358,23 +375,49 @@ export async function previewEntityMerge(client: TxClient, input: MergeEntitiesI
         linkedUserEmail: context.secondaryPlayer.user?.email ?? null,
       },
       summary: await getPlayerMergeSummary(client, context.primaryPlayer.id, context.secondaryPlayer.id),
+      accountOutcome,
     },
     warnings: buildWarnings(context),
   };
 }
 
-async function disableSecondaryLinkedUser(tx: TxClient, mergedByUserId: string, context: SelectionContext, mergedAt: Date) {
+async function reconcileLinkedUsersAfterPlayerMerge(tx: TxClient, mergedByUserId: string, context: SelectionContext, mergedAt: Date) {
   const primaryUser = context.primaryPlayer.user;
   const secondaryUser = context.secondaryPlayer.user;
+  const accountOutcome = resolveMergeAccountOutcome(Boolean(primaryUser), Boolean(secondaryUser));
 
   if (!secondaryUser) {
-    return null;
+    return {
+      accountOutcome,
+      keptUserId: primaryUser?.id ?? null,
+      disabledUserId: null,
+      movedUserId: null,
+    };
   }
 
-  ensure(primaryUser, "O jogador principal precisa manter a conta vinculada para esta unificacao.");
+  if (!primaryUser) {
+    await tx.user.update({
+      where: { id: secondaryUser.id },
+      data: {
+        playerId: context.primaryPlayer.id,
+      },
+    });
+
+    return {
+      accountOutcome,
+      keptUserId: secondaryUser.id,
+      disabledUserId: null,
+      movedUserId: secondaryUser.id,
+    };
+  }
 
   if (primaryUser.id === secondaryUser.id) {
-    return null;
+    return {
+      accountOutcome,
+      keptUserId: primaryUser.id,
+      disabledUserId: null,
+      movedUserId: null,
+    };
   }
 
   if (secondaryUser.role === UserRole.ADMIN && secondaryUser.status === UserStatus.ACTIVE) {
@@ -410,8 +453,10 @@ async function disableSecondaryLinkedUser(tx: TxClient, mergedByUserId: string, 
   });
 
   return {
+    accountOutcome,
     keptUserId: primaryUser.id,
     disabledUserId: secondaryUser.id,
+    movedUserId: null,
   };
 }
 
@@ -494,7 +539,7 @@ async function mergePlayers(tx: TxClient, mergedByUserId: string, context: Selec
     data: { playerId: primaryPlayer.id },
   });
 
-  const mergedUsers = await disableSecondaryLinkedUser(tx, mergedByUserId, context, mergedAt);
+  const mergedUsers = await reconcileLinkedUsersAfterPlayerMerge(tx, mergedByUserId, context, mergedAt);
 
   await tx.player.update({
     where: { id: secondaryPlayer.id },

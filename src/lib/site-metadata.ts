@@ -18,7 +18,7 @@ export function buildSiteMetadata(
   appBaseUrl = process.env.APP_BASE_URL?.trim(),
 ): Metadata {
   const shareImages = settings.shareImageUrl ? [settings.shareImageUrl] : undefined;
-  const faviconHref = settings.faviconUrl || `/favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`;
+  const faviconHref = `/favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`;
 
   return {
     metadataBase: getMetadataBase(appBaseUrl),

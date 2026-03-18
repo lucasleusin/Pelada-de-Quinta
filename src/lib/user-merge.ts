@@ -284,6 +284,7 @@ async function loadSelectionContext(
         where: {
           id: { in: explicitPlayerIds },
           mergedIntoPlayerId: null,
+          isActive: true,
         },
         include: {
           user: {
@@ -365,7 +366,10 @@ async function getPlayerMergeSummary(client: TxClient, primaryPlayerId: string, 
 
 export async function listMergeCandidates(client: TxClient) {
   const players = await client.player.findMany({
-    where: { mergedIntoPlayerId: null },
+    where: {
+      mergedIntoPlayerId: null,
+      isActive: true,
+    },
     orderBy: [{ name: "asc" }],
     include: {
       user: {

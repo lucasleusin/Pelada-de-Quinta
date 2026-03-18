@@ -8,7 +8,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const icons: NonNullable<MetadataRoute.Manifest["icons"]> = settings.faviconUrl
     ? [
         {
-          src: settings.faviconUrl,
+          src: `/favicon.ico?v=${encodeURIComponent(settings.updatedAt)}`,
         },
       ]
     : [

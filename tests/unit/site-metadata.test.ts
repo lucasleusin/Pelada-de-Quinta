@@ -22,12 +22,12 @@ describe("site metadata", () => {
     expect(metadata.manifest).toBe("/manifest.webmanifest");
     expect(metadata.icons).toEqual({
       icon: [
-        { url: "/uploads/site/favicon/brand.ico?v=123" },
+        { url: "/favicon.ico?v=123" },
         { url: "/pwa/icon-192", sizes: "192x192", type: "image/png" },
         { url: "/pwa/icon-512", sizes: "512x512", type: "image/png" },
       ],
-      shortcut: "/uploads/site/favicon/brand.ico?v=123",
-      apple: [{ url: "/uploads/site/favicon/brand.ico?v=123" }],
+      shortcut: "/favicon.ico?v=123",
+      apple: [{ url: "/favicon.ico?v=123" }],
     });
     expect(metadata.appleWebApp).toEqual({
       capable: true,

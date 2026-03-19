@@ -94,6 +94,42 @@ function pendingMessage(status: CurrentUser["status"]) {
   return "Sua conta ainda nao esta pronta para uso.";
 }
 
+function resolveErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const resolved: string = resolveErrorMessage(item, "");
+      if (resolved) return resolved;
+    }
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if ("formErrors" in record) {
+      const resolved: string = resolveErrorMessage(record.formErrors, "");
+      if (resolved) return resolved;
+    }
+
+    if ("fieldErrors" in record && record.fieldErrors && typeof record.fieldErrors === "object") {
+      for (const nestedValue of Object.values(record.fieldErrors as Record<string, unknown>)) {
+        const resolved: string = resolveErrorMessage(nestedValue, "");
+        if (resolved) return resolved;
+      }
+    }
+
+    if ("error" in record) {
+      const resolved: string = resolveErrorMessage(record.error, "");
+      if (resolved) return resolved;
+    }
+  }
+
+  return fallback;
+}
+
 export default function MeuPerfilPage() {
   const searchParams = useSearchParams();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -153,7 +189,7 @@ export default function MeuPerfilPage() {
       .then(async (response) => {
         if (!response.ok) {
           const payload = await response.json().catch(() => ({ error: "Nao foi possivel carregar o perfil." }));
-          throw new Error(payload.error ?? "Nao foi possivel carregar o perfil.");
+          throw new Error(resolveErrorMessage(payload.error, "Nao foi possivel carregar o perfil."));
         }
 
         const payload = (await response.json()) as PlayerHistoryPayload;
@@ -201,7 +237,7 @@ export default function MeuPerfilPage() {
       if (!response.ok) {
         const payload = await response.json().catch(() => ({ error: "Falha ao salvar alteracoes." }));
         setSaveStatus("error");
-        setSaveMessage(payload.error ?? "Falha ao salvar alteracoes.");
+        setSaveMessage(resolveErrorMessage(payload.error, "Falha ao salvar alteracoes."));
         return;
       }
 
@@ -248,7 +284,7 @@ export default function MeuPerfilPage() {
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({ error: "Falha ao enviar foto." }));
-      setPhotoStatus(payload.error ?? "Falha ao enviar foto.");
+      setPhotoStatus(resolveErrorMessage(payload.error, "Falha ao enviar foto."));
       return;
     }
 
@@ -278,7 +314,7 @@ export default function MeuPerfilPage() {
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({ error: "Falha ao remover foto." }));
-      setPhotoStatus(payload.error ?? "Falha ao remover foto.");
+      setPhotoStatus(resolveErrorMessage(payload.error, "Falha ao remover foto."));
       return;
     }
 

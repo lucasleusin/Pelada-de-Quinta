@@ -469,6 +469,11 @@ export default function HomePage() {
       setActionMessage("Jogador voltou para pendentes.");
     }
 
+    if (isAuthenticatedAdminHome) {
+      await loadAdminData();
+      return;
+    }
+
     await loadGuestData();
   }
 

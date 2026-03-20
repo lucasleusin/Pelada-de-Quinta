@@ -3,7 +3,14 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { HeroBlock, SectionShell, StatusNote } from "@/components/layout/primitives";
 import { formatDatePtBr } from "@/lib/date-format";
-import { getPrimaryTeam, getTeamMembershipRank, hasTeam, normalizeTeams, type TeamCode } from "@/lib/team-utils";
+import {
+  getPrimaryTeam,
+  getTeamMembershipRank,
+  hasTeam,
+  normalizeTeams,
+  type TeamCode,
+  type TeamSplitStats,
+} from "@/lib/team-utils";
 
 type Position = "GOLEIRO" | "ZAGUEIRO" | "MEIA" | "ATACANTE" | "OUTRO";
 
@@ -19,9 +26,12 @@ type Participant = {
   teams: TeamCode[];
   primaryTeam: TeamCode | null;
   player: Player;
-  goals: number;
-  assists: number;
-  goalsConceded: number;
+  teamAGoals: number;
+  teamAAssists: number;
+  teamAGoalsConceded: number;
+  teamBGoals: number;
+  teamBAssists: number;
+  teamBGoalsConceded: number;
 };
 
 type Match = {
@@ -56,8 +66,17 @@ function formatPlayerLabel(player: Player) {
   return `${player.name} (${getPositionCode(player.position)})`;
 }
 
+function aggregateParticipantStats(participant: Participant) {
+  return {
+    goals: participant.teamAGoals + participant.teamBGoals,
+    assists: participant.teamAAssists + participant.teamBAssists,
+    goalsConceded: participant.teamAGoalsConceded + participant.teamBGoalsConceded,
+  };
+}
+
 function formatParticipantStats(participant: Participant) {
-  return `G=${participant.goals} / A=${participant.assists} / GS=${participant.goalsConceded}`;
+  const totals = aggregateParticipantStats(participant);
+  return `G=${totals.goals} / A=${totals.assists} / GS=${totals.goalsConceded}`;
 }
 
 function parseNullableScore(value: string): number | null {
@@ -68,6 +87,14 @@ function parseNullableScore(value: string): number | null {
 
 function sanitizeScoreInput(value: string) {
   return value.replace(/\D/g, "").slice(0, 2);
+}
+
+function sanitizeStatInput(value: string) {
+  return value.replace(/\D/g, "").slice(0, 2);
+}
+
+function parseStatInput(value: string) {
+  return Number(sanitizeStatInput(value) || "0");
 }
 
 function resolveErrorMessage(value: unknown, fallback: string): string {
@@ -117,6 +144,39 @@ function scoreStateFromMatch(match: Match | null): ScoreState {
   };
 }
 
+function statsStateFromMatch(match: Match | null): Record<string, TeamSplitStats> {
+  const nextState: Record<string, TeamSplitStats> = {};
+
+  for (const participant of match?.participants ?? []) {
+    nextState[participant.playerId] = {
+      teamAGoals: participant.teamAGoals,
+      teamAAssists: participant.teamAAssists,
+      teamAGoalsConceded: participant.teamAGoalsConceded,
+      teamBGoals: participant.teamBGoals,
+      teamBAssists: participant.teamBAssists,
+      teamBGoalsConceded: participant.teamBGoalsConceded,
+    };
+  }
+
+  return nextState;
+}
+
+function getTeamFieldNames(team: TeamCode) {
+  if (team === "A") {
+    return {
+      goals: "teamAGoals" as const,
+      assists: "teamAAssists" as const,
+      goalsConceded: "teamAGoalsConceded" as const,
+    };
+  }
+
+  return {
+    goals: "teamBGoals" as const,
+    assists: "teamBAssists" as const,
+    goalsConceded: "teamBGoalsConceded" as const,
+  };
+}
+
 export default function AdminPartidasPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -127,8 +187,12 @@ export default function AdminPartidasPage() {
   const [score, setScore] = useState<ScoreState>({ teamAScore: "", teamBScore: "" });
   const [scoreDirty, setScoreDirty] = useState(false);
   const [scoreSaveStatus, setScoreSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [statsState, setStatsState] = useState<Record<string, TeamSplitStats>>({});
+  const [statsDirty, setStatsDirty] = useState(false);
+  const [statsSaveStatus, setStatsSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
   const [scoreMessage, setScoreMessage] = useState("");
+  const [statsMessage, setStatsMessage] = useState("");
 
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId) ?? null,
@@ -193,9 +257,12 @@ export default function AdminPartidasPage() {
         teams: [],
         primaryTeam: null,
         player,
-        goals: 0,
-        assists: 0,
-        goalsConceded: 0,
+        teamAGoals: 0,
+        teamAAssists: 0,
+        teamAGoalsConceded: 0,
+        teamBGoals: 0,
+        teamBAssists: 0,
+        teamBGoalsConceded: 0,
       };
     });
 
@@ -210,6 +277,10 @@ export default function AdminPartidasPage() {
     setScoreDirty(false);
     setScoreSaveStatus("idle");
     setScoreMessage("");
+    setStatsState(statsStateFromMatch(nextMatch));
+    setStatsDirty(false);
+    setStatsSaveStatus("idle");
+    setStatsMessage("");
   }, []);
 
   const handleMatchSelectionChange = useCallback((nextMatchId: string) => {
@@ -302,6 +373,56 @@ export default function AdminPartidasPage() {
     return () => clearTimeout(timeout);
   }, [score, scoreDirty, selectedMatch]);
 
+  useEffect(() => {
+    if (!selectedMatch || !statsDirty) return;
+
+    const timeout = setTimeout(async () => {
+      setStatsSaveStatus("saving");
+
+      const response = await fetch(`/api/admin/matches/${selectedMatch.id}/stats`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          stats: selectedMatch.participants.map((participant) => ({
+            playerId: participant.playerId,
+            teamAGoals: statsState[participant.playerId]?.teamAGoals ?? 0,
+            teamAAssists: statsState[participant.playerId]?.teamAAssists ?? 0,
+            teamAGoalsConceded: statsState[participant.playerId]?.teamAGoalsConceded ?? 0,
+            teamBGoals: statsState[participant.playerId]?.teamBGoals ?? 0,
+            teamBAssists: statsState[participant.playerId]?.teamBAssists ?? 0,
+            teamBGoalsConceded: statsState[participant.playerId]?.teamBGoalsConceded ?? 0,
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: "Falha ao salvar estatisticas." }));
+        setStatsSaveStatus("error");
+        setStatsMessage(resolveErrorMessage(payload.error, "Falha ao salvar estatisticas."));
+        return;
+      }
+
+      setMatches((prev) =>
+        prev.map((match) =>
+          match.id === selectedMatch.id
+            ? {
+                ...match,
+                participants: match.participants.map((participant) => ({
+                  ...participant,
+                  ...statsState[participant.playerId],
+                })),
+              }
+            : match,
+        ),
+      );
+      setStatsDirty(false);
+      setStatsSaveStatus("saved");
+      setStatsMessage(`Estatisticas salvas automaticamente em ${new Date().toLocaleTimeString("pt-BR")}.`);
+    }, 650);
+
+    return () => clearTimeout(timeout);
+  }, [selectedMatch, statsDirty, statsState]);
+
   async function createMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const response = await fetch("/api/admin/matches", {
@@ -338,7 +459,19 @@ export default function AdminPartidasPage() {
 
     const payload = (await response.json()) as {
       updatedParticipants: Array<
-        Pick<Participant, "playerId" | "presenceStatus" | "teams" | "primaryTeam" | "goals" | "assists" | "goalsConceded">
+        Pick<
+          Participant,
+          | "playerId"
+          | "presenceStatus"
+          | "teams"
+          | "primaryTeam"
+          | "teamAGoals"
+          | "teamAAssists"
+          | "teamAGoalsConceded"
+          | "teamBGoals"
+          | "teamBAssists"
+          | "teamBGoalsConceded"
+        >
       >;
     };
 
@@ -389,7 +522,19 @@ export default function AdminPartidasPage() {
 
     const payload = (await response.json()) as {
       updatedParticipants: Array<
-        Pick<Participant, "playerId" | "presenceStatus" | "teams" | "primaryTeam" | "goals" | "assists" | "goalsConceded">
+        Pick<
+          Participant,
+          | "playerId"
+          | "presenceStatus"
+          | "teams"
+          | "primaryTeam"
+          | "teamAGoals"
+          | "teamAAssists"
+          | "teamAGoalsConceded"
+          | "teamBGoals"
+          | "teamBAssists"
+          | "teamBGoalsConceded"
+        >
       >;
     };
 
@@ -438,7 +583,16 @@ export default function AdminPartidasPage() {
 
     const updatedParticipant = (await response.json()) as Pick<
       Participant,
-      "playerId" | "presenceStatus" | "teams" | "primaryTeam" | "goals" | "assists" | "goalsConceded"
+      | "playerId"
+      | "presenceStatus"
+      | "teams"
+      | "primaryTeam"
+      | "teamAGoals"
+      | "teamAAssists"
+      | "teamAGoalsConceded"
+      | "teamBGoals"
+      | "teamBAssists"
+      | "teamBGoalsConceded"
     >;
 
     setMatches((prev) =>
@@ -491,6 +645,23 @@ export default function AdminPartidasPage() {
     setScore((prev) => ({ ...prev, [field]: sanitizeScoreInput(value) }));
     setScoreDirty(true);
     setScoreSaveStatus("idle");
+  }
+
+  function updateStat(playerId: string, field: keyof TeamSplitStats, value: string) {
+    setStatsState((prev) => ({
+      ...prev,
+      [playerId]: {
+        teamAGoals: prev[playerId]?.teamAGoals ?? 0,
+        teamAAssists: prev[playerId]?.teamAAssists ?? 0,
+        teamAGoalsConceded: prev[playerId]?.teamAGoalsConceded ?? 0,
+        teamBGoals: prev[playerId]?.teamBGoals ?? 0,
+        teamBAssists: prev[playerId]?.teamBAssists ?? 0,
+        teamBGoalsConceded: prev[playerId]?.teamBGoalsConceded ?? 0,
+        [field]: parseStatInput(value),
+      },
+    }));
+    setStatsDirty(true);
+    setStatsSaveStatus("idle");
   }
 
   function toggleTeamAssignment(participant: Participant, team: TeamCode) {
@@ -580,6 +751,15 @@ export default function AdminPartidasPage() {
     const primaryTeam = getPrimaryTeam(participant.primaryTeam, participant.teams);
     const isDualTeamPlayer = participant.teams.length === 2 && primaryTeam !== null;
     const isPrimaryTeam = primaryTeam === team;
+    const fields = getTeamFieldNames(team);
+    const teamStats = statsState[participant.playerId] ?? {
+      teamAGoals: participant.teamAGoals,
+      teamAAssists: participant.teamAAssists,
+      teamAGoalsConceded: participant.teamAGoalsConceded,
+      teamBGoals: participant.teamBGoals,
+      teamBAssists: participant.teamBAssists,
+      teamBGoalsConceded: participant.teamBGoalsConceded,
+    };
 
     return (
       <div
@@ -588,8 +768,8 @@ export default function AdminPartidasPage() {
           team === "A" ? "border-blue-100" : "border-red-100"
         }`}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <p>{formatPlayerLabel(participant.player)}</p>
             {isDualTeamPlayer && isPrimaryTeam ? (
               <p
@@ -601,21 +781,57 @@ export default function AdminPartidasPage() {
               </p>
             ) : null}
           </div>
-          {isDualTeamPlayer && !isPrimaryTeam ? (
-            <button
-              type="button"
-              className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-800 transition hover:bg-emerald-100"
-              onClick={() =>
-                setPlayerPrimaryTeam(participant, team).catch(() =>
-                  setMessage("Falha ao atualizar o time principal."),
-                )
-              }
-            >
-              Definir este time como principal
-            </button>
-          ) : null}
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {isDualTeamPlayer && !isPrimaryTeam ? (
+              <button
+                type="button"
+                className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-800 transition hover:bg-emerald-100"
+                onClick={() =>
+                  setPlayerPrimaryTeam(participant, team).catch(() =>
+                    setMessage("Falha ao atualizar o time principal."),
+                  )
+                }
+              >
+                Definir este time como principal
+              </button>
+            ) : null}
+            <div className="grid grid-cols-[52px_52px_52px] gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <span className="text-center">G</span>
+              <span className="text-center">A</span>
+              <span className="text-center">GS</span>
+            </div>
+            <div className="grid grid-cols-[52px_52px_52px] gap-1">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                className="field-input h-9 px-2 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                value={String(teamStats[fields.goals] ?? 0)}
+                onChange={(event) => updateStat(participant.playerId, fields.goals, event.currentTarget.value)}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                className="field-input h-9 px-2 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                value={String(teamStats[fields.assists] ?? 0)}
+                onChange={(event) => updateStat(participant.playerId, fields.assists, event.currentTarget.value)}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                className="field-input h-9 px-2 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                value={String(teamStats[fields.goalsConceded] ?? 0)}
+                onChange={(event) => updateStat(participant.playerId, fields.goalsConceded, event.currentTarget.value)}
+              />
+            </div>
+          </div>
         </div>
-        <p className="text-xs font-medium text-slate-600">{formatParticipantStats(participant)}</p>
+        <p className="mt-2 text-xs font-medium text-slate-600">{formatParticipantStats({ ...participant, ...teamStats })}</p>
       </div>
     );
   }
@@ -704,6 +920,9 @@ export default function AdminPartidasPage() {
         {scoreSaveStatus === "saving" ? <p className="mt-2 text-sm text-amber-700">Salvando placar...</p> : null}
         {scoreSaveStatus === "saved" ? <p className="mt-2 text-sm text-emerald-800">{scoreMessage}</p> : null}
         {scoreSaveStatus === "error" ? <p className="mt-2 text-sm text-red-700">{scoreMessage}</p> : null}
+        {statsSaveStatus === "saving" ? <p className="mt-2 text-sm text-amber-700">Salvando estatisticas...</p> : null}
+        {statsSaveStatus === "saved" ? <p className="mt-2 text-sm text-emerald-800">{statsMessage}</p> : null}
+        {statsSaveStatus === "error" ? <p className="mt-2 text-sm text-red-700">{statsMessage}</p> : null}
       </SectionShell>
 
       {selectedMatch ? (
@@ -808,5 +1027,4 @@ export default function AdminPartidasPage() {
     </div>
   );
 }
-
 

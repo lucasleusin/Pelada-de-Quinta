@@ -66,6 +66,46 @@ function parseNullableScore(value: string): number | null {
   return Number.isNaN(parsed) ? null : Math.min(99, Math.max(0, Math.trunc(parsed)));
 }
 
+function sanitizeScoreInput(value: string) {
+  return value.replace(/\D/g, "").slice(0, 2);
+}
+
+function resolveErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const resolved = resolveErrorMessage(item, "");
+      if (resolved) return resolved;
+    }
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if ("formErrors" in record) {
+      const resolved = resolveErrorMessage(record.formErrors, "");
+      if (resolved) return resolved;
+    }
+
+    if ("fieldErrors" in record && record.fieldErrors && typeof record.fieldErrors === "object") {
+      for (const nestedValue of Object.values(record.fieldErrors as Record<string, unknown>)) {
+        const resolved = resolveErrorMessage(nestedValue, "");
+        if (resolved) return resolved;
+      }
+    }
+
+    if ("error" in record) {
+      const resolved = resolveErrorMessage(record.error, "");
+      if (resolved) return resolved;
+    }
+  }
+
+  return fallback;
+}
+
 function scoreStateFromMatch(match: Match | null): ScoreState {
   if (!match) {
     return { teamAScore: "", teamBScore: "" };
@@ -235,7 +275,7 @@ export default function AdminPartidasPage() {
       if (!response.ok) {
         const payload = await response.json().catch(() => ({ error: "Falha ao salvar placar." }));
         setScoreSaveStatus("error");
-        setScoreMessage(payload.error ?? "Falha ao salvar placar.");
+        setScoreMessage(resolveErrorMessage(payload.error, "Falha ao salvar placar."));
         return;
       }
 
@@ -444,7 +484,7 @@ export default function AdminPartidasPage() {
   }
 
   function updateScore(field: keyof ScoreState, value: string) {
-    setScore((prev) => ({ ...prev, [field]: value }));
+    setScore((prev) => ({ ...prev, [field]: sanitizeScoreInput(value) }));
     setScoreDirty(true);
     setScoreSaveStatus("idle");
   }
@@ -620,10 +660,11 @@ export default function AdminPartidasPage() {
           <label>
             <span className="field-label">{selectedMatch?.teamAName ?? "Time A"}</span>
             <input
-              type="number"
-              min={0}
-              max={99}
-              className="field-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
+              className="field-input text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               disabled={!selectedMatch}
               value={score.teamAScore}
               onChange={(event) => updateScore("teamAScore", event.currentTarget.value)}
@@ -633,10 +674,11 @@ export default function AdminPartidasPage() {
           <label>
             <span className="field-label">{selectedMatch?.teamBName ?? "Time B"}</span>
             <input
-              type="number"
-              min={0}
-              max={99}
-              className="field-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
+              className="field-input text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               disabled={!selectedMatch}
               value={score.teamBScore}
               onChange={(event) => updateScore("teamBScore", event.currentTarget.value)}

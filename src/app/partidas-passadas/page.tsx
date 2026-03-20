@@ -89,6 +89,10 @@ function sanitizeTwoDigitValue(value: string) {
   return digitsOnly;
 }
 
+function parseStatInput(value: string) {
+  return Number(sanitizeTwoDigitValue(value) || "0");
+}
+
 function formatPlayerLabel(player: Participant["player"]) {
   return `${playerLabel(player)} (${getPositionCode(player.position)})`;
 }
@@ -413,9 +417,9 @@ export default function PartidasPassadasPage() {
                     <span className="pr-1 text-xs font-medium leading-tight text-emerald-950 sm:text-sm">{formatPlayerLabel(participant.player)}</span>
                     {match?.canEdit ? (
                       <>
-                        <input className="field-input h-9 px-2 text-center tabular-nums" inputMode="numeric" value={String(statsState[participant.playerId]?.[fields.goals] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.goals, Number(sanitizeTwoDigitValue(event.currentTarget.value) || "0"))} />
-                        <input className="field-input h-9 px-2 text-center tabular-nums" inputMode="numeric" value={String(statsState[participant.playerId]?.[fields.assists] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.assists, Number(sanitizeTwoDigitValue(event.currentTarget.value) || "0"))} />
-                        <input className="field-input h-9 px-2 text-center tabular-nums" inputMode="numeric" value={String(statsState[participant.playerId]?.[fields.goalsConceded] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.goalsConceded, Number(sanitizeTwoDigitValue(event.currentTarget.value) || "0"))} />
+                        <input className="field-input h-9 px-2 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={String(statsState[participant.playerId]?.[fields.goals] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.goals, parseStatInput(event.currentTarget.value))} />
+                        <input className="field-input h-9 px-2 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={String(statsState[participant.playerId]?.[fields.assists] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.assists, parseStatInput(event.currentTarget.value))} />
+                        <input className="field-input h-9 px-2 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={String(statsState[participant.playerId]?.[fields.goalsConceded] ?? 0)} onChange={(event) => updateStat(participant.playerId, fields.goalsConceded, parseStatInput(event.currentTarget.value))} />
                       </>
                     ) : (
                       <>
@@ -489,11 +493,15 @@ export default function PartidasPassadasPage() {
                 <div className="flex items-center justify-end gap-3">
                   <span className="whitespace-nowrap text-base font-semibold text-emerald-950 sm:text-lg">{match.teamAName || "Time A"}</span>
                   <input
-                    className="field-input h-12 w-[4ch] min-w-[4ch] px-1 text-center text-lg font-bold tabular-nums sm:w-[4.5ch] sm:min-w-[4.5ch]"
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={2}
+                    className="field-input h-12 w-[4ch] min-w-[4ch] px-1 text-center text-lg font-bold tabular-nums [appearance:textfield] sm:w-[4.5ch] sm:min-w-[4.5ch] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     value={scoreState.teamAScore}
                     onChange={(event) => {
-                      setScoreState((current) => ({ ...current, teamAScore: sanitizeTwoDigitValue(event.currentTarget.value) }));
+                      const nextValue = sanitizeTwoDigitValue(event.currentTarget.value);
+                      setScoreState((current) => ({ ...current, teamAScore: nextValue }));
                       setScoreDirty(true);
                     }}
                     disabled={!match.canEdit}
@@ -502,11 +510,15 @@ export default function PartidasPassadasPage() {
                 <div className="flex items-center justify-center text-2xl font-black text-emerald-950">X</div>
                 <div className="flex items-center gap-3">
                   <input
-                    className="field-input h-12 w-[4ch] min-w-[4ch] px-1 text-center text-lg font-bold tabular-nums sm:w-[4.5ch] sm:min-w-[4.5ch]"
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={2}
+                    className="field-input h-12 w-[4ch] min-w-[4ch] px-1 text-center text-lg font-bold tabular-nums [appearance:textfield] sm:w-[4.5ch] sm:min-w-[4.5ch] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     value={scoreState.teamBScore}
                     onChange={(event) => {
-                      setScoreState((current) => ({ ...current, teamBScore: sanitizeTwoDigitValue(event.currentTarget.value) }));
+                      const nextValue = sanitizeTwoDigitValue(event.currentTarget.value);
+                      setScoreState((current) => ({ ...current, teamBScore: nextValue }));
                       setScoreDirty(true);
                     }}
                     disabled={!match.canEdit}

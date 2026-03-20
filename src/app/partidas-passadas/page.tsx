@@ -279,8 +279,8 @@ export default function PartidasPassadasPage() {
     setStatsDirty(true);
   }
 
-  const saveScore = useCallback(async (notify = true) => {
-    if (!match || !match.canEdit) return;
+  const saveScore = useCallback(async (notify = true): Promise<boolean> => {
+    if (!match || !match.canEdit) return false;
     setScoreSaving(true);
     try {
       const response = await fetch(`/api/matches/${match.id}/score`, {
@@ -296,7 +296,7 @@ export default function PartidasPassadasPage() {
         const payloadError = await response.json().catch(() => ({ error: "Erro ao salvar placar." }));
         setMessage(payloadError.error ?? "Erro ao salvar placar.");
         setMessageTone("error");
-        return;
+        return false;
       }
 
       if (notify) {
@@ -313,6 +313,7 @@ export default function PartidasPassadasPage() {
           : current,
       );
       setScoreDirty(false);
+      return true;
     } finally {
       setScoreSaving(false);
     }
@@ -320,6 +321,14 @@ export default function PartidasPassadasPage() {
 
   const saveStats = useCallback(async (notify = true) => {
     if (!match || !match.canEdit) return;
+
+    if (scoreDirty) {
+      const scoreSaved = await saveScore(false);
+      if (!scoreSaved) {
+        return;
+      }
+    }
+
     setStatsSaving(true);
     try {
       const response = await fetch(`/api/matches/${match.id}/stats`, {
@@ -365,7 +374,7 @@ export default function PartidasPassadasPage() {
     } finally {
       setStatsSaving(false);
     }
-  }, [currentUser?.playerId, match, statsState]);
+  }, [currentUser?.playerId, match, saveScore, scoreDirty, statsState]);
 
   useEffect(() => {
     if (!match?.canEdit || !scoreDirty) {

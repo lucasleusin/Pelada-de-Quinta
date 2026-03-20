@@ -202,7 +202,7 @@ export default function AdminPartidasPage() {
     return sortByName(list.filter((participant) => participant.presenceStatus !== "CONFIRMED"));
   }, [participantByPlayerId, players]);
 
-  const applyMatchSelection = useCallback((nextMatchId: string, availableMatches: Match[] = matches) => {
+  const applyMatchSelection = useCallback((nextMatchId: string, availableMatches: Match[]) => {
     const nextMatch = availableMatches.find((match) => match.id === nextMatchId) ?? null;
     setSelectedMatchId(nextMatchId);
     setShowNonConfirmedPlayers(false);
@@ -210,7 +210,11 @@ export default function AdminPartidasPage() {
     setScoreDirty(false);
     setScoreSaveStatus("idle");
     setScoreMessage("");
-  }, [matches]);
+  }, []);
+
+  const handleMatchSelectionChange = useCallback((nextMatchId: string) => {
+    applyMatchSelection(nextMatchId, matches);
+  }, [applyMatchSelection, matches]);
 
   const loadData = useCallback(async () => {
     const [matchesRes, playersRes] = await Promise.all([
@@ -645,7 +649,7 @@ export default function AdminPartidasPage() {
               id="match-select"
               className="field-input"
               value={selectedMatchId}
-              onChange={(event) => applyMatchSelection(event.currentTarget.value)}
+              onChange={(event) => handleMatchSelectionChange(event.currentTarget.value)}
             >
               <option value="">-- selecione --</option>
               {matches.map((match) => (

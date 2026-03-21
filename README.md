@@ -2,6 +2,17 @@
 
 Aplicacao web para organizar a pelada semanal de quinta-feira em Cachoeira do Sul.
 
+
+## Guia rapido de contexto
+
+Se voce abrir um chat novo sobre este projeto, leia primeiro:
+
+- `docs/PROJECT_CONTEXT.md`
+- `docs/PRODUCT_RULES.md`
+- `docs/IMPORTANT_DECISIONS.md`
+- `docs/DEPLOYMENT_VPS.md`
+
+Isso reduz bastante o tempo de alinhamento em conversas novas.
 ## Stack
 
 - Next.js (App Router + TypeScript)
@@ -225,3 +236,4 @@ Workflow em `.github/workflows/ci.yml` executa:
 ## Observacao (Windows ARM)
 
 Se voce estiver em Windows ARM e encontrar erro de engine do Prisma, rode o projeto com Node x64.
+

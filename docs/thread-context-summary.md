@@ -1,115 +1,17 @@
 # Pelada da Quinta — Thread Context Summary
 
-## 1) Project Overview
-- **Name:** Pelada da Quinta
-- **Purpose:** Manage weekly soccer matches (mainly Thursdays in Cachoeira do Sul), including attendance, team assignment, score, stats, voting, and reports.
-- **Primary stack:** Next.js (App Router), Tailwind, Prisma, PostgreSQL (Supabase), Auth.js/Credentials for admin.
-- **Deploy:** Vercel + Supabase.
-- **Language/UI:** PT-BR.
+Este arquivo agora e apenas um ponto de entrada rapido.
 
-## 2) Core Product Decisions
-- Player area is mostly **public/no password** (selection by player identity in UI flows).
-- Admin is protected (login currently simplified by username/password fallback in env/code).
-- Match stats are stored in `match_participants` (no event log table for MVP).
-- Waitlist logic exists; admin can manually promote/demote.
-- Match soft delete uses `status = ARCHIVED` and is treated as excluded globally.
+Para qualquer novo chat ou handoff, leia nesta ordem:
+1. `docs/PROJECT_CONTEXT.md`
+2. `docs/PRODUCT_RULES.md`
+3. `docs/IMPORTANT_DECISIONS.md`
+4. `docs/DEPLOYMENT_VPS.md`
+5. `README.md`
 
-## 3) Data/Domain Rules in Use
-- A match is considered valid for stats/reporting when:
-  - date is before today, or
-  - date is today and score is filled (`teamAScore` and `teamBScore` not null).
-- Archived matches are excluded from:
-  - home lists,
-  - past matches,
-  - voting,
-  - stats,
-  - reports/export.
-- Goals by player cannot exceed team score.
-- Additional validations include conceded-goals checks, rating bounds, no duplicate ratings per rater/rated/match.
-
-## 4) Key Features Implemented Across the Thread
-
-### Home
-- Auto-selects next match.
-- Supports switching among future matches.
-- Presence management lists (pending/confirmed/canceled).
-- Live search (accent-insensitive) across lists.
-- Mobile-focused refinements:
-  - compact top cards,
-  - icon-based quick filters,
-  - custom layout for “Próxima Partida” + “Outras Partidas”.
-- Weather icon + temperature next to “Próxima Partida” title using Open-Meteo.
-
-### Statistics (`/estatisticas`)
-- General and per-player views.
-- FIFA-like player card integrated.
-- Added/expanded metrics (wins/draw/loss, efficiencies, averages).
-- New general ranking column: **Aproveitamento** (`%` + points in parentheses).
-- Artilharia list no longer capped at 10 entries.
-
-### Past Matches (`/partidas-passadas`)
-- Match selection and per-team player stat entry.
-- Editable scoreboard.
-- Validation/messaging for unassigned goals and conceded-goals consistency.
-- Multiple mobile usability and layout fixes.
-
-### Voting (`/votacao`)
-- Per-player voting flow.
-- Auto-save behavior.
-- Hiding voted players / filtering to preserve one-at-a-time vote experience.
-
-### Meu Perfil (`/meu-perfil`)
-- Public profile edit flow with auto-save.
-- Editable fields: name, number, position, email, phone, photo.
-- Shared card component reused from statistics.
-
-### Admin
-- Players CRUD with photo upload and extra contact fields (`email`, `phone`).
-- Match management with drag/drop teams and score handling.
-- Soft delete action (“Excluir partida”) mapped to `ARCHIVED`.
-- Various UX adjustments requested throughout thread.
-
-## 5) APIs Added/Adjusted (high-level)
-- Existing match/player/admin/report routes were iterated heavily.
-- Added weather endpoint:
-  - `GET /api/weather/next-match?matchDate=YYYY-MM-DD&startTime=HH:mm`
-  - Returns icon key + weather code + rounded temperature.
-- Public/profile photo routes and admin photo routes were previously introduced and refined.
-
-## 6) UI/UX Direction Established
-- Mobile-first, fast operational flows.
-- Green field palette, clean cards, soccer-themed cues.
-- Frequent preference for immediate actions (visible controls, autosave, fewer clicks).
-- Header mobile variant requested and implemented:
-  - `CH-RS - Pelada de Quinta`
-  - menu below, left-aligned.
-
-## 7) Infra/Config Notes
-- Supabase connection and Prisma setup had early issues (env vars, DIRECT_URL, Windows engine mismatch, npm execution policy).
-- Current deployment pipeline is GitHub -> Vercel.
-- Supabase storage used for player photos; requires:
-  - `SUPABASE_URL`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - bucket configured (e.g. `player-photos`).
-
-## 8) Notable Troubleshooting Outcomes
-- Fixed 404/deploy issues over time.
-- Fixed stale/incorrect date handling incidents (day offset symptoms were investigated and iterated).
-- Fixed data visibility issues in stats caused by UI limiting and match inclusion logic.
-
-## 9) Current Known State (from latest requests)
-- Latest change introduced **Aproveitamento** ranking in Statistics and pushed to `main`.
-- Weather icon + temperature in Home is present and pushed.
-- Project has many iterative UX tweaks; if porting to another project, prioritize extracting:
-  - shared domain rules,
-  - API contracts,
-  - reusable components (`player card`, `ranking card`, `match summary card`),
-  - mobile layout patterns.
-
-## 10) Suggested Hand-off Checklist for Another Project
-1. Recreate Prisma schema + enums + constraints first.
-2. Port `match-service` rules (especially finished-match and archived filters).
-3. Port API routes with same contracts.
-4. Port shared UI components and mobile breakpoints.
-5. Validate with real seeded data (today match + scored match + archived match).
-6. Re-run full QA for date/timezone behavior in `America/Sao_Paulo`.
+## Resumo curtissimo
+- O sistema e player-centric.
+- Duplicidade automatica considera email, nao nome.
+- Cadastro nao depende mais de aprovacao manual.
+- Home tem 3 cenarios: visitante, jogador logado e admin logado.
+- Producao roda na VPS e o banco de producao pode nao ser o mesmo do `.env` local.
